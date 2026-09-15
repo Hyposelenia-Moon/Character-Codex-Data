@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>赋光之人 队伍攻略</title>
+<style>
+    /* 引入汉仪文黑-85W 字体 */
+    @font-face {
+        font-family: 'HYWenHei-85W';
+        src: url('./汉仪文黑-85W.ttf') format('truetype');
+        /* 如果使用 woff2 格式，请改为：src: url('./汉仪文黑-85W.woff2') format('woff2'); */
+        font-weight: normal;
+        font-style: normal;
+    }
+
+    body {
+        font-family: 'HYWenHei-85W', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+        /* 保留后备字体，防止字体加载失败时页面无法正常显示 */
+        background-color: #f4f6f9;
+        color: #333;
+        margin: 0;
+        padding: 20px;
+        width: 860px;
+        box-sizing: border-box;
+    }
+    .header {
+        text-align: center;
+        margin-bottom: 30px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #4a5568;
+    }
+    .header h1 {
+        color: #2d3748;
+        margin: 0;
+        font-size: 28px;
+    }
+    .guide-card {
+        background: #fff;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        margin-bottom: 25px;
+        padding: 20px;
+        page-break-inside: avoid;
+    }
+    .char-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+    }
+    .char-name {
+        font-size: 22px;
+        font-weight: bold;
+        color: #1a202c;
+        display: flex;
+        align-items: center;
+    }
+    .char-tags {
+        display: flex;
+        gap: 10px;
+    }
+    .tag {
+        background: #edf2f7;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 13px;
+        color: #4a5568;
+    }
+    .tag.level { background: #e6fffa; color: #319795; }
+    .tag.role { background: #ebf8ff; color: #3182ce; }
+    
+    .section {
+        margin-bottom: 12px;
+    }
+    .section-title {
+        font-weight: bold;
+        color: #2b6cb0;
+        font-size: 15px;
+        margin-bottom: 5px;
+        background: #f0f5ff;
+        padding: 3px 8px;
+        border-radius: 4px;
+        display: inline-block;
+    }
+    .content-list {
+        font-size: 14px;
+        line-height: 1.6;
+        margin: 0;
+        padding-left: 20px;
+    }
+    .content-list li {
+        margin-bottom: 4px;
+    }
+    .text-block {
+        font-size: 14px;
+        line-height: 1.6;
+        color: #4a5568;
+    }
+    
+    /* 两列布局用于紧凑展示 */
+    .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+    }
+    .highlight { color: #e53e3e; font-weight: bold; }
+    .must { color: #d69e2e; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>赋光之人 · 队伍攻略</h1>
+</div>
+
+<!-- ================= 丝柯克 ================= -->
+<div class="guide-card" data-name="丝柯克">
+    <div class="char-header">
+        <div class="char-name">丝柯克</div>
+        <div class="char-tags">
+            <span class="tag level">建议等级：90级</span>
+            <span class="tag role">定位：站场主C</span>
+        </div>
+    </div>
+    <div class="text-block" style="margin-bottom:10px; color:#dd6b20;">
+        100级提升：7.6%（2命） | 8.4%（满命）
+    </div>
+    <div class="grid-2">
+        <div class="section">
+            <div class="section-title">1. 武器推荐</div>
+            <div class="text-block">
+                第一档：苍耀 &gt; 波乱月白经津 &gt; 雾切之回光<br>
+                第二档：磐岩结绿 &gt; 厄水之祸 &gt; 有乐御廉切<br>
+                第三档：赦罪 &gt; 裁叶萃光 &gt; 海渊终曲 &gt; 黑剑
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">2. 圣遗物推荐</div>
+            <div class="text-block">
+                首选：深廊终曲<br>
+                过渡：逐影猎人<br>
+                主词条：时之沙(攻击力) / 空之杯(冰元素伤害加成 &gt; 攻击力) / 理之冠(暴击伤害/暴击率)<br>
+                副词条：双爆 &gt; 大攻击
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">3. 天赋加点</div>
+            <div class="text-block">
+                优先级：E &gt; Q &gt; A<br>
+                皇冠：EQ（<span class="must">必须</span>）
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">4. 毕业面板参考</div>
+            <div class="text-block">
+                暴击率：70%+<br>暴击伤害：220%+<br>攻击力：2200+
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">5. 命座推荐</div>
+            <div class="text-block">
+                二命——核心输出质变<br>六命——大幅增加输出上限
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">6. 配队推荐</div>
+            <div class="text-block">
+                首选：丝柯克 + 爱可菲 + 芙宁娜 + 莫娜<br>
+                平民：丝柯克 + 夏洛蒂 + 坎迪丝 + 塔利雅
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= 芙宁娜 ================= -->
+<div class="guide-card" data-name="芙宁娜">
+    <div class="char-header">
+        <div class="char-name">芙宁娜</div>
+        <div class="char-tags">
+            <span class="tag level">建议等级：90级</span>
+            <span class="tag role">定位：元素增伤辅助</span>
+        </div>
+    </div>
+    <div class="grid-2">
+        <div class="section">
+            <div class="section-title">1. 武器推荐</div>
+            <div class="text-block">
+                辅助向：西风剑（精5） &gt; 圣显之钥<br>
+                输出向：静水流涌之辉 ≥ 有乐御廉切 &gt; 圣显之钥
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">2. 圣遗物推荐</div>
+            <div class="text-block">
+                辅助向：千岩牢固<br>
+                主词条：时之沙充能 / 空之杯生命 / 理之冠暴击率<br>
+                副词条：充能 &gt; 暴击 &gt; 生命值<br>
+                输出向：黄金剧团/逐影猎人<br>
+                主词条：时之沙生命 / 空之杯水伤(二命)/生命 / 理之冠暴击伤害/暴击率<br>
+                副词条：双爆 &gt; 大生命 &gt; 充能
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">3. 天赋加点</div>
+            <div class="text-block">
+                优先级：Q &gt; E &gt; A<br>
+                皇冠：E（建议） Q（<span class="must">必须</span>）
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">4. 毕业面板参考</div>
+            <div class="text-block">
+                辅助向：暴击率70%+ / 充能240%+<br>
+                输出向：暴击率70% / 暴伤220%+ / 生命值40000+
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">5. 命座推荐</div>
+            <div class="text-block">
+                二命——加快增伤叠层速度<br>六命——解放队伍奶位，解锁战场主C玩法
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">6. 配队推荐</div>
+            <div class="text-block">
+                首选：丝柯克 + 爱可菲 + 芙宁娜 + 莫娜<br>其他：自由选择
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= 爱可菲 ================= -->
+<div class="guide-card" data-name="爱可菲">
+    <div class="char-header">
+        <div class="char-name">爱可菲</div>
+        <div class="char-tags">
+            <span class="tag level">建议等级：81-90级</span>
+            <span class="tag role">定位：冰系专辅</span>
+        </div>
+    </div>
+    <div class="grid-2">
+        <div class="section">
+            <div class="section-title">1. 武器推荐</div>
+            <div class="text-block">
+                辅助向：香韵奏者 ≥ 西风长枪（精5）<br>
+                输出向：香韵奏者 ≥ 息灾 ≥ 其他输出长枪
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">2. 圣遗物推荐</div>
+            <div class="text-block">
+                危战首选：炽城勇者绘卷/千岩牢固<br>
+                主词条：充能/攻击/暴击率<br>
+                副词条：充能 &gt; 大攻击<br>
+                日常使用：黄金剧团<br>
+                主词条：攻击/冰伤/暴击率或爆伤<br>
+                副词条：双爆 &gt; 大攻击 &gt; 充能
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">3. 天赋加点</div>
+            <div class="text-block">
+                优先级：E &gt; Q &gt; A<br>
+                皇冠：EQ（可选）
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">4. 毕业面板参考</div>
+            <div class="text-block">
+                辅助向：暴击率70%+ / 充能240%+<br>
+                输出向：暴击率70%+ / 暴伤180%+ / 攻击2000+ / 充能180%+
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">5. 命座推荐</div>
+            <div class="text-block">
+                一命——提升冰元素爆伤<br>二命——提升前台角色爆发伤害
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">6. 配队推荐</div>
+            <div class="text-block">
+                首选：丝柯克 + 爱可菲 + 芙宁娜 + 莫娜<br>
+                其他：神里绫华 + 爱可菲 + 芙宁娜 + 砂糖
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= 莫娜 ================= -->
+<div class="guide-card" data-name="莫娜">
+    <div class="char-header">
+        <div class="char-name">莫娜</div>
+        <div class="char-tags">
+            <span class="tag level">建议等级：81级</span>
+            <span class="tag role">定位：元素增伤辅助</span>
+        </div>
+    </div>
+    <div class="grid-2">
+        <div class="section">
+            <div class="section-title">1. 武器推荐</div>
+            <div class="text-block">首选：讨龙英杰谭（精5）<br>其他：西风秘典（精5） &gt; 其他辅助武器</div>
+        </div>
+        <div class="section">
+            <div class="section-title">2. 圣遗物推荐</div>
+            <div class="text-block">
+                套装：昔日宗室之仪<br>
+                主词条：充能效率 / 任意 / 任意（若携带西风则选择暴击率）<br>
+                副词条：充能
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">3. 天赋加点</div>
+            <div class="text-block">优先级：Q &gt; E &gt; A<br>皇冠：Q（建议）</div>
+        </div>
+        <div class="section">
+            <div class="section-title">4. 毕业面板参考</div>
+            <div class="text-block">充能效率：240%+</div>
+        </div>
+        <div class="section">
+            <div class="section-title">5. 命座推荐</div>
+            <div class="text-block">四命——提升前台角色暴击率</div>
+        </div>
+        <div class="section">
+            <div class="section-title">6. 配队推荐</div>
+            <div class="text-block">
+                首选：丝柯克 + 爱可菲 + 芙宁娜 + 莫娜<br>
+                其他：任意主C + 莫娜 + 班尼特 + 砂糖
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= 玛薇卡 ================= -->
+<div class="guide-card" data-name="玛薇卡">
+    <div class="char-header">
+        <div class="char-name">玛薇卡</div>
+        <div class="char-tags">
+            <span class="tag level">建议等级：90级</span>
+            <span class="tag role">定位：站场主C</span>
+        </div>
+    </div>
+    <div class="text-block" style="margin-bottom:10px; color:#dd6b20;">
+        100级提升：7.8%（零命） | 7.2%（二命及以上）
+    </div>
+    <div class="grid-2">
+        <div class="section">
+            <div class="section-title">1. 武器推荐</div>
+            <div class="text-block">
+                第一档：焚曜千阳 &gt; 苇海信标（叠满） &gt; 鳞骨剑（精5） &gt; 裁断<br>
+                第二档：狼的末路 &gt; 赤角石溃杵 &gt; 无功之剑<br>
+                第三档：山王长牙 &gt; 饰铁之花 &gt; 玛海拉的水色
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">2. 圣遗物推荐</div>
+            <div class="text-block">
+                输出向：黑曜秘典<br>辅助向：炽城勇者绘卷<br>
+                主词条：攻击力 &gt; 元素精通 / 火元素伤害加成 / 暴击伤害或暴击率<br>
+                副词条：双爆 &gt; 大攻击 &gt; 精通
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">3. 天赋加点</div>
+            <div class="text-block">优先级：Q &gt; E &gt; A<br>皇冠：EQ（<span class="must">必须</span>）</div>
+        </div>
+        <div class="section">
+            <div class="section-title">4. 毕业面板参考</div>
+            <div class="text-block">
+                暴击率：60%<br>暴击伤害：230%+<br>攻击力：2200+<br>元素精通：80+
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">5. 命座推荐</div>
+            <div class="text-block">二命——大幅增加输出上限<br>六命——增加输出上限</div>
+        </div>
+        <div class="section">
+            <div class="section-title">6. 配队推荐</div>
+            <div class="text-block">
+                首选：玛薇卡 + 希诺宁 + 班尼特 + 茜特拉莉<br>
+                超载：玛薇卡 + 夏沃蕾 + 伊安珊 + 欧洛伦
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= 茜特拉莉 ================= -->
+<div class="guide-card" data-name="茜特拉莉">
+    <div class="char-header">
+        <div class="char-name">茜特拉莉</div>
+        <div class="char-tags">
+            <span class="tag level">建议等级：81-90级</span>
+            <span class="tag role">定位：盾辅/增伤辅助</span>
+        </div>
+    </div>
+    <div class="grid-2">
+        <div class="section">
+            <div class="section-title">1. 武器推荐</div>
+            <div class="text-block">
+                第一档：祭星者之望 &gt; 讨龙英杰谭（精5）<br>
+                第二档：千夜浮梦 &gt; 祭礼残章 &gt; 流浪的晚星（精5）
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">2. 圣遗物推荐</div>
+            <div class="text-block">
+                首选：炽城勇者绘卷 / 次选：教官<br>
+                主词条：充能或精通 / 精通 / 精通<br>
+                副词条：充能 &gt; 精通
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">3. 天赋加点</div>
+            <div class="text-block">优先级：E &gt; Q &gt; A<br>皇冠：E（建议） Q（可选）</div>
+        </div>
+        <div class="section">
+            <div class="section-title">4. 毕业面板参考</div>
+            <div class="text-block">元素精通：800+（非讨龙）<br>充能效率：220%+</div>
+        </div>
+        <div class="section">
+            <div class="section-title">5. 命座推荐</div>
+            <div class="text-block">二命——提升元素精通，减水火抗<br>六命——解放大招，增伤</div>
+        </div>
+        <div class="section">
+            <div class="section-title">6. 配队推荐</div>
+            <div class="text-block">
+                首选：玛薇卡 + 希诺宁 + 班尼特 + 茜特拉莉<br>
+                其他：胡桃 + 芙宁娜 + 茜特拉莉 + 夜兰
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= 希诺宁 ================= -->
+<div class="guide-card" data-name="希诺宁">
+    <div class="char-header">
+        <div class="char-name">希诺宁</div>
+        <div class="char-tags">
+            <span class="tag level">建议等级：81-90级</span>
+            <span class="tag role">定位：减抗/治疗辅助</span>
+        </div>
+    </div>
+    <div class="grid-2">
+        <div class="section">
+            <div class="section-title">1. 武器推荐</div>
+            <div class="text-block">
+                辅助：岩峰巡歌，圣显之钥，苍古自由之誓<br>
+                充能：西风剑（精5）
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">2. 圣遗物推荐</div>
+            <div class="text-block">
+                首选：教官/炽城勇者绘卷<br>
+                二命茜特拉莉：悠古的磐岩<br>
+                主词条：防御或充能 / 防御 / 治疗加成或暴击率（带西风时）<br>
+                副词条：暴击（带西风时）&gt;大防御&gt;充能
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">3. 天赋加点</div>
+            <div class="text-block">优先级：E&gt;Q&gt;A<br>皇冠：E（<span class="must">必须</span>） Q（可选）</div>
+        </div>
+        <div class="section">
+            <div class="section-title">4. 毕业面板参考</div>
+            <div class="text-block">暴击率：60%+<br>防御力：2500+</div>
+        </div>
+        <div class="section">
+            <div class="section-title">5. 命座推荐</div>
+            <div class="text-block">二命——提升辅助能力，可进多岩队伍</div>
+        </div>
+        <div class="section">
+            <div class="section-title">6. 配队推荐</div>
+            <div class="text-block">
+                首选：玛薇卡 + 希诺宁 + 班尼特 + 茜特拉莉<br>
+                二命进月结晶：兹白 + 哥伦比娅 + 莉奈娅 + 希诺宁
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= 班尼特 ================= -->
+<div class="guide-card" data-name="班尼特">
+    <div class="char-header">
+        <div class="char-name">班尼特</div>
+        <div class="char-tags">
+            <span class="tag level">建议等级：81-90级</span>
+            <span class="tag role">定位：加攻/治疗辅助</span>
+        </div>
+    </div>
+    <div class="grid-2">
+        <div class="section">
+            <div class="section-title">1. 武器推荐</div>
+            <div class="text-block">
+                加攻：任意674白值武器<br>
+                均衡：天空之刃 &gt; 其他高白值充能武器<br>
+                特殊：苍古自由之誓，圣显之钥
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">2. 圣遗物推荐</div>
+            <div class="text-block">
+                首选：昔日宗室之仪<br>
+                主词条：充能 / 生命值 / 治疗加成或生命值<br>
+                副词条：充能 &gt; 大生命
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">3. 天赋加点</div>
+            <div class="text-block">优先级：Q &gt; E &gt; A<br>皇冠：Q（<span class="must">必须</span>）</div>
+        </div>
+        <div class="section">
+            <div class="section-title">4. 毕业面板参考</div>
+            <div class="text-block">充能效率：240%+<br>生命值：25000+</div>
+        </div>
+        <div class="section">
+            <div class="section-title">5. 命座推荐</div>
+            <div class="text-block">
+                一命——解除加攻限制<br>五命——Q等级+3<br>六命——提升火伤
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">6. 配队推荐</div>
+            <div class="text-block">
+                首选：玛薇卡 + 希诺宁 + 班尼特 + 茜特拉莉<br>
+                其他：任意攻击主C + 班尼特 + 行秋 + 香菱
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= 哥伦比娅 ================= -->
+<div class="guide-card" data-name="哥伦比娅">
+    <div class="char-header">
+        <div class="char-name">哥伦比娅</div>
+        <div class="char-tags">
+            <span class="tag level">建议等级：90级</span>
+            <span class="tag role">定位：月反应通辅</span>
+        </div>
+    </div>
+    <div class="grid-2">
+        <div class="section">
+            <div class="section-title">1. 武器推荐</div>
+            <div class="text-block">
+                首选：帷间夜曲 &gt; 遗祀玉珑（精5）<br>
+                其他：西风秘典（精5） &gt; 试作金珀
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">2. 圣遗物推荐</div>
+            <div class="text-block">
+                输出向：晨星与月的晓歌<br>
+                副词条：双爆 &gt; 大生命 &gt; 充能<br>
+                辅助向：纺月的夜歌<br>
+                副词条：充能 &gt; 大生命<br>
+                主词条：充能或生命 / 生命 / 暴伤或暴击或生命（二命）
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">3. 天赋加点</div>
+            <div class="text-block">优先级：Q &gt; E &gt; A<br>皇冠：E（建议） Q（<span class="must">必须</span>）</div>
+        </div>
+        <div class="section">
+            <div class="section-title">4. 毕业面板参考</div>
+            <div class="text-block">
+                输出向：暴击率70% / 暴伤220%+ / 生命值35000+<br>
+                辅助向：充能240%+ / 生命值35000+
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">5. 命座推荐</div>
+            <div class="text-block">二命——提升前台主C数值<br>六命——提升月曜爆伤</div>
+        </div>
+        <div class="section">
+            <div class="section-title">6. 配队推荐</div>
+            <div class="text-block">
+                月感电：哥伦比娅 + 菲林斯 + 伊涅芙 + 希诺宁/砂糖<br>
+                月绽放：哥伦比娅 + 奈芙尔 + 拉乌玛 + 砂糖/纳西妲(二命)/妮露(高金)<br>
+                月结晶：哥伦比娅 + 兹白 + 莉奈娅 + 叶洛亚/希诺宁(二命)
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= 兹白 ================= -->
+<div class="guide-card" data-name="兹白">
+    <div class="char-header">
+        <div class="char-name">兹白</div>
+        <div class="char-tags">
+            <span class="tag level">建议等级：90级</span>
+            <span class="tag role">定位：月结晶站场主C</span>
+        </div>
+    </div>
+    <div class="text-block" style="margin-bottom:10px; color:#dd6b20;">
+        100级提升：5.7%
+    </div>
+    <div class="grid-2">
+        <div class="section">
+            <div class="section-title">1. 武器推荐</div>
+            <div class="text-block">
+                第一档：脑魄含光 &gt; 有乐御<br>
+                第二档：黎明神剑（精五） &gt; 岩峰巡歌<br>
+                第三档：裁叶萃光 &gt; 静水流涌之辉
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">2. 圣遗物推荐</div>
+            <div class="text-block">
+                首选：穹境示现之夜<br>
+                主词条：防御力 / 防御力 / 暴击伤害或暴击率或防御力（特殊）<br>
+                副词条：双爆 &gt; 防御力
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">3. 天赋加点</div>
+            <div class="text-block">优先级：E&gt;Q&gt;A<br>皇冠：E（<span class="must">必须</span>） Q（建议）</div>
+        </div>
+        <div class="section">
+            <div class="section-title">4. 毕业面板参考</div>
+            <div class="text-block">
+                防御力：2400+<br>暴击率：60-70%（根据队友拐力）<br>暴击伤害：240%+
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">5. 命座推荐</div>
+            <div class="text-block">
+                一命——改变输出轴<br>二命——提升输出上限<br>六命——大幅增加输出上限
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">6. 配队推荐</div>
+            <div class="text-block">
+                首选：兹白 + 叶洛亚 + 哥伦比娅 + 莉奈娅<br>
+                其他：兹白 + 叶洛亚 + 哥伦比娅 + 五郎/希诺宁（二命）
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= 莉奈娅 ================= -->
+<div class="guide-card" data-name="莉奈娅">
+    <div class="char-header">
+        <div class="char-name">莉奈娅</div>
+        <div class="char-tags">
+            <span class="tag level">建议等级：90级</span>
+            <span class="tag role">定位：月结晶专辅/副C</span>
+        </div>
+    </div>
+    <div class="grid-2">
+        <div class="section">
+            <div class="section-title">1. 武器推荐</div>
+            <div class="text-block">
+                第一档：霜结的誓金枝 &gt; 88爆伤/44暴击武器<br>
+                第二档：霜雪誓约（7.0锻造） &gt; 弹弓
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">2. 圣遗物推荐</div>
+            <div class="text-block">
+                零命：晨星与月的晓歌<br>一命及以上：华馆梦醒形骸记<br>
+                主词条：防御力 / 防御力 / 暴击率或暴击伤害或防御力（华馆）<br>
+                副词条：双爆 &gt; 大防御
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">3. 天赋加点</div>
+            <div class="text-block">优先级：E &gt; Q &gt; A<br>皇冠：E（<span class="must">必须</span>） Q（可选）</div>
+        </div>
+        <div class="section">
+            <div class="section-title">4. 毕业面板参考（输出）</div>
+            <div class="text-block">防御力：2600+<br>暴击率：70%+<br>暴击伤害：180%+</div>
+        </div>
+        <div class="section">
+            <div class="section-title">5. 命座推荐</div>
+            <div class="text-block">二命——提升爆伤，月笼协奏<br>六命——提升羽毛拐力</div>
+        </div>
+        <div class="section">
+            <div class="section-title">6. 配队推荐</div>
+            <div class="text-block">
+                首选：兹白 + 莉奈娅 + 叶洛亚 + 哥伦比娅<br>
+                其他：岩元素主C + 莉奈娅 + 五郎 + 哥伦比娅
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= 叶洛亚 ================= -->
+<div class="guide-card" data-name="叶洛亚">
+    <div class="char-header">
+        <div class="char-name">叶洛亚</div>
+        <div class="char-tags">
+            <span class="tag level">建议等级：81级</span>
+            <span class="tag role">定位：月结晶专辅</span>
+        </div>
+    </div>
+    <div class="grid-2">
+        <div class="section">
+            <div class="section-title">1. 武器推荐</div>
+            <div class="text-block">
+                辅助：匣里灭辰<br>循环：西风长枪（精5）<br>其他：喜多院十文字（精5）
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">2. 圣遗物推荐</div>
+            <div class="text-block">
+                首选：纺月的夜歌（二命）<br>过渡：2精通+2精通<br>
+                主词条：充能或精通 / 精通 / 精通或暴击率（带西风时）<br>
+                副词条：充能效率 &gt; 元素精通 &gt; 暴击率（带西风时）
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">3. 天赋加点</div>
+            <div class="text-block">优先级：Q &gt; E &gt; A<br>皇冠：Q（<span class="must">必须</span>）</div>
+        </div>
+        <div class="section">
+            <div class="section-title">4. 毕业面板参考</div>
+            <div class="text-block">充能效率：200%+<br>元素精通：800+</div>
+        </div>
+        <div class="section">
+            <div class="section-title">5. 命座推荐</div>
+            <div class="text-block">二命——解锁纺月<br>六命——提供双爆加成</div>
+        </div>
+        <div class="section">
+            <div class="section-title">6. 配队推荐</div>
+            <div class="text-block">
+                首选：兹白 + 叶洛亚 + 哥伦比娅 + 莉奈娅<br>
+                其他：兹白 + 叶洛亚 + 哥伦比娅 + 五郎
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= 奈芙尔 ================= -->
+<div class="guide-card" data-name="奈芙尔">
+    <div class="char-header">
+        <div class="char-name">奈芙尔</div>
+        <div class="char-tags">
+            <span class="tag level">建议等级：81-90级</span>
+            <span class="tag role">定位：月绽放主C</span>
+        </div>
+    </div>
+    <div class="text-block" style="margin-bottom:10px; color:#dd6b20;">
+        100级提升：0%
+    </div>
+    <div class="grid-2">
+        <div class="section">
+            <div class="section-title">1. 武器推荐</div>
+            <div class="text-block">
+                第一档：真语秘匣 &gt; 纺夜天镜 &gt; 霜辰（精5）<br>
+                第二档：乌髓子灯（精5） &gt; 千夜浮梦 = 寝正月初晴 = 祭星者之望<br>
+                第三档：88爆伤武器 &gt; 44爆伤武器
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">2. 圣遗物推荐</div>
+            <div class="text-block">
+                首选：穹境示现之夜<br>
+                主词条：元素精通 / 元素精通 / 暴击伤害或暴击率或元素精通（特殊）<br>
+                副词条：双爆 &gt; 精通
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">3. 天赋加点</div>
+            <div class="text-block">优先级：E &gt; Q &gt; A<br>皇冠：E（<span class="must">必须</span>） Q（可选）</div>
+        </div>
+        <div class="section">
+            <div class="section-title">4. 毕业面板参考</div>
+            <div class="text-block">
+                元素精通：800+<br>暴击率：60-70%（根据队友拐力）<br>暴击伤害：240%+
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">5. 命座推荐</div>
+            <div class="text-block">二命——大幅提升输出能力<br>六命——大幅提升输出上限</div>
+        </div>
+        <div class="section">
+            <div class="section-title">6. 配队推荐</div>
+            <div class="text-block">
+                首选：奈芙尔 + 拉乌玛 + 哥伦比娅 + 砂糖 + 纳西妲(2命)/妮露(高金)<br>
+                其他：奈芙尔 + 拉乌玛 + 爱诺 + 砂糖
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= 拉乌玛 ================= -->
+<div class="guide-card" data-name="拉乌玛">
+    <div class="char-header">
+        <div class="char-name">拉乌玛</div>
+        <div class="char-tags">
+            <span class="tag level">建议等级：81-90级</span>
+            <span class="tag role">定位：月绽放专辅</span>
+        </div>
+    </div>
+    <div class="grid-2">
+        <div class="section">
+            <div class="section-title">1. 武器推荐</div>
+            <div class="text-block">
+                第一档：纺夜天镜 &gt; 千夜浮梦 = 寝正月初晴 = 祭星者之望<br>
+                第二档：天光的纺琴 &gt; 乌髓子灯（精5）<br>
+                第三档：祭礼残章 &gt; 流浪的晚星
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">2. 圣遗物推荐</div>
+            <div class="text-block">
+                首选：深林的记忆 / 纺月的夜歌<br>次选：2精通 + 2精通<br>
+                主词条：充能或元素精通 / 元素精通 / 元素精通<br>
+                副词条：充能 &gt; 精通
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">3. 天赋加点</div>
+            <div class="text-block">优先级：Q &gt; E &gt; A<br>皇冠：EQ（<span class="must">必须</span>）</div>
+        </div>
+        <div class="section">
+            <div class="section-title">4. 毕业面板参考</div>
+            <div class="text-block">充能效率：220%+<br>元素精通：800+</div>
+        </div>
+        <div class="section">
+            <div class="section-title">5. 命座推荐</div>
+            <div class="text-block">二命——提升辅助能力<br>六命——提升辅助能力，解锁站场输出能力</div>
+        </div>
+        <div class="section">
+            <div class="section-title">6. 配队推荐</div>
+            <div class="text-block">
+                月绽放队：奈芙尔 + 拉乌玛 + 哥伦比娅 + 砂糖 + 纳西妲(二命)/妮露(高金)<br>
+                传统绽放队：拉乌玛 + 行秋/夜兰 + 妮露/久岐忍 + 纳西妲
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= 纳西妲 ================= -->
+<div class="guide-card" data-name="纳西妲">
+    <div class="char-header">
+        <div class="char-name">纳西妲</div>
+        <div class="char-tags">
+            <span class="tag level">建议等级：81-90级</span>
+            <span class="tag role">定位：草系核心辅助</span>
+        </div>
+    </div>
+    <div class="grid-2">
+        <div class="section">
+            <div class="section-title">1. 武器推荐</div>
+            <div class="text-block">
+                第一档：千夜浮梦 &gt; 纺夜天镜 &gt; 乌髓子灯（精5）<br>
+                第二档：流浪的晚星 &gt; 祭礼残章
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">2. 圣遗物推荐</div>
+            <div class="text-block">
+                套装：深林的记忆<br>
+                主词条：元素精通 / 元素精通 / 元素精通<br>
+                副词条：精通 ≥ 充能
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">3. 天赋加点</div>
+            <div class="text-block">优先级：Q &gt; E &gt; A<br>皇冠：EQ（可选）</div>
+        </div>
+        <div class="section">
+            <div class="section-title">4. 毕业面板参考</div>
+            <div class="text-block">元素精通：800+<br>元素充能效率：180+</div>
+        </div>
+        <div class="section">
+            <div class="section-title">5. 命座推荐</div>
+            <div class="text-block">二命——草种子可暴击<br>六命——解锁站场主C玩法</div>
+        </div>
+        <div class="section">
+            <div class="section-title">6. 配队推荐</div>
+            <div class="text-block">
+                月绽放：奈芙尔 + 拉乌玛 + 哥伦比娅 + 纳西妲<br>
+                传统种门：纳西妲 + 行秋 + 久岐忍 + 珊瑚宫心海
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= 菲林斯 ================= -->
+<div class="guide-card" data-name="菲林斯">
+    <div class="char-header">
+        <div class="char-name">菲林斯</div>
+        <div class="char-tags">
+            <span class="tag level">建议等级：90级</span>
+            <span class="tag role">定位：月感电站场主C</span>
+        </div>
+    </div>
+    <div class="text-block" style="margin-bottom:10px; color:#dd6b20;">
+        100级提升：约8%
+    </div>
+    <div class="grid-2">
+        <div class="section">
+            <div class="section-title">1. 武器推荐</div>
+            <div class="text-block">
+                第一档：血染荒城 &gt; 赤沙之杖 &gt; 支离轮光<br>
+                第二档：护摩之杖 &gt; 和璞鸢 &gt; 柔灯挽歌<br>
+                第三档：决斗之枪（精5） &gt; 峡湾长歌（精5）
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">2. 圣遗物推荐</div>
+            <div class="text-block">
+                首选：穹境示现之夜<br>
+                主词条：攻击力 / 攻击力 / 暴击伤害或暴击率<br>
+                副词条：双爆 &gt; 攻击力 &gt; 充能
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">3. 天赋加点</div>
+            <div class="text-block">优先级：Q &gt; E &gt; A<br>皇冠：E（建议） Q（<span class="must">必须</span>）</div>
+        </div>
+        <div class="section">
+            <div class="section-title">4. 毕业面板参考</div>
+            <div class="text-block">
+                暴击率：70%<br>暴击伤害：200%+<br>攻击力：2200+<br>充能效率：130%+
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">5. 命座推荐</div>
+            <div class="text-block">
+                一命——改变输出轴<br>二命——核心输出质变<br>六命——大幅增加输出上限
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">6. 配队推荐</div>
+            <div class="text-block">
+                首选：菲林斯 + 伊涅芙 + 哥伦比娅 + 希诺宁 + 砂糖<br>
+                平民：菲林斯 + 爱诺 + 行秋 + 砂糖
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= 伊涅芙 ================= -->
+<div class="guide-card" data-name="伊涅芙">
+    <div class="char-header">
+        <div class="char-name">伊涅芙</div>
+        <div class="char-tags">
+            <span class="tag level">建议等级：90级</span>
+            <span class="tag role">定位：月感电台副C/辅助</span>
+        </div>
+    </div>
+    <div class="text-block" style="margin-bottom:10px; color:#dd6b20;">
+        100级提升：约5%
+    </div>
+    <div class="grid-2">
+        <div class="section">
+            <div class="section-title">1. 武器推荐</div>
+            <div class="text-block">
+                第一档：支离轮光 &gt; 赤沙之杖 &gt; 香韵奏者<br>
+                第二档：峡湾长歌（精5） &gt; 护摩之杖<br>
+                第三档：风信之锋 &gt; 匣里灭辰
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">2. 圣遗物推荐</div>
+            <div class="text-block">
+                首选：晨星与月的晓歌<br>次选：饰金之梦<br>
+                主词条：攻击力 / 攻击力 / 暴击率或暴击伤害<br>
+                副词条：双爆 &gt; 攻击力 &gt; 精通
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">3. 天赋加点</div>
+            <div class="text-block">优先级：E &gt; Q &gt; A<br>皇冠：EQ（建议）</div>
+        </div>
+        <div class="section">
+            <div class="section-title">4. 毕业面板参考</div>
+            <div class="text-block">
+                攻击力：2200+<br>暴击率：70%+<br>暴击伤害：180%+
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">5. 命座推荐</div>
+            <div class="text-block">二命——提升辅助能力<br>六命——大幅增加自身输出</div>
+        </div>
+        <div class="section">
+            <div class="section-title">6. 配队推荐</div>
+            <div class="text-block">
+                首选：伊涅芙 + 菲林斯 + 哥伦比娅 + 希诺宁 + 砂糖<br>
+                其他：伊涅芙 + 菲谢尔 + 行秋 + 砂糖
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= 砂糖 ================= -->
+<div class="guide-card" data-name="砂糖">
+    <div class="char-header">
+        <div class="char-name">砂糖</div>
+        <div class="char-tags">
+            <span class="tag level">建议等级：60级突破</span>
+            <span class="tag role">定位：增伤辅/精通拐</span>
+        </div>
+    </div>
+    <div class="grid-2">
+        <div class="section">
+            <div class="section-title">1. 武器推荐</div>
+            <div class="text-block">
+                攻击主C队：讨龙英杰谭（精5） &gt; 其他辅助武器<br>
+                月耀队：祭礼残章（精5） &gt; 265精通武器
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">2. 圣遗物推荐</div>
+            <div class="text-block">
+                首选：翠绿之影<br>月绽放：教官<br>
+                主词条：元素精通或充能 / 元素精通 / 元素精通<br>
+                副词条：元素精通 &gt; 充能效率
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">3. 天赋加点</div>
+            <div class="text-block">优先级：E &gt; Q &gt; A<br>皇冠：无需</div>
+        </div>
+        <div class="section">
+            <div class="section-title">4. 毕业面板参考</div>
+            <div class="text-block">元素精通：800+<br>充能效率：180%+</div>
+        </div>
+        <div class="section">
+            <div class="section-title">5. 命座推荐</div>
+            <div class="text-block">一命——增加E次数<br>六命——提供元素增伤</div>
+        </div>
+        <div class="section">
+            <div class="section-title">6. 配队推荐</div>
+            <div class="text-block">
+                月感电：哥伦比娅 + 菲林斯 + 伊涅芙 + 希诺宁 + 砂糖<br>
+                月绽放：哥伦比娅 + 奈芙尔 + 拉乌玛 + 砂糖<br>
+                火神队：玛薇卡 + 茜特拉莉 + 砂糖 + 班尼特
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
