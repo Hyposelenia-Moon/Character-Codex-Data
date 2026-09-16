@@ -44,13 +44,22 @@ function tagOf (tag) {
 }
 
 /**
+ * 读取 JSON（容忍编辑器写入的 UTF-8 BOM：Node 的 JSON.parse 不接受 BOM）
+ * @param {string} file
+ * @returns {object}
+ */
+function readJson (file) {
+  return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''))
+}
+
+/**
  * 读取某游戏的卡片顺序表（data/<gameId>/_order.json，缺省按角色名排序）
  * @param {string} dir
  * @returns {string[]}
  */
 function readOrder (dir) {
   try {
-    const data = JSON.parse(fs.readFileSync(path.join(dir, '_order.json'), 'utf8'))
+    const data = readJson(path.join(dir, '_order.json'))
     const list = Array.isArray(data) ? data : (Array.isArray(data?.order) ? data.order : [])
     return list.map(name => String(name))
   } catch {
@@ -78,7 +87,7 @@ export function listCharacters () {
     const chars = fs.readdirSync(dir)
       .filter(f => f.endsWith('.json') && !f.startsWith('_'))
       .map(file => {
-        const data = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'))
+        const data = readJson(path.join(dir, file))
         return { game, name: data.name || path.basename(file, '.json'), data, dir }
       })
     const rank = (char) => {
