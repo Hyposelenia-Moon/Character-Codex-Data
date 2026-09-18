@@ -68,11 +68,27 @@ function readOrder (dir) {
 }
 
 /**
- * 列出 data/<gameId>/*.json（跳过 `_` 前缀的元数据文件）
+ * 是否为空档：只有六个栏位标题、没有任何内容（新增角色待补充时的占位）
+ * @param {object} data
+ * @returns {boolean}
+ */
+function isEmptyCharacter (data) {
+  const hasTags = Array.isArray(data.tags) && data.tags.length > 0
+  const hasHighlight = Boolean(data.highlight)
+  const hasLines = (data.sections || []).some(s => Array.isArray(s.lines) && s.lines.length > 0)
+  return !hasTags && !hasHighlight && !hasLines
+}
+
+/** 上次列出时跳过的空档角色（供命令行提示） */
+export const skippedEmpty = []
+
+/**
+ * 列出 data/<gameId>/*.json（跳过 `_` 前缀的元数据文件与没有内容的空档角色）
  * @returns {Array<{game: string, name: string, data: object, dir: string}>}
  */
 export function listCharacters () {
   const out = []
+  skippedEmpty.length = 0
   let games = []
   try {
     games = fs.readdirSync(dataDir, { withFileTypes: true })
@@ -84,12 +100,18 @@ export function listCharacters () {
   for (const game of games.sort((a, b) => a.localeCompare(b))) {
     const dir = path.join(dataDir, game)
     const order = readOrder(dir)
-    const chars = fs.readdirSync(dir)
-      .filter(f => f.endsWith('.json') && !f.startsWith('_'))
-      .map(file => {
-        const data = readJson(path.join(dir, file))
-        return { game, name: data.name || path.basename(file, '.json'), data, dir }
-      })
+    const chars = []
+    for (const file of fs.readdirSync(dir)) {
+      if (!file.endsWith('.json') || file.startsWith('_')) continue
+      const data = readJson(path.join(dir, file))
+      const name = data.name || path.basename(file, '.json')
+      // 空档角色（新增待补）不进网页版，避免出现整页空卡片
+      if (isEmptyCharacter(data)) {
+        skippedEmpty.push(name)
+        continue
+      }
+      chars.push({ game, name, data, dir })
+    }
     const rank = (char) => {
       const i = order.indexOf(char.name)
       return i === -1 ? Number.MAX_SAFE_INTEGER : i
@@ -199,5 +221,7 @@ export function buildHtml () {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const html = buildHtml()
   fs.writeFileSync(outputFile, html, 'utf8')
-  console.log(`已生成 ${path.relative(root, outputFile)}（${listCharacters().length} 个角色）`)
+  const rendered = listCharacters().length
+  const skipped = skippedEmpty.length
+  console.log(`已生成 ${path.relative(root, outputFile)}（${rendered} 个角色${skipped ? `，跳过 ${skipped} 个空档` : ''}）`)
 }
