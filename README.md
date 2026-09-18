@@ -1,17 +1,19 @@
 # Character-Codex-Data
 
 角色攻略数据仓库。数据为纯 JSON，供 **Atlas-Plugin**（TRSS-Yunzai 图鉴插件）的 `#角色攻略` / `#角色指南` 页面读取；
-仓库根目录的 `guide.html` 是由 JSON 生成的网页版，方便直接浏览与分享。
+仓库根目录的 `guide.html` 是由 JSON 生成的网页版，`guide.md` 是由同一份数据生成的文档版文本。
 
 ## 目录结构
 
 ```
 data/<gameId>/<角色名>.json      角色攻略数据（gameId：gi 原神 / hsr 星铁 / zzz 绝区零）
-data/<gameId>/_order.json        网页版的卡片顺序（可选，`_` 开头的文件不会当作角色数据）
+data/<gameId>/_order.json        网页版/文档版的角色顺序（可选，`_` 开头的文件不会当作角色数据）
 data/<gameId>/images/…           段落配图（可选）
 templates/guide.html             网页版外壳（样式 + 页头）
 scripts/build-html.mjs           JSON → guide.html
+scripts/build-doc.mjs            JSON → guide.md（文档版文本，可再打包成 .docx）
 guide.html                       生成的网页版，请勿手改
+guide.md                         生成的文档版文本，请勿手改
 汉仪文黑-85W.ttf                  guide.html 使用的字体
 ```
 
@@ -63,10 +65,11 @@ guide.html                       生成的网页版，请勿手改
 
 1. 在 `data/gi/` 下新建 `<角色名>.json`（可复制现有文件改）
 2. 想让网页版按指定位置排列，就把角色名写进 `data/gi/_order.json`；没写的排在已列角色之后
-3. 重新生成网页版：
+3. 重新生成网页版与文档版：
 
 ```bash
-node scripts/build-html.mjs
+node scripts/build-html.mjs      # 网页版 guide.html
+node scripts/build-doc.mjs       # 文档版 guide.md（Word 用可再打包 docx，命令见脚本头部）
 ```
 
 ### 只有栏位、还没填内容（空档角色）
