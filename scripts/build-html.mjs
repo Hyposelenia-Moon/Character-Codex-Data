@@ -17,6 +17,17 @@ const dataDir = path.join(root, 'data')
 const templateFile = path.join(root, 'templates/guide.html')
 const outputFile = path.join(root, 'guide.html')
 
+/** 值是否为空（空串、只有占位符 ___、或只剩标点）：网页版不渲染这类待补栏位 */
+function isBlank (text) {
+  const s = String(text ?? '').trim()
+  if (!s) return true
+  if (s.includes('___')) return true
+  // 去掉「标签：」「标签——」前缀后还有没有实际内容（「第二档：」这类待补栏位算空）
+  const rest = s.replace(/^[^：:—]{1,8}[：:—]+/, '').trim()
+  if (!rest) return true
+  return /^[_\-—·、/：:（）()]+$/.test(rest)
+}
+
 /** 行内文本转义（数据是纯文本，标签由本脚本生成） */
 function escapeHtml (text) {
   return String(text ?? '')
@@ -75,7 +86,7 @@ function readOrder (dir) {
 function isEmptyCharacter (data) {
   const hasTags = Array.isArray(data.tags) && data.tags.length > 0
   const hasHighlight = Boolean(data.highlight)
-  const hasLines = (data.sections || []).some(s => Array.isArray(s.lines) && s.lines.length > 0)
+  const hasLines = (data.sections || []).some(s => Array.isArray(s.lines) && s.lines.some(line => !isBlank(line)))
   return !hasTags && !hasHighlight && !hasLines
 }
 
@@ -145,9 +156,12 @@ function renderBody (section, indent, dir) {
   const lines = []
 
   if (Array.isArray(section.lines)) {
-    lines.push(`${pad}<div class="text-block">`)
-    lines.push(section.lines.map(line => `${pad}    ${inline(line)}`).join('<br>\n'))
-    lines.push(`${pad}</div>`)
+    const body = section.lines.filter(line => !isBlank(line))
+    if (body.length) {
+      lines.push(`${pad}<div class="text-block">`)
+      lines.push(body.map(line => `${pad}    ${inline(line)}`).join('<br>\n'))
+      lines.push(`${pad}</div>`)
+    }
   } else if (Array.isArray(section.items)) {
     lines.push(`${pad}<ul class="content-list">`)
     for (const item of section.items) {
@@ -179,7 +193,7 @@ export function renderCard (character) {
   out.push(`<div class="guide-card" data-name="${escapeHtml(name)}">`)
   out.push('    <div class="char-header">')
   out.push(`        <div class="char-name">${escapeHtml(name)}</div>`)
-  const tags = (data.tags || []).map(tagOf).filter(t => t.text)
+  const tags = (data.tags || []).map(tagOf).filter(t => t.text && !isBlank(t.text) && !/：\s*$/.test(t.text))
   if (tags.length) {
     out.push('        <div class="char-tags">')
     for (const tag of tags) {
@@ -188,7 +202,7 @@ export function renderCard (character) {
     out.push('        </div>')
   }
   out.push('    </div>')
-  if (data.highlight) {
+  if (data.highlight && !isBlank(data.highlight)) {
     out.push('    <div class="text-block" style="margin-bottom:10px; color:#dd6b20;">')
     out.push(`        ${inline(data.highlight)}`)
     out.push('    </div>')
