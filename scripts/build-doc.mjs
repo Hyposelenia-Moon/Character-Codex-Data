@@ -4,8 +4,10 @@
  * - 默认写出仓库根目录的 guide.md（纯文本，可直接贴进 Word / 飞书）
  * - 加 --docx-dir <目录> 时额外写出 OOXML 片段，供打包成 .docx：
  *     node scripts/build-doc.mjs --docx-dir .tmp-docx
- *     powershell -Command "Add-Type -AssemblyName System.IO.Compression.FileSystem; `
- *       [IO.Compression.ZipFile]::CreateFromDirectory('.tmp-docx','攻略.docx')"
+ *     powershell -Command "$d='.tmp-docx';$o='攻略.docx';Add-Type -AssemblyName System.IO.Compression.FileSystem;$z=[IO.Compression.ZipFile]::Open($o,'Create');foreach($r in @('[Content_Types].xml','_rels/.rels','word/document.xml')){$e=$z.CreateEntry($r);$w=New-Object IO.StreamWriter($e.Open(),(New-Object Text.UTF8Encoding($false)));$w.Write([IO.File]::ReadAllText((Join-Path $d ($r -replace '/','\')),[Text.Encoding]::UTF8));$w.Close()};$z.Dispose()"
+ *
+ *   注意：不要用 ZipFile::CreateFromDirectory —— PowerShell 5.1（.NET Framework）会把 zip 条目名
+ *   写成反斜杠（word\document.xml），不符合 OPC 规范；上面这段按正斜杠逐个写入条目。
  *
  * 数据来源：data/<gameId>/*.json（顺序按 _order.json，未列的排在后面）
  */
@@ -164,5 +166,5 @@ if (docxDirFlag > -1 && process.argv[docxDirFlag + 1]) {
   fs.writeFileSync(path.join(dir, '[Content_Types].xml'), CONTENT_TYPES, 'utf8')
   fs.writeFileSync(path.join(dir, '_rels', '.rels'), RELS, 'utf8')
   fs.writeFileSync(path.join(dir, 'word', 'document.xml'), buildDocumentXml(text), 'utf8')
-  console.log(`已生成 OOXML 片段 → ${dir}（打包命令见脚本头部注释）`)
+  console.log(`已生成 OOXML 片段 → ${dir}（打包命令见脚本头部注释，注意用逐个 CreateEntry 的写法）`)
 }
