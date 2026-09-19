@@ -540,22 +540,28 @@ node scripts/build-doc.mjs       # guide.md
 
 ## 许可
 
-本仓库按内容类型**分别授权**：
+本仓库按内容类型**分别授权**，两部分**都是非商用许可**：可自由使用、修改、分享，
+但**不得用于商业用途**；商用需另行取得授权。
 
 | 范围 | 内容 | 许可 |
 |------|------|------|
-| `scripts/`、`resources/` | Node 脚本（Word→JSON 转换、索引 / 网页 / 文档生成、图形化编辑器）与编辑器静态资源 | **MIT**，见 [`LICENSE`](LICENSE) |
-| `data/`、`templates/`、`guide.html`、`guide.md` | 角色攻略数据、页面模板，以及由数据生成的网页版 / 文档版 | **CC BY 4.0**，见 [`LICENSE-DATA`](LICENSE-DATA) |
+| `scripts/`、`resources/` | Node 脚本（Word→JSON 转换、索引 / 网页 / 文档生成、图形化编辑器）与编辑器静态资源 | **PolyForm Noncommercial 1.0.0**（非商用），见 [`LICENSE`](LICENSE) |
+| `data/`、`templates/`、`guide.html`、`guide.md` | 角色攻略数据、页面模板，以及由数据生成的网页版 / 文档版 | **CC BY-NC-SA 4.0**（署名—非商业性使用—相同方式共享），见 [`LICENSE-DATA`](LICENSE-DATA) |
 | `汉仪文黑-85W.ttf` | `guide.html` 使用的字体（**不入库**，用 `node scripts/fetch-font.mjs` 从上游同步） | 商业字体，版权归汉仪字库所有，**不随仓库分发**；使用者需自行获取，或直接用免费回退字体 |
 
-1. **脚本（MIT）**：可自由使用、修改、分发与再许可，需保留版权声明与许可文本。
-2. **攻略数据与文档（CC BY 4.0，署名 4.0 国际）**：
-   - 允许复制、转载、改编，**包括商业用途**（无需另行取得授权）；
+1. **脚本（PolyForm Noncommercial 1.0.0，非商用）**：可自由使用、修改、分享与再分发，
+   **仅限非商业目的**（个人学习 / 研究 / 实验 / 业余项目，以及慈善、教育、公共研究、
+   公共安全与卫生、环保、政府机构的使用）；**不得用于商业用途**，商用需另行取得授权。
+   分发时须随附本许可条款（或官方 URL），并保留 `Required Notice:` 版权行；本许可不允许再许可（sublicense）。
+   官方文本：<https://polyformproject.org/licenses/noncommercial/1.0.0>（全文亦见 [`LICENSE`](LICENSE)）。
+2. **攻略数据与文档（CC BY-NC-SA 4.0，署名—非商业性使用—相同方式共享 4.0 国际）**：
+   - 允许复制、转载、改编，但**仅限非商业用途**；**商业用途不在授权范围内**，需另行取得授权；
    - 必须**署名**：注明来源为本仓库（`Character-Codex-Data`，并附仓库链接）及所用许可；
-   - 改编作品**不必**以相同许可发布（CC BY 4.0 无 SA 条款），但仍须署名并标明是否做过修改；
+   - 改编作品（含基于本数据的二次整理）**必须以相同许可**（CC BY-NC-SA 4.0 或兼容许可）发布
+     —— 这是 NC 之外的另一项限制：**SA 相同方式共享**；
    - 官方法律文本全文见 [`LICENSE-DATA`](LICENSE-DATA)（英文逐字转载），亦见
-     <https://creativecommons.org/licenses/by/4.0/legalcode>；简体中文参考译本：
-     <https://creativecommons.org/licenses/by/4.0/legalcode.zh-Hans>。**如有出入，一律以官方文本为准。**
+     <https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode>；简体中文参考译本：
+     <https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode.zh-Hans>。**如有出入，一律以官方文本为准。**
 3. 上述许可只覆盖整理者可以主张权利的「整理、编排、结构化与表述」部分，**第三方内容不在授权范围内**。
 
 ### 字体（不入库，用 `scripts/fetch-font.mjs` 从上游同步）

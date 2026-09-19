@@ -5,11 +5,20 @@
  * 页面外壳：templates/guide.html（样式与页头，含 <!--{{CARDS}}--> 占位）
  * 输出：仓库根目录的 guide.html —— **该文件由本脚本生成，不要手改**
  *
+ * 显示级归一（标题简称 / 档位标签 推荐·可选·过渡 / 副条目 `＞` / 简写展开 /
+ * 皇冠并入天赋 / 命座「命之座X」 / 空模块「暂无」/ 0% 行不显示）统一走
+ * scripts/lib/guide-display.mjs —— 与游戏内面板（Atlas-Plugin 的 codexIndex）同一份规则，
+ * 所以网页版与面板措辞逐字一致。JSON / docx 里的原始写法**不被改动**。
+ *
  * 用法：node scripts/build-html.mjs
  */
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import {
+  DISPLAY_SECTIONS, TIER_BY_INDEX, EMPTY_TEXT, normalizeSections, displayText, displayLines,
+  resolveSetItems, crownedLetters, normalizePriorityRow
+} from './lib/guide-display.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '..')
@@ -80,6 +89,9 @@ function readOrder (dir) {
 
 /**
  * 是否为空档：只有六个栏位标题、没有任何内容（新增角色待补充时的占位）
+ *
+ * 判据只看 JSON 里的**原始文本行**，不看显示级归一结果 —— 归一后空段落会显示
+ * 「暂无」，若拿它当判据，空档角色也会被当成「有内容」而混进网页版。
  * @param {object} data
  * @returns {boolean}
  */
@@ -182,6 +194,313 @@ function renderBody (section, indent, dir) {
 }
 
 /**
+ * 数据里的 `sections[].lines` → 渲染模型的行
+ *
+ * 网页版的「文本行 → 模型」最小实现：只做**结构解析**（拆出标签 / 条目 / 分隔符）
+ * 与两条显示级分隔符规则（主词条部位之间 `＞`、部位内部候选用 `/`；副词条 `/` → `＞`），
+ * 其余措辞、档位标签、简写展开、皇冠并入、命座命名全部交给 guide-display.mjs。
+ * @param {string[]} lines 原始文本行（未归一）
+ * @param {string[]} [labelHints] 逐行的显示标签覆盖（武器行按 v2 的 tier 算，见 weaponLabelHints）
+ * @param {string|null} [crownHint] 天赋优先级行的「皇冠必需字母」（来自 v2.talents 的皇冠行）
+ * @returns {Array<{label: string, kind?: string, items: Array}>}
+ */
+function linesToModelRows (lines, labelHints = [], crownHint = null) {
+  const out = []
+  lines?.forEach((line, index) => {
+    const text = String(line ?? '').trim()
+    if (!text) return
+    // 段末备注行 `注：…`：单独一行、不拆档位
+    if (/^注\s*[:：]/.test(text)) {
+      out.push({ label: '', kind: 'note', items: [{ text }] })
+      return
+    }
+    const kv = text.match(/^([^：:]{1,12})[:：]\s*(.*)$/)
+    if (!kv) {
+      out.push({ label: '', items: [{ text }] })
+      return
+    }
+    const value = String(kv[2] ?? '').trim()
+    if (!value) return
+    const hint = String(labelHints[index] ?? '').trim()
+    const label = hint || kv[1]
+    if (MAIN_SLOTS.some(s => value.includes(s + '：') || value.includes(s + ':'))) {
+      out.push({ label, items: splitMainSlots(value) })
+      return
+    }
+    // 优先级行交给共享的归一（拆 `A=Q`、必需项补 10、沿用数据分隔符），与面板同一套
+    if (label === '优先级') {
+      out.push({ label, raw: value, items: normalizePriorityRow([{ text: value, sepAfter: '', raw: value }], crownHint ?? undefined, value) })
+      return
+    }
+    const tokens = splitRankParts(value, '／')
+    // 套装行要把 2+2 组合当整体、并把同名套装去重（与面板共用 resolveSetItems）
+    if (/推荐|可选|过渡|首选|次选|套装/.test(label)) {
+      const sets = []
+      const seps = []
+      tokens.forEach((t, i) => {
+        const parts = t.text.split(/\s*[+＋＆&]\s*/).map(s => s.trim()).filter(Boolean)
+        parts.forEach((p, j) => {
+          if (j > 0) seps.push('+')
+          sets.push({ name: p })
+        })
+        if (i < tokens.length - 1) seps.push(t.sepAfter === '／' ? '/' : t.sepAfter)
+      })
+      const resolved = resolveSetItems(sets, seps, { sep: '／' })
+      out.push({
+        label,
+        items: resolved.map(r => ({ text: displayText(r.name), sepAfter: r.sepAfter === '／' ? '＞' : r.sepAfter }))
+      })
+      return
+    }
+    // 其余档位行：分隔符**原样保留数据里的写法**（`>` / `≥` / `＞`），
+    // 与面板侧一致；`／`（候选并列）统一显示成 `/`
+    out.push({
+      label,
+      items: tokens.map((t, i) => ({
+        text: t.text,
+        sepAfter: i < tokens.length - 1 ? (t.sepAfter === '／' ? '/' : (t.sepAfter || '＞')) : ''
+      }))
+    })
+  })
+  return out
+}
+
+/** 主词条三槽（顺序固定；只认 `${部位}：` 前面的部位边界） */
+const MAIN_SLOTS = ['时之沙', '空之杯', '理之冠']
+
+/**
+ * `时之沙：A / B / 空之杯：C / 理之冠：D / E` → 每个部位一条，
+ * 部位之间用 `＞`，部位内部的候选值留在同一条文本里用 `/` 连（去掉多余空格）。
+ * @param {string} text
+ * @returns {Array<{text: string, sepAfter: string}>}
+ */
+/** 括号配对表（用于「括号内部不拆」的判断） */
+const BRACKET_PAIRS = { '(': ')', '（': '）', '[': ']', '【': '】' }
+
+function splitMainSlots (text) {
+  const out = []
+  let buf = ''
+  let i = 0
+  while (i < text.length) {
+    // 部位边界：`时之沙：` / `空之杯：` / `理之冠：` 都是部位的起点，部位名连同「：」一起留在条目里
+    const slot = MAIN_SLOTS.find(s => text.startsWith(s + '：', i) || text.startsWith(s + ':', i))
+    if (slot) {
+      const t = buf.trim()
+      if (t) out.push({ text: t, sepAfter: '＞' }) // 上一部位收尾
+      buf = text.slice(i, i + slot.length + 1)
+      i += slot.length + 1
+      continue
+    }
+    const ch = text[i]
+    if (BRACKET_PAIRS[ch]) {
+      // 括号内部原样搬进来（含括号），免得把里面出现的部位名当边界
+      const end = text.indexOf(BRACKET_PAIRS[ch], i)
+      const stop = end < 0 ? text.length : end + 1
+      buf += text.slice(i, stop)
+      i = stop
+      continue
+    }
+    buf += ch
+    i += 1
+  }
+  const t = buf.trim()
+  if (t) out.push({ text: t, sepAfter: '' })
+  // 候选值之间去空格（`元素充能效率 / 生命值` → `元素充能效率/生命值`），
+  // 并丢掉部位边界上残留的悬挂分隔符（`… / 空之杯：…` 里的那个 `/`）
+  return out.map(item => ({
+    ...item,
+    text: item.text.replace(/\s*[/／]\s*/g, '/').replace(/[/／]+$/, '')
+  }))
+}
+
+/**
+ * 按「顶层 `/`」拆成若干候选组，**组内**再按 `>` / `≥` / `＞` 拆优先级。
+ *
+ * 两类分隔符不能混：`时之沙：攻击力 / 空之杯：冰伤 / 理之冠：暴击率 / 暴击伤害`
+ * 拆成 4 个条目的同时，第 3 个后面的其实是 `/`（候选并列），
+ * 所以用 `candidateSep` 决定「组与组之间」用什么符号，组内一律 `＞`。
+ * @param {string} text
+ * @param {string} candidateSep 组间分隔符（需求第 2 条：候选之间用 `/`，这里统一成全角 `＞` 与面板一致）
+ * @returns {Array<{text: string, sepAfter: string}>}
+ */
+function splitRankParts (text, candidateSep) {
+  const RANK = [' > ', ' ≥ ', '＞', '>', '≥']
+  const levels = [[]]
+  let depth = 0
+  let buf = ''
+  const flushToken = (sep) => {
+    const t = buf.trim()
+    if (t) levels[levels.length - 1].push({ text: t, sep })
+    buf = ''
+  }
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    if ('(（[【'.includes(ch)) depth += 1
+    else if (')）]】'.includes(ch)) depth = Math.max(0, depth - 1)
+    if (depth === 0) {
+      const rank = RANK.find(sep => text.startsWith(sep, i))
+      if (rank) { flushToken(rank.trim()); i += rank.length - 1; continue }
+      if (ch === '/' || ch === '／') { flushToken(''); levels.push([]); continue }
+    }
+    buf += ch
+  }
+  flushToken('')
+
+  const out = []
+  levels.forEach((tokens, li) => {
+    tokens.forEach((tok, ti) => {
+      const isLastInLevel = ti === tokens.length - 1
+      const isLastLevel = li === levels.length - 1
+      out.push({
+        text: tok.text,
+        sepAfter: isLastInLevel ? (isLastLevel ? '' : candidateSep) : (tok.sep || '＞')
+      })
+    })
+  })
+  return out
+}
+
+/**
+ * 武器行的**档位标签**：从 v2 数据取真实档位（1/2/3），
+ * 文档里的「第N档」只是**显示文本**，第 3 档在圣遗物侧会被归到「可选」，
+ * 所以这里必须按 v2 的 tier 算，保证网页版与面板（插件读 v2）措辞一致。
+ * @param {object} data
+ * @returns {string[]} 与武器行一一对应的显示标签
+ */
+function weaponLabelHints (data) {
+  return (data?.v2?.weapons ?? [])
+    .filter(row => row && !row.kind)
+    .map(row => (Number.isInteger(row.tier) && row.tier > 0
+      ? (TIER_BY_INDEX[row.tier] ?? '')
+      : (row.label ?? '')))
+}
+
+/**
+ * 角色 JSON → 六个模块的渲染模型（顺序固定，空模块保留并标 empty）
+ *
+ * 编号徽标（1…6）与面板侧 `section.badge` 同一套：按固定模块顺序取 1..6，
+ * 与原「1. 武器推荐」的编号一致，所以图标/徽标不会因为标题改成简称而错位。
+ * @param {object} data
+ * @returns {object[]}
+ */
+export function characterSections (data) {
+  const byKeyword = new Map()
+  for (const section of data?.sections ?? []) {
+    const title = String(section?.title ?? '')
+    for (const [re, name] of [[/武器/, '武器'], [/圣遗物/, '圣遗物'], [/天赋/, '天赋'], [/命座/, '命座'], [/面板|属性/, '面板'], [/配队|队伍|阵容/, '配队']]) {
+      if (re.test(title)) { byKeyword.set(name, section); break }
+    }
+  }
+  const weaponHints = weaponLabelHints(data)
+  // 天赋：把「皇冠必需项」的字母显式传给归一。
+  // 判据与面板（display.js 的 normalizeTalentRows）**完全一致**：只有 `level` 含「必须」才需要皇冠；
+  // `皇冠：E`（无 level）按数据语义视为可选，不加 10。
+  const crownHint = (data?.v2?.talents ?? [])
+    .filter(row => row?.kind === 'crown')
+    .flatMap(row => (row.items ?? [])
+      .filter(it => /必须/.test(String(it.level ?? '')))
+      .map(it => String(it.name ?? '')))
+    .filter(Boolean)
+  const model = DISPLAY_SECTIONS.map(({ title, kind }, i) => {
+    const src = byKeyword.get(title)
+    const badge = String(i + 1)
+    if (!src) return { title, badge, type: kind, kind, rows: [], teams: [] }
+    const lines = displayLines(src.lines ?? [])
+    if (kind === 'teams') {
+      // 段末备注行 `注：…` 不占队伍行（避免与成员备注重复），交给模板的段末备注渲染
+      const teamLines = lines.filter(l => !/^注\s*[:：]/.test(l))
+      return { title, badge, type: 'teams', kind, rows: [], teams: teamsFromLines(teamLines) }
+    }
+    const rows = linesToModelRows(lines, title === '武器' ? weaponHints : [], title === '天赋' ? crownHint : null)
+    return { title, badge, type: kind === 'stats' ? 'stats' : 'rows', kind, rows }
+  })
+  return normalizeSections(model)
+}
+
+/**
+ * 配队行 → 队伍模型（`推荐：A + B + C　注：…`）
+ *
+ * 与面板侧（parse.js 的 v2TeamRows + display.js 的 normalizeTeams）形状对齐：
+ *   - 用 `+` 连起来的才是成员（`A + B + C`）
+ *   - 没有 `+` 的整段文字是**行尾说明**，统一成 `注：…`（`推荐：减抗位` → `注：减抗位`）
+ */
+function teamsFromLines (lines) {
+  return (lines ?? []).map(line => {
+    const text = String(line ?? '').trim()
+    const kv = text.match(/^([^：:]{1,12})[:：]\s*(.*)$/)
+    const tag = kv ? kv[1] : ''
+    const body = (kv ? kv[2] : text).trim()
+    const noteHit = body.match(/^(.*?)[\s　]*(注\s*[:：].*)$/)
+    const membersPart = (noteHit ? noteHit[1] : body).trim()
+    const notes = noteHit ? [noteHit[2].trim()] : []
+    const members = /\s*[+＋＆&]\s*/.test(membersPart)
+      ? membersPart.split(/\s*[+＋＆&]\s*/).map(x => x.trim()).filter(Boolean)
+        .map(name => ({ name, ref: '', plain: name }))
+      : []
+    if (!members.length && membersPart) notes.push(membersPart)
+    return { tag, members, text: '', note: notes.filter(Boolean).join('；') }
+  }).filter(t => t.tag || t.members.length || t.note)
+}
+
+/**
+ * 渲染一行档位条目（`it.sepAfter` 已由显示级归一换成 `＞`）
+ * @param {object} row
+ * @returns {string} HTML
+ */
+function renderItems (row) {
+  const items = row.items ?? []
+  if (!items.length) return ''
+  if (row.kind === 'note') return `<span class="row-note">${inline(items[0]?.text ?? '')}</span>`
+  if (items.length === 1) return `<span class="row-value">${inline(items[0].text)}</span>`
+  const parts = items.map(it => {
+    const note = it.note ? `<span class="rank-note">（${inline(it.note)}）</span>` : ''
+    const sep = it.sepAfter ? `<span class="sep">${inline(it.sepAfter)}</span>` : ''
+    return `<span class="rank-unit"><span class="rank-item">${inline(it.text)}${note}</span>${sep}</span>`
+  })
+  return `<span class="rank-list">${parts.join('')}</span>`
+}
+
+/**
+ * 渲染一个模块（空模块输出「暂无」占位）
+ * @param {object} section 已归一的段落
+ * @param {number} indent
+ * @param {string} dir
+ * @returns {string} HTML
+ */
+function renderDisplaySection (section, indent, dir) {
+  const pad = ' '.repeat(indent)
+  const out = []
+  out.push(`${pad}<div class="section${section.empty ? ' section-empty' : ''}">`)
+  const badge = section.badge ? `<span class="section-badge">${escapeHtml(section.badge)}</span>` : ''
+  out.push(`${pad}    <div class="section-title">${badge}${inline(section.displayTitle ?? section.title)}</div>`)
+  if (section.empty) {
+    out.push(`${pad}    <div class="section-empty-text">${EMPTY_TEXT}</div>`)
+  } else if (section.kind === 'teams') {
+    out.push(`${pad}    <div class="team-rows">`)
+    for (const team of section.teams) {
+      const tag = team.tag ? `<span class="row-label">${inline(team.tag)}</span>` : ''
+      const members = team.members.map(m => {
+        const note = m.note ? `<span class="team-note-inline">（${inline(m.note)}）</span>` : ''
+        return `<span class="team-member">${inline(m.name)}${note}</span>`
+      }).join('<span class="team-plus">+</span>')
+      const note = team.note ? `<span class="row-note">${inline(team.note)}</span>` : ''
+      out.push(`${pad}        <div class="row${team.tag ? '' : ' row-nolabel'}">${tag}<span class="row-value">${members}${note}</span></div>`)
+    }
+    out.push(`${pad}    </div>`)
+  } else {
+    out.push(`${pad}    <div class="rows">`)
+    for (const row of section.rows) {
+      const label = row.label ? `<span class="row-label">${inline(row.label)}</span>` : ''
+      out.push(`${pad}        <div class="row${row.label ? '' : ' row-nolabel'}">${label}${renderItems(row)}</div>`)
+    }
+    out.push(`${pad}    </div>`)
+  }
+  if (section.image) out.push(`${pad}    <img class="codex-img" src="${escapeHtml(imageSrc(dir, section.image))}"/>`)
+  out.push(`${pad}</div>`)
+  return out.join('\n')
+}
+
+/**
  * 渲染单个角色卡片
  * @param {{name: string, data: object, dir: string}} character
  * @returns {string} HTML
@@ -207,16 +526,11 @@ export function renderCard (character) {
     out.push(`        ${inline(data.highlight)}`)
     out.push('    </div>')
   }
-  if (Array.isArray(data.sections) && data.sections.length) {
-    out.push('    <div class="grid-2">')
-    for (const section of data.sections) {
-      out.push('        <div class="section">')
-      out.push(`            <div class="section-title">${inline(section.title)}</div>`)
-      out.push(renderBody(section, 12, dir))
-      out.push('        </div>')
-    }
-    out.push('    </div>')
+  out.push('    <div class="grid-2">')
+  for (const section of characterSections(data)) {
+    out.push(renderDisplaySection(section, 8, dir))
   }
+  out.push('    </div>')
   out.push('</div>')
   return out.join('\n')
 }

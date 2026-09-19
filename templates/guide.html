@@ -79,17 +79,103 @@
 
     .section {
         margin-bottom: 12px;
+        padding: 8px 10px 10px;
+        border: 1px solid #e8edf5;
+        border-radius: 8px;
+        background: #fcfdff;
     }
     .section-title {
+        display: flex;
+        align-items: center;
+        gap: 6px;
         font-weight: bold;
-        color: #2b6cb0;
+        color: #2b4c7e;
         font-size: 15px;
-        margin-bottom: 5px;
-        background: #f0f5ff;
-        padding: 3px 8px;
-        border-radius: 4px;
-        display: inline-block;
+        margin-bottom: 8px;
+        padding-bottom: 6px;
+        background: none;
+        border-bottom: 1px solid #e6edf7;
     }
+    /* 模块序号徽标（1…6，与面板的 .codex-badge 对应） */
+    .section-badge {
+        flex-shrink: 0;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #2b6cb0;
+        color: #fff;
+        font-size: 12px;
+        font-weight: bold;
+        line-height: 20px;
+        text-align: center;
+    }
+    .section-empty {
+        background: #fafbfc;
+        border-style: dashed;
+        border-color: #e2e8f0;
+    }
+    .section-empty-text {
+        font-size: 13px;
+        color: #a0aec0;
+        padding: 2px 0;
+    }
+    .rows, .team-rows {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .row {
+        display: grid;
+        grid-template-columns: 62px minmax(0, 1fr);
+        column-gap: 8px;
+        align-items: start;
+        font-size: 13px;
+        line-height: 1.7;
+        color: #4a5568;
+    }
+    .row.row-nolabel { grid-template-columns: minmax(0, 1fr); }
+    .row-label {
+        display: block;
+        padding: 0 6px;
+        border-radius: 4px;
+        background: #eef3fa;
+        color: #2b4c7e;
+        font-size: 12px;
+        font-weight: bold;
+        line-height: 1.8;
+        text-align: center;
+    }
+    .row-value { min-width: 0; overflow-wrap: break-word; }
+    /* 档位序列：条目 + 分隔符（推荐 › 可选 › 过渡） */
+    .rank-list { display: inline; }
+    .rank-unit { display: inline; white-space: nowrap; }
+    .rank-item {
+        display: inline-block;
+        padding: 0 7px;
+        border: 1px solid #e3e9f2;
+        border-radius: 6px;
+        background: #f5f8fc;
+        color: #2d3748;
+        font-size: 12.5px;
+        line-height: 1.7;
+    }
+    .rank-note { color: #8a8378; font-size: 11.5px; font-style: italic; }
+    .sep { color: #a9b4c4; font-weight: bold; padding: 0 3px; font-size: 12px; }
+    /* 行内备注（注：…）与段末备注行：小一号灰字 */
+    .row-note { display: block; color: #8a8378; font-size: 12px; font-style: italic; }
+    /* 配队成员 */
+    .team-member {
+        display: inline-block;
+        padding: 0 9px;
+        border: 1px solid #dfe6f0;
+        border-radius: 12px;
+        background: #f4f7fb;
+        color: #2d3748;
+        font-size: 12.5px;
+        line-height: 1.8;
+    }
+    .team-plus { color: #a9b4c4; padding: 0 4px; font-size: 12px; }
+    .team-note-inline { color: #8a8378; font-size: 11.5px; font-style: italic; }
     .content-list {
         font-size: 14px;
         line-height: 1.6;

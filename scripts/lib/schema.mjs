@@ -253,16 +253,30 @@ export function resolveNoteText (text, ctx = {}) {
 }
 
 /**
+ * `100级提升` = 0 的判据：`0` / `0%` / `0%（收益可忽略）` 都算 0，`约 5%`、`0.5%` 不算。
+ * 末尾用「除数字和点以外的任意字符」收尾，所以 `0%`、`0%（收益可忽略）` 都能匹配，
+ * 而 `0.5%` 会因为 `.5` 不是数字/点以外的字符而不匹配。
+ */
+export const ZERO_POWER_RE = /^[+＋]?0+(?:\.0+)?[%％]?(?:[^0-9.]*)$/
+
+/**
  * 由结构化字段回推 tags（旧版渲染器读它）
+ *
+ * `100级提升` 为 `0` / `0%`（或没填）时**不产出这一条** —— 没有信息量的行不显示；
+ * 显示侧（scripts/lib/guide-display.mjs）也会再挡一层，保证网页版与面板一致。
  * @param {object} data
  * @returns {Array<{text: string, style: string}>}
  */
 export function deriveTags (data) {
   const m = data?.meta ?? {}
   const tags = []
+  const power = stripMarks(m['100级提升'] ?? '').trim()
   if (m['建议等级']) tags.push({ text: `建议等级：${stripMarks(m['建议等级'])}`, style: 'level' })
   if (m['定位']) tags.push({ text: `定位：${stripMarks(m['定位'])}`, style: 'role' })
-  if (m['100级提升']) tags.push({ text: `100级提升：${stripMarks(m['100级提升'])}`, style: 'power' })
+  // 100级提升：没填（含占位符 ___）或 0 / 0% 都不显示
+  if (power && !power.includes('___') && !ZERO_POWER_RE.test(power)) {
+    tags.push({ text: `100级提升：${power}`, style: 'power' })
+  }
   return tags
 }
 
