@@ -30,7 +30,7 @@ guide.md                         生成的文档版文本，请勿手改
 | `tags` | | 卡片标签，字符串数组；也可写成 `{ "text": "定位：站场主C", "style": "role" }`（`style` 只影响网页版配色，如 `level` / `role`） |
 | `highlight` | | 卡片顶部高亮行（如 `100级提升：7.6%`），会显示在攻略页标题下方 |
 | `sections` | ✅ | 段落数组，顺序即展示顺序，见下 |
-| `source.guide` | | 数据来源页名（如 `赋光之人 · 队伍攻略`），插件页脚会展示 |
+| `source.guide` | | 数据来源页名（如 `原神·角色攻略`），插件页脚会展示 |
 
 ### 段落（sections）
 
@@ -90,7 +90,7 @@ node scripts/build-doc.mjs       # 文档版 guide.md（Word 用可再打包 doc
     { "title": "5. 命座推荐", "lines": [] },
     { "title": "6. 配队推荐", "lines": [] }
   ],
-  "source": { "guide": "赋光之人 · 队伍攻略" }
+  "source": { "guide": "原神·角色攻略" }
 }
 ```
 
@@ -147,7 +147,7 @@ node scripts/build-doc.mjs       # 文档版 guide.md（Word 用可再打包 doc
       ]
     }
   ],
-  "source": { "guide": "赋光之人 · 队伍攻略" }
+  "source": { "guide": "原神·角色攻略" }
 }
 ```
 
@@ -220,7 +220,7 @@ node scripts/build-doc.mjs       # 文档版 guide.md（Word 用可再打包 doc
   },
   "tags": [],        // ← deriveTags(data) 生成，不要手写
   "sections": [],    // ← deriveSections(data) 生成，不要手写
-  "source": { "guide": "赋光之人 · 队伍攻略" }
+  "source": { "guide": "原神·角色攻略" }
 }
 ```
 
@@ -655,7 +655,7 @@ font-family: 'HYWenHei-85W', 'MiSans', 'Source Han Sans SC', 'Noto Sans CJK SC',
 ### 数据来源
 
 - **攻略正文**：由本地 Word 文档《原神·角色攻略.docx》整理转换而来（`scripts/parse-docx.mjs`）。
-  每个角色文件的出处记录在 `source.guide` 字段，目前取值有 `原神·角色攻略.docx` 与 `赋光之人 · 队伍攻略`。
+  每个角色文件的出处记录在 `source.guide` 字段，目前取值有 `原神·角色攻略.docx` 与 `原神·角色攻略`。
 - **名称索引** `data/_index.json`（武器 / 角色 / 圣遗物套装名）：由图鉴后端
   [nanoka-atlas-backend](https://github.com/MOPELotus/nanoka-atlas-backend)（数据源 [nanoka.cc](https://nanoka.cc/)）生成，
   见 `scripts/build-index.mjs`。

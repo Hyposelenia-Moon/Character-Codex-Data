@@ -561,7 +561,7 @@ function buildCharacter (body, name, prev = {}) {
 
   data.tags = deriveTags(data)
   data.sections = deriveSections(data)
-  data.source = prev.source && typeof prev.source === 'object' ? prev.source : { guide: '赋光之人 · 队伍攻略' }
+  data.source = prev.source && typeof prev.source === 'object' ? prev.source : { guide: '原神·角色攻略' }
 
   // 原文件里的其它顶层字段（未知字段）原样保留，避免编辑器静默丢数据
   for (const key of Object.keys(prev)) {
@@ -582,7 +582,7 @@ export function emptyCharacter (name) {
     v2: { weapons: [], artifacts: [], talents: [], panels: [], constellations: [], teams: [] },
     tags: [],
     sections: [],
-    source: { guide: '赋光之人 · 队伍攻略' }
+    source: { guide: '原神·角色攻略' }
   }
   data.tags = deriveTags(data)
   data.sections = deriveSections(data)

@@ -24,10 +24,10 @@ const build = await import(pathToFileURL(path.join(root, 'scripts/build-html.mjs
 
 /** 去标签 + 去括注（件数/命座类括注只影响展示细节） */
 const clean = s => String(s ?? '').replace(/<[^>]*>/g, '').replace(/&gt;/g, '>').trim()
-/** 分隔符字形与两侧空格归一（`＞`↔`>`、` / `↔`/`），语义等价不算差异 */
+/** 分隔符字形与两侧空格归一（`＞`↔`>`、` / `↔`/`、`｜`↔`/`），语义等价不算差异 */
 const canon = s => String(s ?? '')
   .replace(/[＞﹥]/g, '>')
-  .replace(/[／]/g, '/')
+  .replace(/[／｜]/g, '/')
   .replace(/\s+/g, ' ')
   .replace(/\s*([>≥=/])\s*/g, '$1')
   .trim()

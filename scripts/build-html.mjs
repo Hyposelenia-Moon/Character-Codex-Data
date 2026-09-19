@@ -267,10 +267,12 @@ function linesToModelRows (lines, labelHints = [], crownHint = null) {
 
 /** 主词条三槽（顺序固定；只认 `${部位}：` 前面的部位边界） */
 const MAIN_SLOTS = ['时之沙', '空之杯', '理之冠']
+/** 槽位之间是**并列**关系 → 全角竖线（与 schema.mjs 的 MAIN_SLOT_SEP 一致；槽位内部候选值仍用 `/`） */
+const MAIN_SLOT_SEP = '｜'
 
 /**
  * `时之沙：A / B / 空之杯：C / 理之冠：D / E` → 每个部位一条，
- * 部位之间用 `＞`，部位内部的候选值留在同一条文本里用 `/` 连（去掉多余空格）。
+ * 部位之间用 `｜`（并列），部位内部的候选值留在同一条文本里用 `/` 连（去掉多余空格）。
  * @param {string} text
  * @returns {Array<{text: string, sepAfter: string}>}
  */
@@ -286,7 +288,7 @@ function splitMainSlots (text) {
     const slot = MAIN_SLOTS.find(s => text.startsWith(s + '：', i) || text.startsWith(s + ':', i))
     if (slot) {
       const t = buf.trim()
-      if (t) out.push({ text: t, sepAfter: '＞' }) // 上一部位收尾
+      if (t) out.push({ text: t, sepAfter: MAIN_SLOT_SEP }) // 上一部位收尾（部位之间=并列）
       buf = text.slice(i, i + slot.length + 1)
       i += slot.length + 1
       continue
@@ -306,10 +308,10 @@ function splitMainSlots (text) {
   const t = buf.trim()
   if (t) out.push({ text: t, sepAfter: '' })
   // 候选值之间去空格（`元素充能效率 / 生命值` → `元素充能效率/生命值`），
-  // 并丢掉部位边界上残留的悬挂分隔符（`… / 空之杯：…` 里的那个 `/`）
+  // 并丢掉部位边界上残留的悬挂分隔符（`… / 空之杯：…` 里的 `/`，以及 `… ｜空之杯：…` 里多余的 `｜`）
   return out.map(item => ({
     ...item,
-    text: item.text.replace(/\s*[/／]\s*/g, '/').replace(/[/／]+$/, '')
+    text: item.text.replace(/\s*[/／]\s*/g, '/').replace(/[/／｜]+$/, '')
   }))
 }
 

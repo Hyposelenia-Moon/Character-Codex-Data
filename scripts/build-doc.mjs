@@ -20,6 +20,9 @@ const root = path.resolve(here, '..')
 const dataDir = path.join(root, 'data', 'gi')
 const outMd = path.join(root, 'guide.md')
 
+/** 攻略名（文档大标题 / 与 data/gi/*.json 的 source.guide 一致） */
+const GUIDE_TITLE = '原神·角色攻略'
+
 /** 空档角色保留的栏位骨架（与原 Word 模板一致） */
 const SLOTS = {
   '武器推荐': ['第一档：', '第二档：', '第三档：'],
@@ -101,7 +104,7 @@ function buildText () {
   const filled = characters.length - empty.length
 
   const out = []
-  out.push('赋光之人 · 队伍攻略')
+  out.push(GUIDE_TITLE)
   out.push('')
   out.push(`共 ${characters.length} 名角色：${filled} 名已有内容，${empty.length} 名仅保留栏位待补充。`)
   out.push(`待补充：${empty.map(c => c.name).join('、') || '（无）'}`)
@@ -124,7 +127,8 @@ const escapeXml = (text) => String(text)
 
 function buildDocumentXml (text) {
   const paragraphs = text.split('\n').map(line => {
-    const size = line.startsWith('赋光之人') ? '<w:rPr><w:b/><w:sz w:val="32"/></w:rPr>' : ''
+    // 文档大标题（攻略名）加粗放大：标题行以 GUIDE_TITLE 开头
+    const size = line.startsWith(GUIDE_TITLE) ? '<w:rPr><w:b/><w:sz w:val="32"/></w:rPr>' : ''
     const text2 = line === '' ? '' : `<w:r>${size}<w:t xml:space="preserve">${escapeXml(line)}</w:t></w:r>`
     return `    <w:p>${text2}</w:p>`
   })

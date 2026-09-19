@@ -43,14 +43,23 @@ var state = {
   backupHistory: [],     // 本次会话里做过的批量替换（可依次回滚）
   usage: null,           // 名称库使用统计（/api/name-usage）
   usageAt: 0,
-  toolsOpen: false,      // 工具箱面板是否展开
   batch: { type: 'weapon', from: '', to: '', preview: null },
   library: { type: 'weapon', filter: '', selected: null },
   gq: '',                // 工具箱里最后一次搜索词
-  idleExit: 0            // 服务端开启的空闲自动退出秒数（0 = 未开启）
+  idleExit: 0,           // 服务端开启的空闲自动退出秒数（0 = 未开启）
+  drawerOpen: false,     // 右侧抽屉（回收站 / 批量替换 / 名称库 / 全局检索）是否展开
+  drawerTab: 'search'    // 抽屉当前页签
 }
 
 var $ = function (id) { return document.getElementById(id) }
+
+/** 抽屉页签：id → 标题（次要操作都收进抽屉，工具条只留主操作） */
+var DRAWER_TABS = [
+  ['search', '全局检索'],
+  ['batch', '批量替换'],
+  ['library', '名称库'],
+  ['trash', '回收站']
+]
 
 /* ============================================================ 通用小工具 */
 
@@ -957,26 +966,47 @@ function jumpTo (name, rowId) {
   }).catch(function (e) { showStatus('跳转失败：' + e.message, 'error', true) })
 }
 
-/* ============================================================ 工具箱面板 */
+/* ============================================================ 右侧抽屉（次要工具） */
 
-var TOOL_TABS = [['search', '全局搜索'], ['batch', '批量替换'], ['library', '名称库浏览']]
-
-/** 顶栏下方的工具面板：批量替换 + 名称库浏览（#tools 在 index.html 里没有，用 status 之下动态插入） */
-function renderToolPanel () {
-  var panel = $('tools')
-  if (!panel) return
-  if (!state.toolsOpen) { panel.className = 'tools hidden'; return }
-  panel.className = 'tools'
-  var tab = state.view
-  var head = '<div class="tools-head">' +
-    TOOL_TABS.map(function (t) {
-      return '<button type="button" class="btn ' + (t[0] === tab ? 'primary' : '') + ' tab" data-tab="' + t[0] + '">' + t[1] + '</button>'
-    }).join('') +
-    '<span class="spacer"></span><button type="button" class="btn mini" data-tab="close">✕ 关闭</button></div>'
-  var body = tab === 'batch' ? batchPanelHtml() : (tab === 'library' ? libraryPanelHtml() : searchPanelHtml())
-  panel.innerHTML = head + '<div class="tools-body">' + body + '</div>'
+/** 抽屉页签：全局检索 / 批量替换 / 名称库 / 回收站（主操作留在工具条上） */
+function renderDrawer () {
+  var drawer = $('drawer')
+  var mask = $('drawer-mask')
+  if (!drawer) return
+  var open = !!state.drawerOpen
+  drawer.className = 'drawer' + (open ? '' : ' hidden')
+  if (mask) mask.className = 'drawer-mask' + (open ? '' : ' hidden')
+  if (!open) return
+  var tab = state.drawerTab
+  var tabs = $('drawer-tabs')
+  if (tabs) {
+    tabs.innerHTML = DRAWER_TABS.map(function (t) {
+      return '<button type="button" class="btn tab' + (t[0] === tab ? ' primary' : '') + '" data-drawer="' + t[0] + '">' + t[1] + '</button>'
+    }).join('')
+  }
+  var body = $('drawer-body')
+  if (!body) return
+  body.innerHTML = tab === 'batch' ? batchPanelHtml()
+    : (tab === 'library' ? libraryPanelHtml()
+      : (tab === 'trash' ? trashPanelHtml() : searchPanelHtml()))
   if (tab === 'library') renderLibraryList()
+  if (tab === 'trash') renderTrash()
 }
+
+/** 打开 / 切换抽屉页签 */
+function openDrawer (tab) {
+  state.drawerOpen = true
+  if (tab) state.drawerTab = tab
+  renderDrawer()
+}
+
+function closeDrawer () {
+  state.drawerOpen = false
+  renderDrawer()
+}
+
+/** 兼容旧调用名（工具条「工具箱」按钮 → 抽屉） */
+function renderToolPanel () { renderDrawer() }
 
 /** 工具箱 - 全局搜索 tab */
 function searchPanelHtml () {
@@ -1109,9 +1139,7 @@ function renderLibraryDetail (name) {
 
 /** 打开工具箱并定位到某个 tab */
 function openTools (tab) {
-  state.toolsOpen = true
-  if (tab) state.view = tab
-  renderToolPanel()
+  openDrawer(tab)
 }
 
 /** 批量替换：先预览，再执行 */
@@ -1122,7 +1150,7 @@ function batchPreview () {
   showStatus('正在扫描全部角色…', '', true)
   return api('POST', '/api/batch-replace', { type: b.type, from: b.from, to: b.to, dry: true }).then(function (res) {
     state.batch.preview = res
-    renderToolPanel()
+    renderDrawer()
     showStatus('预览：命中 ' + res.total + ' 处，涉及 ' + res.files + ' 个角色' +
       (asArray(res.warnings).length ? '；' + res.warnings.join('；') : ''), asArray(res.warnings).length ? 'warn' : 'ok', true)
     return res
@@ -1159,7 +1187,7 @@ function batchRun () {
         return refreshIndex().then(refreshList).then(function () {
           if (state.current) return openCharacter(state.current).catch(function () {})
         }).then(function () {
-          renderToolPanel()
+          renderDrawer()
           toast('批量替换完成', [
             '「' + b.from + '」→「' + b.to + '」',
             '改动 ' + done.changed + ' 处，涉及 ' + done.files + ' 个文件',
@@ -1190,7 +1218,7 @@ function batchUndo (stamp) {
       return refreshIndex().then(refreshList).then(function () {
         if (state.current) return openCharacter(state.current).catch(function () {})
       }).then(function () {
-        renderToolPanel()
+        renderDrawer()
         toast('已回滚', ['备份 ' + res.stamp + ' 已还原 ' + res.files + ' 个文件：' + asArray(res.characters).join('、')])
         showStatus('已回滚 ' + res.files + ' 个文件', 'ok', true)
         return res
@@ -1233,7 +1261,7 @@ function refreshIndex () {
     state.usage = null
     state.usageAt = 0
     renderDatalists()
-    renderToolPanel()
+    renderDrawer()
   })
 }
 
@@ -1903,21 +1931,26 @@ function applyRef (el) {
 
 /* ============================================================ 回收站 */
 
+/** 抽屉里的回收站面板骨架（内容由 renderTrash 填充） */
+function trashPanelHtml () {
+  return '<div class="tool-row"><span class="muted" id="trash-count"></span>' +
+    '<span class="spacer"></span>' +
+    '<button type="button" class="btn mini danger" id="btn-trash-empty" title="把回收站里的角色全部彻底删除（不可撤销）">清空回收站</button>' +
+    '</div>' +
+    '<div id="trash-list" class="trash-list"></div>'
+}
+
 /**
- * 打开回收站面板：列出 data/_trash/ 里被软删除的角色，
+ * 打开回收站（抽屉页签）：列出 data/_trash/ 里被软删除的角色，
  * 支持「恢复」（移回 data/gi/ 并把名字补回 _order.json 末尾）/「彻底删除」/「清空」。
  * 三个写操作都要二次确认；恢复撞名时服务端返回 409，这里给出中文提示。
  */
 function openTrash () {
-  var el = $('trash-view')
-  if (!el) return
-  el.className = 'trash-view'
-  renderTrash()
+  openDrawer('trash')
 }
 
 function closeTrash () {
-  var el = $('trash-view')
-  if (el) el.className = 'trash-view hidden'
+  closeDrawer()
 }
 
 function renderTrash () {
@@ -2216,16 +2249,22 @@ function globalEvents () {
     }
   })
 
-  /* ------------------------------------------------ 工具箱面板 */
-  $('btn-tools').addEventListener('click', function () { openTools('batch') })
-  $('tools').addEventListener('click', function (e) {
+  /* ------------------------------------------------ 右侧抽屉（更多工具） */
+  $('btn-drawer').addEventListener('click', function () { state.drawerOpen ? closeDrawer() : openDrawer() })
+  $('btn-drawer-close').addEventListener('click', function () { closeDrawer() })
+  $('drawer-mask').addEventListener('click', function () { closeDrawer() })
+  $('drawer-tabs').addEventListener('click', function (e) {
     var t = e.target
     if (!t || !t.getAttribute) return
-    var tab = t.getAttribute('data-tab')
-    if (tab === 'close') { state.toolsOpen = false; renderToolPanel(); return }
-    if (tab) { state.view = tab; renderToolPanel(); return }
-    var libTab = t.getAttribute('data-lib')
-    if (libTab) { state.library.type = libTab; state.library.selected = null; renderToolPanel(); return }
+    var tab = t.getAttribute('data-drawer')
+    if (tab) openDrawer(tab)
+  })
+  $('drawer').addEventListener('click', function (e) {
+    var t = e.target
+    if (!t || !t.getAttribute) return
+    var trt = t.getAttribute('data-trt')
+    if (trt === 'restore') { trashRestore(t.getAttribute('data-name')); return }
+    if (trt === 'delete') { trashDeleteForever(t.getAttribute('data-name')); return }
     var undo = t.getAttribute('data-undo')
     if (undo) { batchUndo(undo); return }
     var libName = t.getAttribute('data-libname')
@@ -2246,7 +2285,19 @@ function globalEvents () {
     var bjump = t.closest ? t.closest('[data-batch-jump]') : null
     if (bjump) { e.preventDefault(); jumpTo(bjump.getAttribute('data-name'), bjump.getAttribute('data-row')) }
   })
-  $('tools').addEventListener('input', function (e) {
+  $('drawer').addEventListener('click', function (e) {
+    var t = e.target
+    if (!t) return
+    var libTab = t.getAttribute ? t.getAttribute('data-lib') : null
+    if (libTab) { state.library.type = libTab; state.library.selected = null; renderDrawer(); return }
+    var id = t.id
+    if (id === 'tools-search') runToolsSearch()
+    else if (id === 'batch-preview') batchPreview()
+    else if (id === 'batch-run') batchRun()
+    else if (id === 'lib-refresh') { loadUsage(true).then(function () { renderLibraryList() }) }
+    else if (id === 'btn-trash-empty') trashEmpty()
+  })
+  $('drawer').addEventListener('input', function (e) {
     var t = e.target
     if (!t || !t.id) return
     if (t.id === 'lib-filter') {
@@ -2256,14 +2307,14 @@ function globalEvents () {
     }
     if (t.id === 'batch-from' || t.id === 'batch-to') syncBatchForm()
   })
-  $('tools').addEventListener('change', function (e) {
+  $('drawer').addEventListener('change', function (e) {
     if (e.target && e.target.id === 'batch-type') {
       syncBatchForm()
       state.batch.preview = null
-      renderToolPanel()
+      renderDrawer()
     }
   })
-  $('tools').addEventListener('keydown', function (e) {
+  $('drawer').addEventListener('keydown', function (e) {
     if (e.key !== 'Enter') return
     var t = e.target
     if (!t || !t.id) return
@@ -2271,34 +2322,14 @@ function globalEvents () {
     else if (t.id === 'batch-from' || t.id === 'batch-to') { e.preventDefault(); batchPreview() }
     else if (t.id === 'lib-filter') { e.preventDefault(); renderLibraryList() }
   })
-  $('tools').addEventListener('click', function (e) {
-    var id = e.target && e.target.id
-    if (id === 'tools-search') runToolsSearch()
-    else if (id === 'batch-preview') batchPreview()
-    else if (id === 'batch-run') batchRun()
-    else if (id === 'lib-refresh') { loadUsage(true).then(function () { renderLibraryList() }) }
-  })
 
   $('btn-publish').addEventListener('click', function () { publish() })
   if ($('btn-publish-all')) $('btn-publish-all').addEventListener('click', function () { saveAndPublish() })
 
-  /* ------------------------------------------------ 回收站 */
-  $('btn-trash').addEventListener('click', function () { openTrash() })
-  $('trash-view').addEventListener('click', function (e) {
-    var t = e.target
-    if (!t || !t.getAttribute) return
-    var act = t.getAttribute('data-trash')
-    if (act === 'close') { closeTrash(); return }
-    if (t === $('trash-view') || (t.classList && t.classList.contains('picker-mask'))) { closeTrash(); return }
-    var trt = t.getAttribute('data-trt')
-    if (trt === 'restore') { trashRestore(t.getAttribute('data-name')); return }
-    if (trt === 'delete') { trashDeleteForever(t.getAttribute('data-name')); return }
-  })
-  $('btn-trash-empty').addEventListener('click', function () { trashEmpty() })
+  /* ------------------------------------------------ 回收站（在抽屉里，事件见上） */
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return
-    var el = $('trash-view')
-    if (el && !el.classList.contains('hidden')) { e.preventDefault(); closeTrash() }
+    if (state.drawerOpen) { e.preventDefault(); closeDrawer() }
   })
 
   /* ------------------------------------------------ 快捷键 */

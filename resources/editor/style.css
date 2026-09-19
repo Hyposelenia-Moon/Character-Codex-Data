@@ -14,6 +14,8 @@
   --warn: #b7791f;
   --warn-soft: #fff8e6;
   --radius: 8px;
+  /* 顶栏高度（工具条会换行，所以用变量统一 sticky 偏移） */
+  --topbar-h: 56px;
 }
 
 * { box-sizing: border-box; }
@@ -45,15 +47,15 @@ code {
   z-index: 20;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  height: 52px;
-  padding: 0 16px;
+  gap: 14px;
+  flex-wrap: wrap;
+  min-height: 56px;
+  padding: 8px 16px;
   background: var(--panel);
   border-bottom: 1px solid var(--line);
 }
 
-.brand { display: flex; align-items: center; gap: 9px; }
+.brand { display: flex; align-items: center; gap: 9px; flex: 0 0 auto; }
 
 .logo {
   display: inline-flex;
@@ -67,19 +69,82 @@ code {
   letter-spacing: -1px;
 }
 
-.brand-text { font-weight: 600; }
+.brand-text { font-weight: 600; white-space: nowrap; }
 
-.top-actions { display: flex; align-items: center; gap: 10px; }
+/* ===== 主操作工具条：一条横排，按钮统一高度 / 圆角 / 间距 ===== */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  min-width: 0;
+}
 
-.current-name { font-weight: 600; color: var(--text-dim); }
+.toolbar .tb-group { display: inline-flex; align-items: center; gap: 4px; }
 
-.dirty { color: var(--warn); font-size: 13px; }
+.toolbar .btn.tb {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.toolbar .tb-ico { width: 15px; height: 15px; flex: 0 0 auto; }
+
+.tb-search {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 200px;
+  min-width: 150px;
+  max-width: 380px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: #fbfcfe;
+  color: var(--text-soft);
+}
+
+.tb-search .tb-ico { flex: 0 0 auto; }
+
+.tb-search .gsearch {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  outline: none;
+}
+
+.top-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.current-name { font-weight: 600; color: var(--text-dim); white-space: nowrap; }
+
+.dirty { color: var(--warn); font-size: 13px; white-space: nowrap; }
+
+@media (max-width: 1180px) {
+  .top-actions { margin-left: 0; }
+}
 
 /* ------------------------------------------------------------ 状态提示条 */
 
 .status {
   position: sticky;
-  top: 52px;
+  top: var(--topbar-h);
   z-index: 19;
   padding: 7px 16px;
   font-size: 13px;
@@ -94,13 +159,13 @@ code {
 
 /* ---------------------------------------------------------------- 布局 */
 
-.layout { display: flex; align-items: flex-start; min-height: calc(100vh - 52px); }
+.layout { display: flex; align-items: flex-start; min-height: calc(100vh - var(--topbar-h)); }
 
 .sidebar {
   position: sticky;
-  top: 52px;
+  top: var(--topbar-h);
   flex: 0 0 256px;
-  height: calc(100vh - 52px);
+  height: calc(100vh - var(--topbar-h));
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -460,7 +525,7 @@ textarea { resize: vertical; min-height: 54px; }
 }
 
 .gr-head { display: flex; align-items: center; gap: 8px; padding: 6px 8px; font-size: 13px; color: var(--text-dim); border-bottom: 1px solid var(--line); margin-bottom: 6px; }
-.gr-head .spacer, .gr-title .spacer, .picker-head .spacer, .picker-foot .spacer, .tools-head .spacer { flex: 1 1 auto; }
+.gr-head .spacer, .gr-title .spacer, .picker-head .spacer, .picker-foot .spacer, .drawer-head .spacer { flex: 1 1 auto; }
 .gr-group { padding: 4px 6px 8px; border-bottom: 1px dashed var(--line); }
 .gr-title { display: flex; align-items: center; gap: 7px; padding: 4px 2px; font-size: 13px; }
 .gr-title .badge {
@@ -478,31 +543,47 @@ textarea { resize: vertical; min-height: 54px; }
 .gr-list a:hover, .gr-row a:hover { text-decoration: underline; }
 .gr-text { color: var(--text-soft); margin-left: 6px; }
 
-/* ============================================================ 工具箱面板 */
+/* ============================================================ 右侧抽屉（次要工具） */
 
-.tools {
-  position: sticky;
-  top: 52px;
-  z-index: 18;
+.drawer-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(28, 34, 44, .22);
+}
+
+.drawer {
+  position: fixed;
+  top: var(--topbar-h);
+  right: 0;
+  bottom: 0;
+  z-index: 31;
+  width: min(460px, 94vw);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px 16px;
   background: var(--panel);
-  border-bottom: 1px solid var(--line);
-  padding: 10px 16px 12px;
-  max-height: 62vh;
+  border-left: 1px solid var(--line);
+  box-shadow: -12px 0 30px rgba(20, 26, 38, .12);
   overflow: auto;
 }
 
-.tools-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-.tools-head .tab { min-width: 92px; }
-.tools-body { display: flex; flex-direction: column; gap: 8px; }
+.drawer-head { display: flex; align-items: center; gap: 8px; }
+.drawer-title { font-weight: 600; }
+.drawer-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.drawer-tabs .tab { min-width: 80px; }
+.drawer-body { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+
 .tool-row { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
-.tool-row .field { min-width: 190px; }
-.tool-row .grow { flex: 1 1 260px; min-width: 200px; }
+.tool-row .field { min-width: 170px; }
+.tool-row .grow { flex: 1 1 240px; min-width: 180px; }
 .tool-btns { display: flex; gap: 6px; }
 .batch-preview { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: #fcfdff; }
 
-.lib-wrap { display: flex; gap: 12px; align-items: stretch; min-height: 220px; }
-.lib-list { flex: 0 0 300px; max-height: 44vh; overflow: auto; border: 1px solid var(--line); border-radius: 10px; padding: 4px; }
-.lib-detail { flex: 1 1 auto; min-width: 0; max-height: 44vh; overflow: auto; border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; }
+.lib-wrap { display: flex; flex-direction: column; gap: 10px; }
+.lib-list { max-height: 32vh; overflow: auto; border: 1px solid var(--line); border-radius: 10px; padding: 4px; }
+.lib-detail { min-height: 120px; max-height: 40vh; overflow: auto; border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; }
 .lib-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 7px; border-radius: 7px; cursor: pointer; font-size: 13px; }
 .lib-item:hover { background: #f5f7fb; }
 .lib-item.active { background: var(--accent-soft); font-weight: 600; }
@@ -545,11 +626,9 @@ textarea { resize: vertical; min-height: 54px; }
 }
 .toast-copy:hover { background: rgba(255, 255, 255, .26); }
 
-/* ============================================================ 回收站 */
+/* ============================================================ 回收站（抽屉里的一个页签） */
 
-.trash-view { position: fixed; inset: 0; z-index: 72; }
-.trash-pop { width: min(680px, 94vw); }
-.trash-list { flex: 1 1 auto; overflow: auto; border: 1px solid var(--line); border-radius: 10px; padding: 4px; min-height: 160px; max-height: 58vh; }
+.trash-list { flex: 1 1 auto; overflow: auto; border: 1px solid var(--line); border-radius: 10px; padding: 4px; min-height: 200px; max-height: 56vh; }
 .trash-item {
   display: flex;
   align-items: center;

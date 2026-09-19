@@ -23,6 +23,14 @@ export const MARK_RE = /\[\[([wactk])[:：]([^[\]]+?)\]\]/g
 /** 天赋字母（图标按 A/E/Q 顺序对应 0/1/2） */
 export const TALENT_ORDER = ['A', 'E', 'Q']
 
+/**
+ * 主词条「部位之间」的并列分隔符 —— 全角竖线。
+ * 三个槽位（时之沙 / 空之杯 / 理之冠）是并列关系，不是优先级，所以**不能**用 `＞`；
+ * 部位内部的候选值仍用 `/`，副词条的优先级仍用 `＞`。
+ * 文档行（本模块 deriveSections）、网页版（build-html.mjs）、面板（插件 parse.js）三处必须一致。
+ */
+export const MAIN_SLOT_SEP = '｜'
+
 /** 档位中文数字 */
 const CN_NUM = ['', '一', '二', '三', '四', '五', '六', '七', '八']
 
@@ -440,6 +448,11 @@ export function pickMainNoteSlot (row) {
 
 /**
  * 主词条行：把每个词条值按需补上括注，再拼成一行。
+ *
+ * 分隔符语义（重要，别改回去）：
+ *   · **部位之间**（时之沙 → 空之杯 → 理之冠）是**并列**关系，用全角竖线 `｜`
+ *   · **部位内部**的候选值（同一部位里的备选）用 `/`
+ *   · 副词条的优先级关系才用 `＞`（由显示层处理，这里不碰）
  * @param {object} row
  * @param {string} label
  * @returns {string}
@@ -459,7 +472,7 @@ function mainStatsLine (row, label) {
     }
     return `${k}：${list.join(' / ')}`
   })
-  return `${label}主词条：${parts.join(' / ')}${note && !slot ? note : ''}`
+  return `${label}主词条：${parts.join(MAIN_SLOT_SEP)}${note && !slot ? note : ''}`
 }
 
 /** 单条圣遗物行 → 文本行 */

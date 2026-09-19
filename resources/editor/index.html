@@ -12,23 +12,46 @@
     <span class="logo">攻略</span>
     <span class="brand-text">角色攻略编辑器</span>
   </div>
-  <div class="global-search">
-    <input id="gsearch" class="gsearch" type="search" placeholder="全局搜索：武器 / 圣遗物 / 角色 / 套装 / 正文关键词（Ctrl+F）" autocomplete="off">
-    <div id="gresults" class="gresults hidden"></div>
-  </div>
-  <div class="top-actions">
-    <span id="dirty" class="dirty hidden">● 未保存</span>
-    <span id="current-name" class="current-name">未选择角色</span>
-    <button id="btn-tools" class="btn" type="button" title="批量替换 / 名称库浏览">工具箱</button>
-    <button id="btn-publish" class="btn" type="button" title="把当前已保存的数据重新生成 guide.html 与 Word 主文档（不写入正在编辑的表单）">发布</button>
-    <button id="btn-publish-all" class="btn" type="button" title="Ctrl+Shift+S：写 JSON → 重建索引 → 写回 Word 主文档（含备份）→ 生成 guide.html → 三方一致性校验 → 自动提交（**不推送**）">保存并发布</button>
-    <button id="btn-save" class="btn primary" type="button" title="Ctrl+S / ⌘+S">保存</button>
-    <button id="btn-close-server" class="btn danger" type="button" title="停止后台的编辑器服务（只关服务，不动已保存的数据）">关闭服务</button>
+
+  <!-- 主操作工具条：搜索 + 新建 + 排序 + 保存 / 发布（图标 + 文字，统一样式） -->
+  <div class="toolbar">
+    <span class="tb-search">
+      <svg class="tb-ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10.6 10.6 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <input id="gsearch" class="gsearch" type="search" placeholder="全局搜索（Ctrl+F）" autocomplete="off">
+      <span id="gresults" class="gresults hidden"></span>
+    </span>
+    <button id="btn-new" class="btn tb" type="button" title="新建角色（data/gi/&lt;角色名&gt;.json）">
+      <svg class="tb-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>新建</button>
+    <span class="tb-group">
+      <button id="btn-up" class="btn tb" type="button" title="在 _order.json 里上移">
+        <svg class="tb-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 12.5V4M4.2 7.4 8 3.6l3.8 3.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>上移</button>
+      <button id="btn-down" class="btn tb" type="button" title="在 _order.json 里下移">
+        <svg class="tb-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5V12M4.2 8.6 8 12.4l3.8-3.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>下移</button>
+    </span>
+    <span class="tb-group">
+      <button id="btn-rename" class="btn tb" type="button" title="重命名角色文件与 _order.json">
+        <svg class="tb-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.4 2.9 13.1 5.6 6 12.7l-3.3.6.6-3.3z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>重命名</button>
+      <button id="btn-delete" class="btn danger tb" type="button" title="软删除到 data/_trash/（可从回收站恢复）">
+        <svg class="tb-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 4.5h9M6.5 4.5V3h3v1.5M5 4.5l.6 8.2h4.8L11 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>删除</button>
+    </span>
+    <button id="btn-drawer" class="btn tb" type="button" title="批量替换 / 名称库 / 回收站 / 全局检索">
+      <svg class="tb-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4.5h10M3 8h10M3 11.5h10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>更多</button>
+    <span class="top-actions">
+      <span id="dirty" class="dirty hidden">● 未保存</span>
+      <span id="current-name" class="current-name">未选择角色</span>
+      <button id="btn-publish" class="btn tb" type="button" title="把当前已保存的数据重新生成 guide.html 与 Word 主文档（不写入正在编辑的表单）">
+        <svg class="tb-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 10.5V2.8M5 5.8 8 2.8l3 3M3.2 10.5v2.3h9.6v-2.3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>发布</button>
+      <button id="btn-publish-all" class="btn tb" type="button" title="Ctrl+Shift+S：写 JSON → 重建索引 → 写回 Word 主文档（含备份）→ 生成 guide.html → 三方一致性校验 → 自动提交（不推送）">
+        <svg class="tb-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.6c2.6 0 4.4 1.9 4.4 4.6 0 2-1.3 3.4-3 3.9v2.3H6.6v-2.3c-1.7-.5-3-1.9-3-3.9 0-2.7 1.8-4.6 4.4-4.6z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>保存并发布</button>
+      <button id="btn-save" class="btn primary tb" type="button" title="Ctrl+S / ⌘+S">
+        <svg class="tb-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h8.2L13 4.8V13H3z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M5.5 3v3.4h5V3M5.5 13v-3.6h5V13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>保存</button>
+      <button id="btn-close-server" class="btn danger tb" type="button" title="停止后台的编辑器服务（只关服务，不动已保存的数据）">
+        <svg class="tb-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.6v5.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4.6 4.6a5 5 0 1 0 6.8 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>关闭服务</button>
+    </span>
   </div>
 </header>
 
 <div id="status" class="status hidden"></div>
-<div id="tools" class="tools hidden"></div>
 <div id="toast" class="toast hidden"></div>
 
 <div class="layout">
@@ -38,44 +61,33 @@
       <div id="list" class="list" tabindex="0"></div>
     </div>
     <div class="side-foot">
-      <button id="btn-new" class="btn wide" type="button">＋ 新增角色</button>
-      <div class="btn-row">
-        <button id="btn-up" class="btn" type="button" title="在 _order.json 里上移">↑ 上移</button>
-        <button id="btn-down" class="btn" type="button" title="在 _order.json 里下移">↓ 下移</button>
-      </div>
-      <div class="btn-row">
-        <button id="btn-rename" class="btn" type="button">重命名</button>
-        <button id="btn-delete" class="btn danger" type="button">删除</button>
-      </div>
-      <button id="btn-trash" class="btn wide" type="button" title="查看 data/_trash/ 里被软删除的角色：可恢复 / 彻底删除 / 清空回收站">🗑 回收站</button>
       <div class="side-hint">排序写入 <code>data/gi/_order.json</code></div>
     </div>
   </aside>
 
   <main class="main">
     <div id="empty" class="empty">
-      <p>左侧选一个角色开始编辑，或点「＋ 新增角色」。</p>
+      <p>左侧选一个角色开始编辑，或点工具条「新建」。</p>
       <p class="muted">改动在浏览器内暂存，点「保存」（Ctrl+S）才会写入 <code>data/gi/&lt;角色名&gt;.json</code>。</p>
       <p class="muted">保存并发布 = 保存 + 发布 + 三方校验 + 自动提交（<strong>不推送</strong>，push 由你手动执行）。</p>
-      <p class="muted">快捷键：↑↓ 切换角色 · Ctrl+S 保存 · Ctrl+Shift+S 保存并发布 · Ctrl+F 全局搜索。</p>
+      <p class="muted">快捷键：↑↓ 切换角色 · Ctrl+S 保存 · Ctrl+Shift+S 保存并发布 · Ctrl+F 全局搜索 · Esc 关抽屉。</p>
     </div>
     <form id="form" class="form hidden" autocomplete="off"></form>
   </main>
+
+  <!-- 右侧抽屉：批量替换 / 名称库 / 回收站 / 全局检索（次要操作收在这里，工具条只留主操作） -->
+  <aside id="drawer" class="drawer hidden" aria-label="更多工具">
+    <div class="drawer-head">
+      <span class="drawer-title">更多</span>
+      <span class="spacer"></span>
+      <button type="button" class="btn mini" id="btn-drawer-close" title="收起（Esc）">✕</button>
+    </div>
+    <div class="drawer-tabs" id="drawer-tabs"></div>
+    <div class="drawer-body" id="drawer-body"></div>
+  </aside>
 </div>
 
-<div id="trash-view" class="trash-view hidden">
-  <div class="picker-mask" data-trash="mask"></div>
-  <div class="picker-pop trash-pop" role="dialog" aria-label="回收站">
-    <div class="picker-head">
-      <span class="picker-title">🗑 回收站</span>
-      <span id="trash-count" class="muted"></span>
-      <span class="spacer"></span>
-      <button type="button" class="btn mini danger" id="btn-trash-empty" title="把回收站里的角色全部彻底删除（不可撤销）">清空回收站</button>
-      <button type="button" class="btn mini" data-trash="close">✕</button>
-    </div>
-    <div id="trash-list" class="trash-list"></div>
-  </div>
-</div>
+<div class="drawer-mask hidden" id="drawer-mask"></div>
 
 <datalist id="dl-weapon"></datalist>
 <datalist id="dl-artifact"></datalist>
