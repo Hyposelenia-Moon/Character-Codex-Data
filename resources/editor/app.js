@@ -8,14 +8,49 @@ var TIERS = [1, 2, 3, 4, 5, 6]
 var CN_NUM = { 1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: '六' }
 
 var ARTIFACT_KINDS = [
-  { value: 'preferred', label: '首选' },
-  { value: 'transition', label: '过渡' },
-  { value: 'optional', label: '可选' },
+  { value: 'preferred', label: '推荐' },
+  { value: 'transition', label: '可选' },
+  { value: 'optional', label: '可选（备选）' },
   { value: 'main', label: '主词条' },
   { value: 'sub', label: '副词条' },
   { value: 'text', label: '文本' },
   { value: 'note', label: '备注（注：）' }
 ]
+
+/**
+ * 武器档位下拉：与面板 / 网页版同一套术语 —— 1/2/3 → 推荐 / 可选 / 过渡。
+ * 仓库里数据只有 1~3 档；真出现第 4 档以上就显示「第N档」（不静默改写数据）。
+ * @param {number|string} tier
+ * @returns {string}
+ */
+function tierLabel (tier) {
+  var n = Number(tier)
+  if (n === 1) return '推荐'
+  if (n === 2) return '可选'
+  if (n === 3) return '过渡'
+  if (Number.isInteger(n) && n > 3) return '第' + n + '档'
+  return String(tier == null ? '' : tier)
+}
+
+/** 行首标签的界面用词：数据里的「首选 / 其他」在界面上显示为 推荐 / 可选（只改显示，不改数据） */
+function labelText (label) {
+  var s = str(label).trim()
+  if (!s) return ''
+  if (s === '首选') return '推荐'
+  if (s === '其他') return '可选'
+  return s
+}
+
+/** 标签输入框旁的「显示为」小字：数据值与显示层用词不同时给个提示（只读，不改数据） */
+function labelHint (label) {
+  var raw = str(label).trim()
+  var shown = labelText(raw)
+  if (!raw || shown === raw) return ''
+  return '<span class="muted" style="font-size:11px" title="数据里存的是「' + esc(raw) + '」，面板 / 网页版显示为「' + esc(shown) + '」">显示为：' + esc(shown) + '</span>'
+}
+
+/** 空模块占位文案（与面板 / 网页版一致） */
+var EMPTY_TEXT = '暂无'
 
 var REF_KINDS = {
   weapon: { type: 'weapon', list: 'dl-weapon', icon: '⚔', text: '武器' },
@@ -48,7 +83,9 @@ var state = {
   gq: '',                // 工具箱里最后一次搜索词
   idleExit: 0,           // 服务端开启的空闲自动退出秒数（0 = 未开启）
   drawerOpen: false,     // 右侧抽屉（回收站 / 批量替换 / 名称库 / 全局检索）是否展开
-  drawerTab: 'search'    // 抽屉当前页签
+  drawerTab: 'search',   // 抽屉当前页签
+  previewOpen: false,    // 右侧「实时预览」面板是否展开
+  previewText: false     // 预览显示形态：false = 渲染视图，true = 逐行文本
 }
 
 var $ = function (id) { return document.getElementById(id) }
@@ -131,7 +168,14 @@ function normalizeData (data) {
         }
         return {
           kind: 'crown',
-          items: asArray(r && r.items).map(function (it) { return { name: str(it && it.name).toUpperCase(), level: str(it && it.level) } })
+          items: asArray(r && r.items).map(function (it) {
+            return {
+              name: str(it && it.name).toUpperCase(),
+              level: str(it && it.level),
+              // 界面上「皇冠」是勾选框：单看 level 里有没有「必须」，`10` 这种旧文本写法也算必需
+              note: str(it && it.note)
+            }
+          })
         }
       }),
       panels: asArray(v2.panels).map(function (r) {
@@ -310,6 +354,8 @@ function diffSummary (before, after) {
 function markDirty (on) {
   state.dirty = !!on
   $('dirty').className = state.dirty ? 'dirty' : 'dirty hidden'
+  // 改动后刷新实时预览（预览面板没开时是空操作）
+  if (state.dirty) renderPreviewSoon()
 }
 
 /* ============================================================ 弹窗 */
@@ -432,10 +478,7 @@ function selectBox (path, value, options, cls) {
   return '<select class="' + (cls || '') + '" data-path="' + esc(path) + '">' + opts + '</select>'
 }
 
-function tierLabel (tier) {
-  var n = Number(tier)
-  return CN_NUM[n] ? '第' + CN_NUM[n] + '档' : String(tier)
-}
+/* 档位标签统一用上面那份 tierLabel（1/2/3 → 推荐/可选/过渡），这里不再重复定义 */
 
 /** 结构按钮：data-act + data-path + data-i 由事件委托处理 */
 function actBtn (act, path, text, cls, title, index) {
@@ -554,8 +597,9 @@ function renderWeapons () {
     return '<div class="box"' + rowAttr(rowId) + '>' +
       '<div class="box-head">' +
       '<span class="box-title">行 ' + (i + 1) + '</span>' +
-      '<input type="text" class="w-sm" data-path="' + p + '.label" value="' + esc(row.label) + '" placeholder="标签（可空，如 辅助向）">' +
+      '<input type="text" class="w-sm" data-path="' + p + '.label" value="' + esc(row.label) + '" placeholder="标签（可空，如 辅助向）" title="界面按显示层显示：首选 → 推荐、其他 → 可选">' +
       selectBox(p + '.tier', row.tier === null ? '' : row.tier, [{ value: '', label: '档位：不标' }].concat(TIERS.map(function (t) { return { value: t, label: tierLabel(t) } })), 'w-sm') +
+      (Number(row.tier) > 3 ? '<span class="warn-chip" title="数据里出现了第 ' + row.tier + ' 档：面板 / 网页版只认 1~3 档（推荐 / 可选 / 过渡），请确认是否该并档">⚠ 第 ' + row.tier + ' 档</span>' : '') +
       '<span class="spacer"></span>' +
       actBtn('move-row-up', 'v2.weapons', '↑', 'btn mini', '上移', i) +
       actBtn('move-row-down', 'v2.weapons', '↓', 'btn mini', '下移', i) +
@@ -583,14 +627,23 @@ function renderArtifacts () {
 
     var body2 = ''
     if (row.kind === 'main') {
-      body2 = '<div class="grid-3">' + MAIN_SLOTS.map(function (slot) {
-        return multiValue(slot, p + '.stats.' + slot, row.stats[slot], '如 攻击力')
-      }).join('') + '</div>' +
+      // 三个槽位是**并列**关系（槽内候选用 `/`）；这里实时显示当前渲染形态：
+      // `时之沙：… ｜ 空之杯：… ｜ 理之冠：…`（副词条才是优先级 `＞`）
+      var nowLine = MAIN_SLOTS
+        .filter(function (slot) { return asArray(row.stats && row.stats[slot]).length })
+        .map(function (slot) { return slot + '：' + asArray(row.stats[slot]).map(function (x) { return str(x).trim() }).filter(Boolean).join(' / ') })
+        .join(' ｜ ')
+      body2 = '<div class="muted main-hint">三个槽位是<strong>并列</strong>关系（槽内候选用 <code>/</code>，槽位之间渲染成 <code>｜</code>）；只有副词条用优先级 <code>＞</code>。' +
+        (nowLine ? '<br>当前渲染：<code>主词条：' + esc(nowLine) + '</code>' : '<br>当前渲染：<code>（空，' + EMPTY_TEXT + '）</code>') +
+        '</div>' +
+        '<div class="grid-3">' + MAIN_SLOTS.map(function (slot) {
+          return multiValue(slot, p + '.stats.' + slot, row.stats[slot], '如 攻击力')
+        }).join('') + '</div>' +
         '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px">' +
         '<span class="muted" style="font-size:12px">主词条括注</span>' +
         '<input type="text" class="w-sm" data-path="' + p + '.note" value="' + esc(row.note) + '" placeholder="可空，如 二命">' +
         selectBox(p + '.noteSlot', row.noteSlot, [{ value: '', label: '挂在哪个部位？' }].concat(MAIN_SLOTS.map(function (s) { return { value: s, label: '挂在 ' + s } })), 'w-sm') +
-        '<span class="muted" style="font-size:12px">写成「词条（二命）」，指回具体那个杯/沙/冠</span>' +
+        '<span class="muted" style="font-size:12px">对某个部位的**补充说明**才写这里（整行就是说明时不必写「注：」）</span>' +
         '</div>'
     } else if (row.kind === 'sub') {
       body2 = multiValue('副词条（按优先级从左到右）', p + '.stats', row.stats, '如 双爆')
@@ -661,14 +714,17 @@ function renderTalents () {
       var p = 'v2.talents.' + i
       var items = row.items.map(function (it, j) {
         var q = p + '.items.' + j
-        return '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
+        // 「皇冠」= 必需项：勾选（界面不再出现 `10` 这种文本，勾选状态落到 level='必须'）
+        var need = /必须/.test(str(it.level))
+        return '<div class="crown-row">' +
           talentField(it.name, q + '.name') +
-          '<input type="text" class="w-sm" data-path="' + q + '.level" value="' + esc(it.level) + '" placeholder="等级文本（如 建议/必须）">' +
+          '<label class="crown-check" title="勾选 = 需要皇冠（渲染成技能图标角上的皇冠徽标；不勾选 = 可选，不标注）">' +
+          '<input type="checkbox" data-path="' + q + '.level" data-crown="1"' + (need ? ' checked' : '') + '>必需（皇冠）</label>' +
           actBtn('del-item', p + '.items', '×', 'row-del', '删除', j) +
           '</div>'
       }).join('')
       return '<div class="box"' + rowAttr(p) + '><div class="box-head">' +
-        '<span class="box-title">皇冠</span><span class="spacer"></span>' +
+        '<span class="box-title">皇冠</span><span class="muted" style="font-size:12px">勾选「必需」的项会在预览 / 面板里带上皇冠徽标</span><span class="spacer"></span>' +
         actBtn('add-item', p + '.items', '＋ 天赋', 'btn mini') +
         actBtn('del-row', 'v2.talents', '删除行', 'btn mini danger', '删除这一行', i) +
         '</div><div class="sub-list">' + items + '</div></div>'
@@ -676,8 +732,9 @@ function renderTalents () {
     crownBody += '<div style="margin-top:8px">' + actBtn('add-crown', 'v2.talents', '＋ 再加一条皇冠', 'btn mini') + '</div>'
   }
 
-  var body = '<div style="font-size:12px;color:var(--text-soft);margin-bottom:6px">优先级</div>' + priBody +
-    '<div style="font-size:12px;color:var(--text-soft);margin:12px 0 6px">皇冠</div>' + crownBody
+  var body = '<div style="font-size:12px;color:var(--text-soft);margin-bottom:6px">优先级' +
+    (s.talents.length ? '' : '（' + EMPTY_TEXT + '）') + '</div>' + priBody +
+    '<div style="font-size:12px;color:var(--text-soft);margin:12px 0 6px">皇冠（必需项勾选）</div>' + crownBody
   return card('天赋加点', s.talents.length + ' 行', body, true)
 }
 
@@ -737,7 +794,7 @@ function renderTeams () {
     }).join('')
     return '<div class="box"' + rowAttr(rowId) + '><div class="box-head">' +
       '<span class="box-title">行 ' + (i + 1) + '</span>' +
-      '<input type="text" class="w-sm" data-path="' + p + '.label" value="' + esc(row.label) + '" placeholder="标签（如 首选）">' +
+      '<input type="text" class="w-sm" data-path="' + p + '.label" value="' + esc(row.label) + '" placeholder="标签（如 首选）" title="界面按显示层显示：首选 → 推荐、其他 → 可选（只改显示，不改数据）">' + labelHint(row.label) +
       '<span class="spacer"></span>' +
       actBtn('move-row-up', 'v2.teams', '↑', 'btn mini', '上移', i) +
       actBtn('move-row-down', 'v2.teams', '↓', 'btn mini', '下移', i) +
@@ -773,10 +830,12 @@ function renderTeamsHtml () {
 }
 
 function card (title, count, body, open, readonly) {
+  // 空模块在标题旁显示「暂无」灰字提示（与面板 / 网页版的占位一致）
+  var isEmpty = /^0(\s|行|$)/.test(String(count || ''))
   return '<details class="card"' + (open ? ' open' : '') + '>' +
     '<summary>' + esc(title) +
     '<span class="spacer"></span>' +
-    (count ? '<span class="count">' + esc(count) + '</span>' : '') +
+    (isEmpty ? '<span class="count empty">' + EMPTY_TEXT + '</span>' : (count ? '<span class="count">' + esc(count) + '</span>' : '')) +
     (readonly ? '<span class="count">只读</span>' : '') +
     '</summary><div class="card-body">' + body + '</div></details>'
 }
@@ -1760,6 +1819,12 @@ function formEvents () {
   form.addEventListener('input', function (e) {
     var el = e.target
     if (!el || !el.getAttribute) return
+    // 皇冠勾选框：勾上 = 必需（level='必须'），取消 = 可选（level=''）
+    if (el.getAttribute && el.getAttribute('data-crown')) {
+      setPath(state.model, el.getAttribute('data-path'), el.checked ? '必须' : '')
+      markDirty(true)
+      return
+    }
     var path = el.getAttribute('data-path')
     if (!path) return
     var kind = el.getAttribute('data-ref-kind')
@@ -2132,6 +2197,69 @@ function closeServerManually () {
   })
 }
 
+/* ============================================================ 实时预览 */
+
+var previewTimer = null
+var previewLast = null
+
+/** 打开 / 收起预览面板（右侧） */
+function togglePreview (on) {
+  var el = $('preview')
+  if (!el) return
+  var next = on === undefined ? el.classList.contains('hidden') : !!on
+  state.previewOpen = next
+  el.className = 'preview' + (next ? '' : ' hidden')
+  if (next) renderPreviewNow()
+}
+
+/** 延迟渲染（编辑时每 400ms 最多一次，避免每敲一个字都打接口） */
+function renderPreviewSoon () {
+  if (!state.previewOpen) return
+  if (previewTimer) clearTimeout(previewTimer)
+  previewTimer = setTimeout(renderPreviewNow, 400)
+}
+
+/**
+ * 调 /api/preview 拿渲染结果。
+ * 服务端用的是与面板 / 网页版**同一份显示归一**（scripts/lib/guide-display.mjs），
+ * 所以这里看到的就是最终效果；接口幂等、不改数据。
+ */
+function renderPreviewNow () {
+  var box = $('preview-body')
+  if (!box) return
+  if (!state.current || !state.model) {
+    box.innerHTML = '<div class="muted" style="padding:10px">先选一个角色。</div>'
+    return
+  }
+  syncRefInputs()
+  var body = buildBody()
+  var token = String(Date.now()) + Math.random()
+  previewLast = token
+  box.innerHTML = '<div class="muted" style="padding:10px">渲染中…</div>'
+  api('POST', '/api/preview', body).then(function (res) {
+    if (previewLast !== token) return   // 有更新的请求了，丢弃这次结果
+    previewLast = res
+    var nameEl = $('preview-name')
+    if (nameEl) nameEl.textContent = state.current + (asArray(res.issues).length ? '（⚠ ' + res.issues.length + ' 处名称待确认）' : '')
+    if (state.previewText) {
+      box.innerHTML = '<pre class="preview-lines">' + esc(asArray(res.lines).join('\n')) + '</pre>'
+    } else {
+      box.innerHTML = '<div class="guide-preview">' + res.html + '</div>'
+    }
+  }).catch(function (e) {
+    if (previewLast !== token) return
+    box.innerHTML = '<div class="muted" style="padding:10px">预览失败：' + esc(e.message) + '</div>'
+  })
+}
+
+/** 切换「渲染视图 / 逐行文本」 */
+function togglePreviewText () {
+  state.previewText = !state.previewText
+  var btn = $('btn-preview-text')
+  if (btn) btn.textContent = state.previewText ? '渲染视图' : '逐行文本'
+  renderPreviewNow()
+}
+
 function globalEvents () {
   $('search').addEventListener('input', function (e) {
     state.filter = e.target.value
@@ -2329,8 +2457,15 @@ function globalEvents () {
   /* ------------------------------------------------ 回收站（在抽屉里，事件见上） */
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return
-    if (state.drawerOpen) { e.preventDefault(); closeDrawer() }
+    if (state.drawerOpen) { e.preventDefault(); closeDrawer(); return }
+    if (state.previewOpen) { e.preventDefault(); togglePreview(false) }
   })
+
+  /* ------------------------------------------------ 实时预览 */
+  $('btn-preview').addEventListener('click', function () { togglePreview() })
+  $('btn-preview-close').addEventListener('click', function () { togglePreview(false) })
+  $('btn-preview-refresh').addEventListener('click', function () { renderPreviewNow() })
+  $('btn-preview-text').addEventListener('click', function () { togglePreviewText() })
 
   /* ------------------------------------------------ 快捷键 */
   document.addEventListener('keydown', function (e) {
@@ -2346,6 +2481,12 @@ function globalEvents () {
       e.preventDefault()
       $('gsearch').focus()
       $('gsearch').select()
+      return
+    }
+    if (mod && key === 'p') {
+      // Ctrl+P 默认是打印，这里改成实时预览
+      e.preventDefault()
+      togglePreview()
       return
     }
     // 角色列表：↑↓ 切换（输入框里不抢键）

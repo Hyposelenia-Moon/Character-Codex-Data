@@ -42,6 +42,7 @@ import crypto from 'node:crypto'
 import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { deriveSections, deriveTags, validate, parseRef, itemText } from './lib/schema.mjs'
+import { renderGuideSectionsHtml, renderGuideSectionsText, characterSections, renderCard } from './build-html.mjs'
 import { verifyThreeWay, snapshotMainDoc, sha1File } from './lib/publish-verify.mjs'
 import { buildIndex } from './build-index.mjs'
 
@@ -2124,6 +2125,53 @@ function runNodeScript (file, args = []) {
   })
 }
 
+/* -------------------------------------------------------------- 实时预览 */
+
+/**
+ * POST /api/preview
+ *
+ * 「编辑器里看到的就是面板 / 网页最终效果」：把**编辑器当前表单内容**（未保存也行）交给
+ * 与网页版 / 面板**同一份显示级归一**（scripts/lib/guide-display.mjs，经 build-html.mjs 的
+ * characterSections），返回六个模块的渲染结果：
+ *   · html —— 与 guide.html 卡片同一套渲染函数（含 推荐/可选/过渡、`｜`、`＞`、皇冠 SVG、暂无）
+ *   · lines —— 逐行纯文本，便于与面板模型逐行比对
+ *   · sections —— 归一后的渲染模型（调试 / 逐行比对用）
+ *
+ * **幂等且不改数据**：只读内存里的 body，不写任何文件、不重建索引。
+ * body: { name?, game?, meta?, v2?, unparsed? }（与 PUT /api/character 同形状）
+ */
+async function apiPreview (req, res) {
+  const body = await readJsonBody(req)
+  const asked = String(body?.name ?? '').trim()
+  const name = isValidName(asked) ? asked : '预览'
+  let prev = {}
+  if (isValidName(asked)) {
+    const file = characterFile(asked)
+    if (fs.existsSync(file)) {
+      try {
+        prev = readJson(file)
+      } catch { prev = {} }
+    }
+  }
+  // 与保存走同一套规范化：mergeV2 按位置合并 + normalizeV2 去空行 + tags/sections 回推
+  const data = buildCharacter(body?.character ?? body, name, prev)
+  const html = renderGuideSectionsHtml(data, { indent: 2 })
+  const lines = renderGuideSectionsText(data)
+  const sections = characterSections(data).map(s => ({
+    badge: s.badge ?? '',
+    title: s.displayTitle ?? s.title,
+    kind: s.kind,
+    empty: !!s.empty,
+    rows: (s.rows ?? []).map(r => ({
+      label: r.label ?? '',
+      kind: r.kind ?? '',
+      items: (r.items ?? []).map(it => ({ text: it.text, sepAfter: it.sepAfter || '', crown: it.crown === true, note: it.note || '' }))
+    })),
+    teams: (s.teams ?? []).map(t => ({ tag: t.tag ?? '', members: (t.members ?? []).map(m => ({ name: m.name, note: m.note || '' })), note: t.note || '' }))
+  }))
+  sendJson(res, 200, { ok: true, name, html, lines, sections, issues: validate(data, readIndex()) })
+}
+
 /* ------------------------------------------------------------- 静态资源服务 */
 
 const serveIndexHtml = (res) => serveStatic(res, '/index.html')
@@ -2195,6 +2243,7 @@ async function route (req, res) {
     if (pathname === '/api/batch-replace/undo' && method === 'POST') return await apiBatchUndo(req, res)
     if (pathname === '/api/batch-replace' && method === 'POST') return await apiBatchReplace(req, res)
     if (pathname === '/api/publish' && method === 'POST') return await apiPublish(req, res)
+    if (pathname === '/api/preview' && method === 'POST') return await apiPreview(req, res)
     // 心跳 / 关闭信号：只在开了 --exit-on-idle 时才有实际作用（否则仅回 200，纯 no-op）
     if (pathname === '/api/heartbeat') {
       if (idleWatcher) idleWatcher.heartbeat()

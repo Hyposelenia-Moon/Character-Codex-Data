@@ -39,14 +39,22 @@ const canon = s => String(s ?? '')
  */
 const itemSig = i => canon(clean(i.text) + clean(i.note ? `（${String(i.note).replace(/^[（(]|[）)]$/g, '')}）` : '') + '|' + clean(i.sepAfter || ''))
 const rowSig = row => canon((row.items || []).map(itemSig).join(' '))
-/** 配队行：两端都把「成员为空的说明」当行尾备注看（网页版放在 text、面板放在 note） */
-const teamSig = t => canon([t.tag || '', (t.members || []).map(m => clean(m.name)).join('+'), clean(t.note || t.text || '')].join('|'))
+/**
+ * 配队行：两端都把「成员为空的说明」当行尾备注看（网页版放在 text、面板放在 note）。
+ * 备注的 `注：` 前缀由显示层按 `notePrefix` 决定（整行就是备注时不加），
+ * 所以比对前先剥掉前缀，只比内容（前缀的有无另有专门断言）。
+ */
+const teamSig = t => canon([t.tag || '', (t.members || []).map(m => clean(m.name)).join('+'), clean(String(t.note || t.text || '').replace(/^注\s*[:：]/, ''))].join('|'))
 /**
  * 插件侧把**段末备注行**（`注：…`）也塞进 `section.teams` 里渲染（v2TeamRows 之后的
  * note-row 是插件既有的展示细节）；网页版把它们归到行尾备注。为聚焦「角色 / 套装 / 档位」
  * 的一致性，这里把插件侧这类纯备注行排除（它们的文案本身两端相同）。
+ *
+ * 判定：没有成员、也没有「除 `注：` 前缀外的标签」→ 就是一条整行备注。
+ * （`notePrefix === true` 的行是「成员 + 补充说明」，属于正常队伍行，不能排除。）
  */
-const isPanelNoteRow = t => !t.tag && !(t.members || []).length && /^注[:：]/.test(String(t.note ?? ''))
+const isPanelNoteRow = t => !(t.members || []).length &&
+  (!String(t.tag ?? '').trim() || /^注\s*[:：]?$/.test(String(t.tag ?? '').trim()))
 
 let rows = 0
 let teams = 0

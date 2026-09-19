@@ -409,7 +409,9 @@ export function characterSections (data) {
     if (!src) return { title, badge, type: kind, kind, rows: [], teams: [] }
     const lines = displayLines(src.lines ?? [])
     if (kind === 'teams') {
-      // 段末备注行 `注：…` 不占队伍行（避免与成员备注重复），交给模板的段末备注渲染
+      // 段末备注行 `注：…` 是**整行备注**（不加前缀，见 guide-display.mjs 的 NOTE_PREFIX_RULE）：
+      // 它不当独立队伍行渲染，交给该行已有内容的行尾备注 / 段末备注通道；
+      // 面板侧（插件 display.normalizeTeams 的 notePrefix=false）同样不画它，两端保持一致。
       const teamLines = lines.filter(l => !/^注\s*[:：]/.test(l))
       return { title, badge, type: 'teams', kind, rows: [], teams: teamsFromLines(teamLines) }
     }
@@ -434,7 +436,7 @@ function teamsFromLines (lines) {
     const body = (kv ? kv[2] : text).trim()
     const noteHit = body.match(/^(.*?)[\s　]*(注\s*[:：].*)$/)
     const membersPart = (noteHit ? noteHit[1] : body).trim()
-    const notes = noteHit ? [noteHit[2].trim()] : []
+    const notes = noteHit ? [noteHit[2].trim().replace(/^注\s*[:：]\s*/, '')] : []
     const members = /\s*[+＋＆&]\s*/.test(membersPart)
       ? membersPart.split(/\s*[+＋＆&]\s*/).map(x => x.trim()).filter(Boolean)
         .map(name => ({ name, ref: '', plain: name }))
@@ -453,13 +455,69 @@ function renderItems (row) {
   const items = row.items ?? []
   if (!items.length) return ''
   if (row.kind === 'note') return `<span class="row-note">${inline(items[0]?.text ?? '')}</span>`
-  if (items.length === 1) return `<span class="row-value">${inline(items[0].text)}</span>`
+  if (items.length === 1) return `<span class="row-value">${inline(items[0].text)}${crownBadge(items[0])}</span>`
   const parts = items.map(it => {
     const note = it.note ? `<span class="rank-note">（${inline(it.note)}）</span>` : ''
     const sep = it.sepAfter ? `<span class="sep">${inline(it.sepAfter)}</span>` : ''
-    return `<span class="rank-unit"><span class="rank-item">${inline(it.text)}${note}</span>${sep}</span>`
+    return `<span class="rank-unit"><span class="rank-item">${inline(it.text)}${crownBadge(it)}${note}</span>${sep}</span>`
   })
   return `<span class="rank-list">${parts.join('')}</span>`
+}
+
+/**
+ * 皇冠必需项的徽标：**内联 SVG**（不用 emoji —— 游戏内 webview 渲染不一致）。
+ * 数据里的 `10` 已经不在文本里，皇冠只由渲染模型的 `crown: true` 表达。
+ */
+function crownBadge (item) {
+  if (!item || item.crown !== true) return ''
+  return '<svg class="crown-badge" viewBox="0 0 16 16" role="img" aria-label="需要皇冠">' +
+    '<path d="M1.6 4.4l2.9 2.1L8 2.6l3.5 3.9 2.9-2.1-1.3 8.1H2.9z" fill="currentColor"/>' +
+    '<rect x="2.9" y="12.9" width="10.2" height="1.7" rx="0.85" fill="currentColor"/>' +
+    '<circle cx="1.6" cy="4.4" r="1.15" fill="currentColor"/>' +
+    '<circle cx="14.4" cy="4.4" r="1.15" fill="currentColor"/>' +
+    '<circle cx="8" cy="2.6" r="1.25" fill="currentColor"/></svg>'
+}
+
+/**
+ * 六个模块 → 预览用 HTML 片段（与 guide.html 的卡片**同一套渲染函数**）
+ * @param {object} data 角色 JSON
+ * @param {{dir?: string, indent?: number}} [opts]
+ * @returns {string}
+ */
+export function renderGuideSectionsHtml (data, opts = {}) {
+  const indent = Number.isInteger(opts.indent) ? opts.indent : 6
+  return characterSections(data)
+    .map(section => renderDisplaySection(section, indent, opts.dir ?? ''))
+    .join('\n')
+}
+
+/**
+ * 六个模块 → 纯文本行（预览面板的逐行文本；与面板模型逐行可比对）
+ * 形如 `[天赋] 优先级：Q＞E＞A`、`[配队] 推荐：A + B 注：…`
+ * @param {object} data
+ * @returns {string[]}
+ */
+export function renderGuideSectionsText (data) {
+  const out = []
+  for (const section of characterSections(data)) {
+    const name = `${section.badge ? section.badge + ' ' : ''}${section.displayTitle ?? section.title}`
+    if (section.empty) { out.push(`[${name}] ${EMPTY_TEXT}`); continue }
+    if (section.kind === 'teams') {
+      for (const team of section.teams) {
+        const members = team.members.map(m => `${m.name}${m.note ? `（${m.note}）` : ''}`).join(' + ')
+        const note = team.note ? `${team.notePrefix ? '注：' : ''}${team.note}` : ''
+        const body = [members, note].filter(Boolean).join(team.members.length ? ' ' : '')
+        out.push(`[${name}] ${team.tag ? team.tag + '：' : ''}${body}`)
+      }
+      continue
+    }
+    for (const row of section.rows) {
+      if (row.kind === 'note') { out.push(`[${name}] ${row.items?.[0]?.text ?? ''}`); continue }
+      const body = (row.items ?? []).map(it => `${it.text}${it.crown ? '👑' : ''}${it.sepAfter || ''}`).join('')
+      out.push(`[${name}] ${row.label ? row.label + '：' : ''}${body}`)
+    }
+  }
+  return out
 }
 
 /**
@@ -469,7 +527,7 @@ function renderItems (row) {
  * @param {string} dir
  * @returns {string} HTML
  */
-function renderDisplaySection (section, indent, dir) {
+export function renderDisplaySection (section, indent, dir) {
   const pad = ' '.repeat(indent)
   const out = []
   out.push(`${pad}<div class="section${section.empty ? ' section-empty' : ''}">`)
@@ -485,7 +543,9 @@ function renderDisplaySection (section, indent, dir) {
         const note = m.note ? `<span class="team-note-inline">（${inline(m.note)}）</span>` : ''
         return `<span class="team-member">${inline(m.name)}${note}</span>`
       }).join('<span class="team-plus">+</span>')
-      const note = team.note ? `<span class="row-note">${inline(team.note)}</span>` : ''
+      const note = team.note ? `<span class="row-note">${team.notePrefix ? '注：' : ''}${inline(team.note)}</span>` : ''
+      // 没有成员也没有备注的行不画（避免渲染出空的「可选：」）
+      if (!team.members.length && !note) return
       out.push(`${pad}        <div class="row${team.tag ? '' : ' row-nolabel'}">${tag}<span class="row-value">${members}${note}</span></div>`)
     }
     out.push(`${pad}    </div>`)

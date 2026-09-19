@@ -644,6 +644,55 @@ textarea { resize: vertical; min-height: 54px; }
 .trash-item .ti-btns { flex: 0 0 auto; display: flex; gap: 6px; }
 .empty-trash { padding: 26px 10px; text-align: center; }
 
+/* ============================================================ 实时预览面板 */
+
+.preview {
+  position: fixed;
+  top: var(--topbar-h);
+  right: 0;
+  bottom: 0;
+  z-index: 29;
+  width: min(520px, 94vw);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px 16px;
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  box-shadow: -12px 0 30px rgba(20, 26, 38, .12);
+}
+
+.preview-head { display: flex; align-items: center; gap: 8px; }
+.preview-title { font-weight: 600; }
+.preview-head .spacer { flex: 1 1 auto; }
+.preview-note { font-size: 11px; line-height: 1.5; }
+.preview-body { flex: 1 1 auto; overflow: auto; border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: #fbfcfe; }
+.preview-lines { margin: 0; font: 12px/1.7 Consolas, "Microsoft YaHei", monospace; white-space: pre-wrap; word-break: break-word; }
+
+/* 预览里的六模块：视觉对齐 guide.html（同一套显示归一的结果） */
+.guide-preview .section { margin-bottom: 12px; }
+.guide-preview .section-title { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 13px; color: #333; border-bottom: 1px solid var(--line); padding-bottom: 4px; margin-bottom: 6px; }
+.guide-preview .section-badge { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: #4a4a4a; color: #fff; font-size: 11px; }
+.guide-preview .section-empty-text { color: #b3ada4; font-style: italic; font-size: 12px; }
+.guide-preview .row { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; line-height: 1.7; margin-bottom: 3px; }
+.guide-preview .row-label { flex: 0 0 auto; min-width: 52px; padding: 0 6px; border-radius: 4px; background: rgba(110, 110, 110, .11); color: #2f2f2f; font-weight: 700; text-align: center; }
+.guide-preview .row-value { min-width: 0; }
+.guide-preview .rank-item { display: inline-block; padding: 0 7px; border: 1px solid #e3e9f2; border-radius: 6px; background: #f5f8fc; color: #2d3748; }
+.guide-preview .rank-note, .guide-preview .row-note { color: #8a8378; font-size: 11.5px; font-style: italic; }
+.guide-preview .sep { color: #a9b4c4; font-weight: 700; padding: 0 3px; }
+.guide-preview .team-member { color: #2d3748; }
+.guide-preview .team-plus { color: #a9b4c4; padding: 0 4px; }
+.guide-preview .crown-badge { width: 12px; height: 12px; margin-left: 3px; vertical-align: 1px; color: #c8891a; }
+
+/* ============================================================ 皇冠勾选框 / 主词条提示 */
+
+.crown-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.crown-check { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-dim); cursor: pointer; white-space: nowrap; }
+.crown-check input { width: 14px; height: 14px; accent-color: #c8891a; }
+.main-hint { font-size: 11.5px; line-height: 1.6; margin-bottom: 6px; }
+.main-hint code { font-size: 11.5px; }
+.count.empty { color: #b3ada4; font-style: italic; }
+
 /* ============================================================ 引用字段的小按钮 */
 
 .pick-btn {

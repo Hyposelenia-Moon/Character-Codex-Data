@@ -36,6 +36,8 @@
     </span>
     <button id="btn-drawer" class="btn tb" type="button" title="批量替换 / 名称库 / 回收站 / 全局检索">
       <svg class="tb-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4.5h10M3 8h10M3 11.5h10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>更多</button>
+    <button id="btn-preview" class="btn tb" type="button" title="实时预览（Ctrl+P）：用与面板 / 网页版同一份显示归一渲染当前编辑内容">
+      <svg class="tb-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.6 8S4.4 3.6 8 3.6 14.4 8 14.4 8 11.6 12.4 8 12.4 1.6 8 1.6 8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="8" cy="8" r="1.9" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>预览</button>
     <span class="top-actions">
       <span id="dirty" class="dirty hidden">● 未保存</span>
       <span id="current-name" class="current-name">未选择角色</span>
@@ -84,6 +86,20 @@
     </div>
     <div class="drawer-tabs" id="drawer-tabs"></div>
     <div class="drawer-body" id="drawer-body"></div>
+  </aside>
+
+  <!-- 实时预览：用服务端 /api/preview（与面板 / 网页版同一份显示归一）渲染当前表单内容 -->
+  <aside id="preview" class="preview hidden" aria-label="实时预览">
+    <div class="preview-head">
+      <span class="preview-title">实时预览</span>
+      <span id="preview-name" class="muted"></span>
+      <span class="spacer"></span>
+      <button type="button" class="btn mini" id="btn-preview-text" title="切换「渲染视图 / 逐行文本」">逐行文本</button>
+      <button type="button" class="btn mini" id="btn-preview-refresh" title="立即重新渲染">刷新</button>
+      <button type="button" class="btn mini" id="btn-preview-close" title="收起（Ctrl+P / Esc）">✕</button>
+    </div>
+    <div class="preview-note muted">与面板 / 网页版同一份显示归一：推荐 / 可选 / 过渡、`｜`、`＞`、皇冠徽标、暂无</div>
+    <div id="preview-body" class="preview-body"><div class="muted" style="padding:10px">打开编辑器后自动渲染当前角色。</div></div>
   </aside>
 </div>
 
