@@ -55,7 +55,10 @@ export async function loadParseBlock () {
   fs.mkdirSync(path.join(dir, 'lib'), { recursive: true })
   const code = fs.readFileSync(path.join(here, 'parse-docx.mjs'), 'utf8')
   fs.writeFileSync(path.join(dir, 'parse-docx.mjs'), code.replace(/^main\(\)$/m, '') + '\nexport { parseBlock }\n', 'utf8')
-  for (const f of ['docx.mjs', 'schema.mjs']) fs.copyFileSync(path.join(here, 'lib', f), path.join(dir, 'lib', f))
+  for (const f of ['docx.mjs', 'schema.mjs', 'parse-warnings.mjs']) {
+    const src = path.join(here, 'lib', f)
+    if (fs.existsSync(src)) fs.copyFileSync(src, path.join(dir, 'lib', f))
+  }
   const mod = await import(new URL('file://' + path.join(dir, 'parse-docx.mjs').replace(/\\/g, '/')).href)
   if (typeof mod.parseBlock !== 'function') throw new Error('无法从 parse-docx.mjs 复用 parseBlock')
   parseBlock = mod.parseBlock
@@ -607,7 +610,10 @@ export function parseToJson (docx, dumpDir, opts = {}) {
   fs.mkdirSync(path.join(clone, 'scripts', 'lib'), { recursive: true })
   fs.mkdirSync(path.join(clone, 'data'), { recursive: true })
   fs.copyFileSync(path.join(here, 'parse-docx.mjs'), path.join(clone, 'scripts', 'parse-docx.mjs'))
-  for (const f of ['docx.mjs', 'schema.mjs']) fs.copyFileSync(path.join(here, 'lib', f), path.join(clone, 'scripts', 'lib', f))
+  for (const f of ['docx.mjs', 'schema.mjs', 'parse-warnings.mjs']) {
+    const src = path.join(here, 'lib', f)
+    if (fs.existsSync(src)) fs.copyFileSync(src, path.join(clone, 'scripts', 'lib', f))
+  }
   fs.copyFileSync(path.join(dataDir, '_index.json'), path.join(clone, 'data', '_index.json'))
   const abs = path.isAbsolute(docx) ? docx : path.resolve(root, docx)
   const r = childRun(path.join(clone, 'scripts', 'parse-docx.mjs'), [abs], clone, path.join(clone, 'stdout.txt'), opts.giDir ? { DSH_GI_DIR: opts.giDir } : undefined)

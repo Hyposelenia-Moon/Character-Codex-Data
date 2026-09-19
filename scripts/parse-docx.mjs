@@ -15,6 +15,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readDocx, SEPARATOR } from './lib/docx.mjs'
 import { makeRef, parseRef, deriveSections, deriveTags, validate, constellationIndex, extractMarks, stripMarks, MARK_RE, parseNoteLine, resolveNoteText, artifactStatPool, isNoteRow } from './lib/schema.mjs'
+import { warn, getWarnings, resetWarnings, setWarnContext } from './lib/parse-warnings.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '..')
@@ -322,11 +323,13 @@ function parseMainStats (text, into = { 时之沙: [], 空之杯: [], 理之冠:
   let current = null
   const take = (raw) => {
     let v = String(raw ?? '').trim()
+    const before = v
     const m = v.match(NAME_NOTE_RE)
     if (m && !out.note && resolveNoteText(m[2], { readPool: [] })) {
       out.note = m[2]
       out.slot = current
       v = m[1].trim()
+      if (!current) warn(`主词条括注「（${m[2]}）」出现在任何部位之前，无法归位，已兜底按「时之沙」处理（原文：${before}）`)
     }
     return stripCostParens(v).trim()
   }
@@ -342,6 +345,8 @@ function parseMainStats (text, into = { 时之沙: [], 空之杯: [], 理之冠:
     } else {
       const v = take(seg)
       if (v) into['时之沙'].push(v)
+      // 还没遇到过任何部位就有独立词条 → 无法归位，兜底塞进「时之沙」并显式告警（防呆，不静默）
+      warn(`主词条片段「${String(seg).trim()}」出现在任何部位之前，无法归位，已兜底归入「时之沙」`)
     }
   }
   return into
@@ -627,10 +632,12 @@ function main () {
   }
   if (cur.some(x => x.trim())) blocks.push(cur)
 
-  const report = { doc: docFile, characters: [], totals: { characters: 0, weapons: 0, artifacts: 0, talents: 0, panels: 0, constellations: 0, teams: 0, notes: 0, unparsed: 0 }, issues: [], stray: [] }
+  const report = { doc: docFile, characters: [], totals: { characters: 0, weapons: 0, artifacts: 0, talents: 0, panels: 0, constellations: 0, teams: 0, notes: 0, unparsed: 0 }, issues: [], stray: [], warnings: [] }
+  resetWarnings()
   for (const block of blocks) {
     const lines = block.filter(x => x !== '')
     if (!lines.length) continue
+    setWarnContext(String(lines[0] ?? '').split('——')[0].trim())
     const parsed = parseBlock(lines, index)
     if (!parsed.name || parsed.name.includes('共 129') || parsed.name.startsWith('原神 ·')) continue
     const prevFile = path.join(giDir, `${parsed.name}.json`)
@@ -686,6 +693,13 @@ function main () {
   console.log(`武器行 ${report.totals.weapons} / 圣遗物行 ${report.totals.artifacts} / 天赋行 ${report.totals.talents} / 面板行 ${report.totals.panels} / 命座 ${report.totals.constellations} / 配队行 ${report.totals.teams}`)
   console.log(`备注行（注：）${report.totals.notes} 条`)
   console.log(`未识别行：${report.totals.unparsed}${dry ? '（--dry 未写文件）' : ''}`)
+  report.warnings = getWarnings()
+  if (report.warnings.length) {
+    console.log(`解析告警：${report.warnings.length} 条（无法保留 / 无法归位的括注与标记${dry ? '，--dry 不写文件' : '，已汇总进 data/_parse-report.json 的 warnings'}）`)
+    for (const w of report.warnings.slice(0, 8)) console.log(`  ⚠ ${w}`)
+  } else {
+    console.log('解析告警：0 条（没有无法保留 / 无法归位的括注与标记）')
+  }
   if (report.issues.length) {
     console.log(`名称校验问题：${report.issues.length} 条（详见 data/_parse-report.json）`)
     for (const it of report.issues.slice(0, 8)) console.log(`  · ${it.name} ${it.where} ${it.ref} — ${it.reason}`)

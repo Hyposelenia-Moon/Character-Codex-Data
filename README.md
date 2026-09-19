@@ -371,21 +371,41 @@ PowerShell 的隐藏命令，而不是直接指向 `node.exe`：
             →  三方一致性校验（全过才继续）  →  git add + git commit（**绝不 push**）
 ```
 
-**保存并发布 = 保存 + 发布 + 三方校验 + 自动提交；推送（`git push`）由人工执行** ——
+**保存并发布 = 保存 + 发布 + 多方校验 + 自动提交；推送（`git push`）由人工执行** ——
 全链路只做 `git add` / `git commit`，**不执行任何 `git push`，也不设置远端**。
 
-「三方一致」指：**数据库（`data/gi`）× 文档（Word 主文档）× 网页版（`guide.html`）** 内容一致。
+「一致」指：**数据库（`data/gi`）× 主文档（干净可读版）× 标记版文档 × 网页版（`guide.html`）** 内容等价。
 提交前逐项校验，**任一项不过就跳过提交**（已生成的文档 / 网页保持可用，不回滚）：
 
 | 校验 | 命令 / 依据 | 通过标准 |
 |------|-------------|----------|
-| a. 数据 ↔ 文档 | `node scripts/diagnose-docx-json.mjs` | 不一致角色 **0** |
-| b. 文档往返 | `build-docx --write-main` 的往返校验（`parse-docx` 读回 vs 生成时 JSON） | **129/129 深度相等** |
+| a. 数据 ↔ 主文档 | `node scripts/diagnose-docx-json.mjs` | 不一致角色 **0** |
+| b. 主文档往返 | `build-docx --write-main` 的往返校验（`parse-docx` 读回 vs 生成时 JSON） | **129/129 深度相等** |
 | c. 网页版新鲜度 | `guide.html` 必须是本次 publish 的 `build-html` 刚生成的（比对 sha1/大小） | 本次生成 |
 | d. 悬挂分隔符 | `node scripts/scan-separators.mjs` | **0 处** |
+| e. 标记版文档 | 标记版本次刷新；`parse-docx` 读回与 `data/gi` **129/129 深度相等**；与主文档**去标记后逐字一致** | 全过 |
 
 任一项不过时返回 `{ok:false, step:'verify', detail:'…', commitExecuted:false}`，
 `detail` 里写明**哪一项没过、哪几个角色不一致**，摘要也会标注「已跳过自动提交」。
+
+### 两份文档的分工（主文档=可读版，标记版=转换用）
+
+`build-docx --write-main` 一次产出**两份**文档，内容同源、去标记后逐字等价：
+
+| 文档 | 内容 | 用途 |
+|------|------|------|
+| `D:\文件\游戏\原神\原神·角色攻略.docx`（主文档） | **纯文本可读版**（等价 `--no-mark`） | 给人读 / 手工微调 |
+| `out\原神·角色攻略(标记版).docx` + `D:\文件\游戏\原神\原神·角色攻略(标记版).docx` | **带引用标记** `[[w:]] [[a:]] [[c:]] [[t:]] [[k:]]` | 给 `parse-docx` 转换用（引用显式化） |
+
+* 只想单独生成一种：`--out x.docx --no-mark`（纯文本）/ `--out x.docx`（带标记，默认）；`--marked-src` 表示按标记版语义生成。
+* 标记版覆盖交付副本前备份 `.bak-<时间戳>`（保留最近 5 份）。
+* 写主文档**只**发生在显式 `--write-main`，且往返校验不过就拒绝写。
+
+### 解析告警（防呆，不静默）
+
+`parse-docx` 遇到**无法保留 / 无法归位**的括注或标记时会显式告警：
+逐条 `⚠ 解析告警：…` 打到 stderr，并汇总进 `data/_parse-report.json` 的 `warnings` 数组
+（既有 `注：` 备注走廊机制不变）。正常文档应为 `解析告警：0 条`。
 
 | 产出 | 说明 |
 |------|------|
@@ -541,7 +561,12 @@ node scripts/build-doc.mjs       # guide.md
 ### 字体（不入库，用 `scripts/fetch-font.mjs` 从上游同步）
 
 `汉仪文黑-85W.ttf` 是**商业字体**，版权归汉仪字库（北京汉仪创新科技股份有限公司）所有，
-**不在本仓库的授权范围内，也不随仓库分发**（已 `git rm --cached` 从版本控制移除，并写进 `.gitignore` 的 `*.ttf` / `*.otf`）。
+**不在本仓库的授权范围内，也不随仓库分发**：
+
+- 该文件**已从整个 git 历史里彻底移除**（`git filter-repo` / `git filter-branch --index-filter` + `reflog expire` + `gc --prune=now`，
+  所有 ref 的任何提交里都不再含这个 blob），因此**远端一旦强推，别人也看不到它**；
+- 同时写进 `.gitignore` 的 `*.ttf` / `*.otf`，避免以后再被 `git add` 带进去；
+- 本机想看图鉴网页版的真实排版，用 `node scripts/fetch-font.mjs` 从上游取一份同名文件放到仓库根目录即可（见下）。
 
 #### 上游到底有没有这个字体
 

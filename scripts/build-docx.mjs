@@ -30,9 +30,15 @@ const root = path.resolve(here, '..')
 const dataDir = path.join(root, 'data')
 const giDir = path.join(dataDir, 'gi')
 const DEFAULT_DOC = 'D:\\文件\\游戏\\原神\\原神·角色攻略.docx'
-/** 标记版文档：仓库内产物 + 用户目录里的交付副本（与主文档同源） */
+/**
+ * 两份文档的分工（用户决定，模式 B）：
+ *   主文档 = 纯文本可读版（--write-main 时等价 --no-mark）
+ *   标记版 = 带 [[w:]]/[[a:]]/[[c:]]/[[t:]]/[[k:]] 的转换用版本
+ */
 const MARKED_OUT = path.join(root, 'out', '原神·角色攻略(标记版).docx')
 const MARKED_SHIPPED = 'D:\\文件\\游戏\\原神\\原神·角色攻略(标记版).docx'
+/** 标记版的中间产物（验证通过后才同步到 out/ 与交付路径） */
+const MARKED_STAGE = path.join(root, '.tmp', 'build-docx', '原神·角色攻略(标记版).docx')
 
 /** 六个小节标题（顺序 = 文档里 `1.` … `6.` 的顺序） */
 export const SECTIONS = ['武器推荐', '圣遗物推荐', '天赋加点', '毕业面板参考', '命座推荐', '配队推荐']
@@ -551,6 +557,23 @@ async function main () {
   const t0 = Date.now()
   const args = parseArgs(process.argv.slice(2))
   const writesMain = path.resolve(args.out) === path.resolve(DEFAULT_DOC)
+
+  /** 把一次 build 的 entries 写成 stage 文件：zip 部件完整性 + 往返校验 */
+  const writeStage = (rr, stage, tmpDir) => {
+    const writtenX = writeDocx(rr.entries, stage)
+    const verifyX = verifyAgainstJson(stage, rr.bundle, path.join(tmpDir, `v-${path.basename(stage, '.docx')}`), rr.jsonSnapshot, rr.frozenGiDir?.dir)
+    const rtX = readDocx(stage)
+    const needX = ['[Content_Types].xml', '_rels/.rels', 'word/document.xml']
+    const missingX = needX.filter(n => !rtX.entries.has(n))
+    const changedX = []
+    for (const [name, buf] of rr.src.entries) {
+      if (name === 'word/document.xml') continue
+      const other = rtX.entries.get(name)
+      if (!other || sha256(buf) !== sha256(other)) changedX.push(name)
+    }
+    return { written: writtenX, rt: rtX, missing: missingX, changedOthers: changedX, verify: verifyX }
+  }
+
   const r = await build({ template: args.template, mark: args.mark, out: args.out })
   const w = args.dry ? { bytes: 0, count: r.entries.size, stored: [], deflated: [] } : null
 
@@ -573,21 +596,9 @@ async function main () {
 
   // ---- 先写到临时文件并自检，通过后才备份 / 替换目标 ----
   const stage = path.join(tmp, `stage-${process.pid}.docx`)
-  const written = writeDocx(r.entries, stage)
-
-  let verify = null
-  if (args.verify) verify = verifyAgainstJson(stage, r.bundle, tmp, r.jsonSnapshot, r.frozenGiDir?.dir)
-
-  // ---- zip 结构与部件完整性 ----
-  const rt = readDocx(stage)
-  const need = ['[Content_Types].xml', '_rels/.rels', 'word/document.xml']
-  const missing = need.filter(n => !rt.entries.has(n))
-  const changedOthers = []
-  for (const [name, buf] of r.src.entries) {
-    if (name === 'word/document.xml') continue
-    const other = rt.entries.get(name)
-    if (!other || sha256(buf) !== sha256(other)) changedOthers.push(name)
-  }
+  const sres = writeStage(r, stage, tmp)
+  const { written, rt, missing, changedOthers } = sres
+  const verify = sres.verify
 
   // 主文档要备份；out/ 下的试验产物直接覆盖
   // 硬门槛：写主文档前往返校验必须通过 —— 否则宁可不写，保留旧文档
@@ -612,24 +623,27 @@ async function main () {
     if (!post.ok) process.exitCode = 1
   }
 
-  // ---- 标记版：与主文档同源（当前主文档本身就带标记），同步刷新两份 ----
+  // ---- 标记版：单独生成一份带引用标记的（主文档是干净可读版，两者去标记后应逐字等价）----
   let marked = null
   if (writesMain) {
-    marked = syncMarkedDocx(args.out)
-    // 权威复验：直接解析「已落盘的标记版」，与生成时 JSON 深比较
-    const mv = verifyAgainstJson(marked.shippedPath, r.bundle, path.join(tmp, 'marked'), r.jsonSnapshot, r.frozenGiDir?.dir)
-    marked.roundTrip = mv.ok ? `${mv.names.length}/${r.bundle.names.length} 完全相等` : '不一致 → ' + mv.diffs.slice(0, 3).join(' ｜ ')
+    const mr = await build({ template: args.template, mark: true, out: MARKED_STAGE, frozenGiDir: r.frozenGiDir?.dir })
+    const mstage = path.join(tmp, `marked-${process.pid}.docx`)
+    const mres = writeStage(mr, mstage, tmp)
+    const mv = mres.verify
+    marked = syncMarkedDocx(mstage)
+    marked.roundTrip = mv.ok ? `${mv.names.length}/${mr.bundle.names.length} 完全相等` : '不一致 → ' + mv.diffs.slice(0, 3).join(' ｜ ')
     marked.roundTripOk = mv.ok
+    marked.markStats = mr.markStats
+    marked.stripsEqualCheck = stripsEqual(marked.shippedPath, args.out)
+    marked.stripsEqual = marked.stripsEqualCheck.equal
+    marked.paragraphs = mres.rt.paragraphs
     marked.sameAsMain = marked.sha === sha1File(args.out)
-    marked.differsOnlyByPath = marked.sameAsMain
-    marked.stats = mv.stats
-    marked.stripsEqual = stripsEqual(marked.shippedPath, args.out)
     console.log(`标记版输出：${marked.outPath}`)
-    console.log(`标记版拷贝：${marked.shippedPath}（备份 ${marked.backup ?? '无'}）`)
+    console.log(`标记版拷贝：${marked.shippedPath}（备份 ${marked.backup ?? '无'}，${marked.bytes} 字节，sha1 ${String(marked.sha).slice(0, 12)}）`)
     console.log(`标记版往返（parse-docx ↔ 生成时 JSON）：${marked.roundTrip}`)
-    console.log(`主文档 ↔ 标记版：字节级${marked.sameAsMain ? '完全一致（同源产物）' : '不同'}（sha1 ${marked.sha.slice(0, 12)}）`)
-    console.log(`两份文档去标记后逐字一致：${marked.stripsEqual.equal ? `是（${marked.stripsEqual.paragraphs} 段全等）` : `否（${marked.stripsEqual.diffs.length} 处不同）`}`)
-    if (!mv.ok || !marked.stripsEqual.equal) process.exitCode = 1
+    console.log(`两份文档去标记后逐字一致：${marked.stripsEqual ? `是（${marked.stripsEqualCheck.paragraphs} 段全等）` : `否（${marked.stripsEqualCheck.diffs.join('；')}）`}`)
+    fs.rmSync(mstage, { force: true })
+    if (!mv.ok || !marked.stripsEqual) process.exitCode = 1
   }
 
   console.log(`zip：${written.count} 个部件（store ${written.stored.length} / deflate ${written.deflated.length}），${written.bytes} 字节`)
