@@ -637,6 +637,7 @@ async function main () {
   console.log(`段落数：产物 ${rt.paragraphs}（模板 ${r.paragraphs}）`)
   console.log(`备份：${backup ?? (writesMain ? '（目标不存在，未备份）' : '（非主文档，无需备份）')}`)
   console.log(`写出：${args.out}`)
+  console.log(`主文档 sha1：${sha1File(args.out)}`)
   if (verify) {
     const fmt = s => `角色 ${s.characters}/武器 ${s.weapons}/圣遗物 ${s.artifacts}/天赋 ${s.talents}/面板 ${s.panels}/命座 ${s.constellations}/配队 ${s.teams}/未识别 ${s.unparsed}`
     console.log(`回读统计（parse-docx --dry）：${fmt(verify.stats)}`)
@@ -647,6 +648,35 @@ async function main () {
     console.log(`冻结快照目录：${r.frozenGiDir?.dir ?? '（无）'}`)
     if (!verify.ok) process.exitCode = 1
   }
+  // ---- 标记版（自包含块，防止被并发编辑覆盖）：主文档=干净可读版，标记版=带引用标记 ----
+  if (writesMain) {
+    const MARKED_OUT = path.join(OUT_DIR, '原神·角色攻略(标记版).docx')
+    const MARKED_SHIPPED = 'D:\\文件\\游戏\\原神\\原神·角色攻略(标记版).docx'
+    const mstage = path.join(tmp, `marked-${process.pid}.docx`)
+    const mr = await build({ template: args.template, mark: true, out: mstage, frozenGiDir: r.frozenGiDir?.dir })
+    // 自包含：写 stage + 往返校验（不依赖 main 里的局部函数，避免被并发编辑覆盖）
+    const mWritten = writeDocx(mr.entries, mstage)
+    const mv = verifyAgainstJson(mstage, mr.bundle, path.join(tmp, `mv-${process.pid}`), mr.jsonSnapshot, mr.frozenGiDir?.dir)
+    if (!mv.ok) console.log(`⚠ 标记版往返校验未通过：${mv.diffs.slice(0, 3).join(' ｜ ')}`)
+    console.log(`标记版 zip：${mWritten.count} 个部件，${mWritten.bytes} 字节`)
+    fs.mkdirSync(OUT_DIR, { recursive: true })
+    fs.copyFileSync(mstage, MARKED_OUT)
+    fs.mkdirSync(path.dirname(MARKED_SHIPPED), { recursive: true })
+    const markedBackup = fs.existsSync(MARKED_SHIPPED) ? backupFile(MARKED_SHIPPED) : null
+    atomicWrite(MARKED_SHIPPED, fs.readFileSync(mstage))
+    const markedSha = sha1File(MARKED_SHIPPED)
+    const strips = stripsEqual(MARKED_SHIPPED, args.out)
+    const markedParas = readDocx(MARKED_SHIPPED).paragraphs.length
+    console.log(`标记版输出：${MARKED_OUT}`)
+    console.log(`标记版拷贝：${MARKED_SHIPPED}（备份 ${markedBackup ?? '无'}）`)
+    console.log(`标记版往返（parse-docx ↔ 生成时 JSON）：${mv.ok ? `${mv.names.length}/${mr.bundle.names.length} 完全相等` : '不一致'}`)
+    console.log(`标记版标记数：w=${mr.markStats.marks.w} a=${mr.markStats.marks.a} c=${mr.markStats.marks.c} t=${mr.markStats.marks.t} k=${mr.markStats.marks.k}`)
+    console.log(`两份文档去标记后逐字一致：${strips.equal ? `是（${strips.paragraphs} 段全等）` : `否（${strips.diffs.join('；')}）`}`)
+    console.log(`标记版 sha1：${markedSha}`)
+    fs.rmSync(mstage, { force: true })
+    if (!mv.ok || !strips.equal) process.exitCode = 1
+  }
+
   // ---- 幂等：再生成一次，document.xml 必须逐字节相同 ----
   const again = await build({ template: args.out, mark: args.mark, out: args.out })
   const idem = again.docFingerprint === docFingerprint(args.out)

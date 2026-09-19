@@ -1806,19 +1806,27 @@ function parseMarkedDocxLog (text) {
   const shippedPath = shim?.[1]?.trim() ?? 'D:\\文件\\游戏\\原神\\原神·角色攻略(标记版).docx'
   const backup = shim?.[2]?.trim() ?? null
   const roundTrip = t.match(/^标记版往返（parse-docx ↔ 生成时 JSON）：(.*)$/m)?.[1]?.trim() ?? null
-  const sameAsMain = /主文档 ↔ 标记版：字节级完全一致/.test(t)
+  const mainSha = t.match(/^主文档 sha1：(.*)$/m)?.[1]?.trim() ?? null
+  const markedShaLog = t.match(/^标记版 sha1：(.*)$/m)?.[1]?.trim() ?? null
+  const markCounts = t.match(/^标记版标记数：w=(\d+) a=(\d+) c=(\d+) t=(\d+) k=(\d+)/m)
   const strips = t.match(/^两份文档去标记后逐字一致：(是|否)/m)?.[1]
+  const sha = sha1File(shippedPath) ?? markedShaLog
   return {
     outPath,
     shippedPath,
     backup: backup && backup !== '无' ? backup : null,
     bytes: fs.existsSync(shippedPath) ? fs.statSync(shippedPath).size : 0,
-    sha: sha1File(shippedPath),
+    sha,
+    mainSha,
+    mainBytes: fs.existsSync(DEFAULT_DOC) ? fs.statSync(DEFAULT_DOC).size : 0,
+    marks: markCounts
+      ? { w: Number(markCounts[1]), a: Number(markCounts[2]), c: Number(markCounts[3]), t: Number(markCounts[4]), k: Number(markCounts[5]) }
+      : null,
     roundTrip,
     roundTripOk: Boolean(roundTrip && /完全相等/.test(roundTrip)),
-    sameAsMain,
+    sameAsMain: Boolean(mainSha && mainSha === sha),
     stripsEqual: strips === '是',
-    fresh: Boolean(outPath && fs.existsSync(outPath) && fs.existsSync(shippedPath) && sha1File(outPath) === sha1File(shippedPath))
+    fresh: Boolean(outPath && fs.existsSync(outPath) && fs.existsSync(shippedPath) && sha1File(outPath) === sha)
   }
 }
 
