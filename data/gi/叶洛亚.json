@@ -1,6 +1,187 @@
 {
+  "schema": 2,
   "name": "叶洛亚",
   "game": "gi",
+  "meta": {
+    "建议等级": "81级",
+    "定位": "月结晶专辅",
+    "100级提升": "___%"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": "辅助",
+        "tier": null,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "匣里灭辰",
+            "ref": "weapon:匣里灭辰"
+          }
+        ]
+      },
+      {
+        "label": "循环",
+        "tier": null,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "西风长枪",
+            "ref": "weapon:西风长枪"
+          },
+          {
+            "name": "寒息",
+            "ref": "weapon:寒息"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "纺月的夜歌",
+            "ref": "artifact:纺月的夜歌"
+          }
+        ]
+      },
+      {
+        "kind": "transition",
+        "label": null,
+        "sep": " + ",
+        "sets": [
+          {
+            "name": "2精通",
+            "ref": "artifact:2精通"
+          },
+          {
+            "name": "2精通",
+            "ref": "artifact:2精通"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "元素充能效率",
+            "元素精通"
+          ],
+          "空之杯": [
+            "元素精通"
+          ],
+          "理之冠": [
+            "元素精通",
+            "暴击率"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "充能效率",
+          "元素精通",
+          "暴击率"
+        ],
+        "sep": " > "
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          }
+        ],
+        "raw": "Q"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "Q",
+            "level": "必须",
+            "ref": "talent:Q"
+          }
+        ]
+      }
+    ],
+    "panels": [
+      {
+        "label": null,
+        "k": "充能效率",
+        "v": "200%+"
+      },
+      {
+        "label": null,
+        "k": "元素精通",
+        "v": "800+"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "二命",
+        "index": 2,
+        "text": "解锁纺月"
+      },
+      {
+        "name": "六命",
+        "index": 6,
+        "text": "提供双爆加成"
+      }
+    ],
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "兹白",
+            "ref": "character:兹白"
+          },
+          {
+            "name": "叶洛亚",
+            "ref": "character:叶洛亚"
+          },
+          {
+            "name": "哥伦比娅",
+            "ref": "character:哥伦比娅"
+          },
+          {
+            "name": "莉奈娅",
+            "ref": "character:莉奈娅"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "其他",
+        "members": [
+          {
+            "name": "兹白",
+            "ref": "character:兹白"
+          },
+          {
+            "name": "叶洛亚",
+            "ref": "character:叶洛亚"
+          },
+          {
+            "name": "哥伦比娅",
+            "ref": "character:哥伦比娅"
+          },
+          {
+            "name": "五郎",
+            "ref": "character:五郎"
+          }
+        ],
+        "text": ""
+      }
+    ]
+  },
   "tags": [
     {
       "text": "建议等级：81级",
@@ -9,6 +190,10 @@
     {
       "text": "定位：月结晶专辅",
       "style": "role"
+    },
+    {
+      "text": "100级提升：___%",
+      "style": "power"
     }
   ],
   "sections": [
@@ -16,24 +201,23 @@
       "title": "1. 武器推荐",
       "lines": [
         "辅助：匣里灭辰",
-        "循环：西风长枪（精5）",
-        "其他：喜多院十文字（精5）"
+        "循环：西风长枪 > 寒息"
       ]
     },
     {
       "title": "2. 圣遗物推荐",
       "lines": [
-        "首选：纺月的夜歌（二命）",
+        "首选：纺月的夜歌",
         "过渡：2精通 + 2精通",
-        "主词条：时之沙：元素充能效率 / 元素精通 / 空之杯：元素精通 / 理之冠：元素精通 / 暴击率（带西风时）",
-        "副词条：充能效率 > 元素精通 > 暴击率（带西风时）"
+        "主词条：时之沙：元素充能效率 / 元素精通 / 空之杯：元素精通 / 理之冠：元素精通 / 暴击率",
+        "副词条：充能效率 > 元素精通 > 暴击率"
       ]
     },
     {
       "title": "3. 天赋加点",
       "lines": [
-        "优先级：Q > E > A",
-        "皇冠：Q（**必须**）"
+        "优先级：Q",
+        "皇冠：Q（必须）"
       ]
     },
     {

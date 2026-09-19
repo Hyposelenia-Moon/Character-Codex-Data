@@ -1,6 +1,212 @@
 {
+  "schema": 2,
   "name": "爱可菲",
   "game": "gi",
+  "meta": {
+    "建议等级": "81-90级",
+    "定位": "冰系专辅",
+    "100级提升": "___%"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": "辅助向",
+        "tier": null,
+        "sep": " ≥ ",
+        "items": [
+          {
+            "name": "香韵奏者",
+            "ref": "weapon:香韵奏者"
+          },
+          {
+            "name": "西风长枪",
+            "ref": "weapon:西风长枪"
+          }
+        ]
+      },
+      {
+        "label": "输出向",
+        "tier": null,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "香韵奏者",
+            "ref": "weapon:香韵奏者"
+          },
+          {
+            "name": "息灾",
+            "ref": "weapon:息灾"
+          },
+          {
+            "name": "其他输出长枪",
+            "ref": "weapon:其他输出长枪"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": "危战首选",
+        "sep": " / ",
+        "sets": [
+          {
+            "name": "烬城勇者绘卷",
+            "ref": "artifact:烬城勇者绘卷"
+          },
+          {
+            "name": "千岩牢固",
+            "ref": "artifact:千岩牢固"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "元素充能效率"
+          ],
+          "空之杯": [
+            "攻击力"
+          ],
+          "理之冠": [
+            "暴击率"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "充能",
+          "大攻击"
+        ],
+        "sep": " > "
+      },
+      {
+        "kind": "preferred",
+        "label": "日常使用",
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "黄金剧团",
+            "ref": "artifact:黄金剧团"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "攻击力"
+          ],
+          "空之杯": [
+            "冰元素伤害加成"
+          ],
+          "理之冠": [
+            "暴击率",
+            "暴击伤害"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "双爆",
+          "大攻击",
+          "充能"
+        ],
+        "sep": " > "
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "E",
+            "ref": "talent:E"
+          },
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          },
+          {
+            "name": "A",
+            "ref": "talent:A"
+          }
+        ],
+        "raw": "E > Q > A"
+      }
+    ],
+    "panels": [
+      {
+        "label": "辅助向",
+        "text": "暴击率70%+ / 充能240%+"
+      },
+      {
+        "label": "输出向",
+        "text": "暴击率70%+ / 暴伤180%+ / 攻击2000+ / 充能180%+"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "一命",
+        "index": 1,
+        "text": "提升冰元素爆伤"
+      },
+      {
+        "name": "二命",
+        "index": 2,
+        "text": "提升前台角色爆发伤害"
+      }
+    ],
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "丝柯克",
+            "ref": "character:丝柯克"
+          },
+          {
+            "name": "爱可菲",
+            "ref": "character:爱可菲"
+          },
+          {
+            "name": "芙宁娜",
+            "ref": "character:芙宁娜"
+          },
+          {
+            "name": "莫娜",
+            "ref": "character:莫娜"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "其他",
+        "members": [
+          {
+            "name": "神里绫华",
+            "ref": "character:神里绫华"
+          },
+          {
+            "name": "爱可菲",
+            "ref": "character:爱可菲"
+          },
+          {
+            "name": "芙宁娜",
+            "ref": "character:芙宁娜"
+          },
+          {
+            "name": "砂糖",
+            "ref": "character:砂糖"
+          }
+        ],
+        "text": ""
+      }
+    ]
+  },
   "tags": [
     {
       "text": "建议等级：81-90级",
@@ -9,13 +215,17 @@
     {
       "text": "定位：冰系专辅",
       "style": "role"
+    },
+    {
+      "text": "100级提升：___%",
+      "style": "power"
     }
   ],
   "sections": [
     {
       "title": "1. 武器推荐",
       "lines": [
-        "辅助向：香韵奏者 ≥ 西风长枪（精5）",
+        "辅助向：香韵奏者 ≥ 西风长枪",
         "输出向：香韵奏者 > 息灾 > 其他输出长枪"
       ]
     },

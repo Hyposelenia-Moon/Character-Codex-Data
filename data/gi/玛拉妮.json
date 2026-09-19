@@ -1,31 +1,181 @@
 {
+  "schema": 2,
   "name": "玛拉妮",
   "game": "gi",
-  "tags": [],
+  "meta": {
+    "建议等级": "___级",
+    "定位": "___",
+    "100级提升": "___%"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "冲浪时光",
+            "ref": "weapon:冲浪时光"
+          },
+          {
+            "name": "遗祀玉珑",
+            "ref": "weapon:遗祀玉珑"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "黑曜秘典",
+            "ref": "artifact:黑曜秘典"
+          }
+        ]
+      },
+      {
+        "kind": "transition",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "沉沦之心",
+            "ref": "artifact:沉沦之心"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "生命值",
+            "元素精通"
+          ],
+          "空之杯": [
+            "水元素伤害加成",
+            "生命值"
+          ],
+          "理之冠": [
+            "暴击率",
+            "暴击伤害"
+          ]
+        }
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "E",
+            "ref": "talent:E"
+          },
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          }
+        ],
+        "raw": "E > Q"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "E",
+            "ref": "talent:E"
+          },
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          }
+        ]
+      }
+    ],
+    "panels": [
+      {
+        "label": null,
+        "k": "暴击率",
+        "v": "52-60%"
+      },
+      {
+        "label": null,
+        "k": "暴击伤害",
+        "v": "265-290%"
+      },
+      {
+        "label": null,
+        "k": "元素精通",
+        "v": "150-250"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "二命",
+        "index": 2,
+        "text": ""
+      },
+      {
+        "name": "六命",
+        "index": 6,
+        "text": ""
+      }
+    ],
+    "teams": []
+  },
+  "tags": [
+    {
+      "text": "建议等级：___级",
+      "style": "level"
+    },
+    {
+      "text": "定位：___",
+      "style": "role"
+    },
+    {
+      "text": "100级提升：___%",
+      "style": "power"
+    }
+  ],
   "sections": [
     {
       "title": "1. 武器推荐",
-      "lines": []
+      "lines": [
+        "第一档：冲浪时光 > 遗祀玉珑"
+      ]
     },
     {
       "title": "2. 圣遗物推荐",
-      "lines": []
+      "lines": [
+        "首选：黑曜秘典",
+        "过渡：沉沦之心",
+        "主词条：时之沙：生命值 / 元素精通 / 空之杯：水元素伤害加成 / 生命值 / 理之冠：暴击率 / 暴击伤害"
+      ]
     },
     {
       "title": "3. 天赋加点",
-      "lines": []
+      "lines": [
+        "优先级：E > Q",
+        "皇冠：EQ"
+      ]
     },
     {
       "title": "4. 毕业面板参考",
-      "lines": []
+      "lines": [
+        "暴击率：52-60%",
+        "暴击伤害：265-290%",
+        "元素精通：150-250"
+      ]
     },
     {
       "title": "5. 命座推荐",
-      "lines": []
-    },
-    {
-      "title": "6. 配队推荐",
-      "lines": []
+      "lines": [
+        "二命",
+        "六命"
+      ]
     }
   ],
   "source": {

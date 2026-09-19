@@ -1,31 +1,187 @@
 {
+  "schema": 2,
   "name": "法尔伽",
   "game": "gi",
-  "tags": [],
+  "meta": {
+    "建议等级": "90级",
+    "定位": "魔导混伤c",
+    "100级提升": "___%"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "狼的武功歌",
+            "ref": "weapon:狼的武功歌"
+          },
+          {
+            "name": "苇海信标",
+            "ref": "weapon:苇海信标"
+          },
+          {
+            "name": "焚曜千阳",
+            "ref": "weapon:焚曜千阳"
+          }
+        ]
+      },
+      {
+        "label": null,
+        "tier": 2,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "螭骨剑",
+            "ref": "weapon:螭骨剑"
+          },
+          {
+            "name": "狼的末路",
+            "ref": "weapon:狼的末路"
+          },
+          {
+            "name": "无工之剑",
+            "ref": "weapon:无工之剑"
+          }
+        ]
+      },
+      {
+        "label": null,
+        "tier": 3,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "浪影阔剑",
+            "ref": "weapon:浪影阔剑"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "风起之日",
+            "ref": "artifact:风起之日"
+          }
+        ]
+      },
+      {
+        "kind": "transition",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "角斗士的终幕礼",
+            "ref": "artifact:角斗士的终幕礼"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "攻击力"
+          ],
+          "空之杯": [
+            "攻击力"
+          ],
+          "理之冠": [
+            "暴击伤害",
+            "暴击率"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "暴击率",
+          "暴击伤害",
+          "攻击力百分比"
+        ],
+        "sep": " / "
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "E",
+            "ref": "talent:E"
+          },
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          }
+        ],
+        "raw": "E＞Q"
+      }
+    ],
+    "panels": [],
+    "constellations": [
+      {
+        "name": "二命",
+        "index": 2,
+        "text": ""
+      },
+      {
+        "name": "六命",
+        "index": 6,
+        "text": ""
+      }
+    ],
+    "teams": []
+  },
+  "tags": [
+    {
+      "text": "建议等级：90级",
+      "style": "level"
+    },
+    {
+      "text": "定位：魔导混伤c",
+      "style": "role"
+    },
+    {
+      "text": "100级提升：___%",
+      "style": "power"
+    }
+  ],
   "sections": [
     {
       "title": "1. 武器推荐",
-      "lines": []
+      "lines": [
+        "第一档：狼的武功歌 > 苇海信标 > 焚曜千阳",
+        "第二档：螭骨剑 > 狼的末路 > 无工之剑",
+        "第三档：浪影阔剑"
+      ]
     },
     {
       "title": "2. 圣遗物推荐",
-      "lines": []
+      "lines": [
+        "首选：风起之日",
+        "过渡：角斗士的终幕礼",
+        "主词条：时之沙：攻击力 / 空之杯：攻击力 / 理之冠：暴击伤害 / 暴击率",
+        "副词条：暴击率 / 暴击伤害 / 攻击力百分比"
+      ]
     },
     {
       "title": "3. 天赋加点",
-      "lines": []
-    },
-    {
-      "title": "4. 毕业面板参考",
-      "lines": []
+      "lines": [
+        "优先级：E > Q"
+      ]
     },
     {
       "title": "5. 命座推荐",
-      "lines": []
-    },
-    {
-      "title": "6. 配队推荐",
-      "lines": []
+      "lines": [
+        "二命",
+        "六命"
+      ]
     }
   ],
   "source": {

@@ -1,13 +1,215 @@
 {
+  "schema": 2,
   "name": "砂糖",
   "game": "gi",
+  "meta": {
+    "建议等级": "60级突破",
+    "定位": "精通拐/减抗辅"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": "攻击主C队",
+        "tier": null,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "讨龙英杰谭",
+            "ref": "weapon:讨龙英杰谭"
+          },
+          {
+            "name": "其他辅助武器",
+            "ref": "weapon:其他辅助武器"
+          }
+        ]
+      },
+      {
+        "label": "月耀队",
+        "tier": null,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "祭礼残章",
+            "ref": "weapon:祭礼残章"
+          },
+          {
+            "name": "265精通武器",
+            "ref": "weapon:265精通武器"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "翠绿之影",
+            "ref": "artifact:翠绿之影"
+          }
+        ]
+      },
+      {
+        "kind": "preferred",
+        "label": "月绽放",
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "教官",
+            "ref": "artifact:教官"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "元素精通",
+            "元素充能效率"
+          ],
+          "空之杯": [
+            "元素精通"
+          ],
+          "理之冠": [
+            "元素精通"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "元素精通",
+          "充能效率"
+        ],
+        "sep": " > "
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "E",
+            "ref": "talent:E"
+          },
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          },
+          {
+            "name": "A",
+            "ref": "talent:A"
+          }
+        ],
+        "raw": "E > Q > A"
+      }
+    ],
+    "panels": [
+      {
+        "label": null,
+        "k": "元素精通",
+        "v": "800+"
+      },
+      {
+        "label": null,
+        "k": "充能效率",
+        "v": "180%+"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "一命",
+        "index": 1,
+        "text": "增加E次数"
+      },
+      {
+        "name": "六命",
+        "index": 6,
+        "text": "提供元素增伤"
+      }
+    ],
+    "teams": [
+      {
+        "label": "月感电",
+        "members": [
+          {
+            "name": "哥伦比娅",
+            "ref": "character:哥伦比娅"
+          },
+          {
+            "name": "菲林斯",
+            "ref": "character:菲林斯"
+          },
+          {
+            "name": "伊涅芙",
+            "ref": "character:伊涅芙"
+          },
+          {
+            "name": "希诺宁",
+            "ref": "character:希诺宁"
+          },
+          {
+            "name": "砂糖",
+            "ref": "character:砂糖"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "月绽放",
+        "members": [
+          {
+            "name": "哥伦比娅",
+            "ref": "character:哥伦比娅"
+          },
+          {
+            "name": "奈芙尔",
+            "ref": "character:奈芙尔"
+          },
+          {
+            "name": "菈乌玛",
+            "ref": "character:菈乌玛"
+          },
+          {
+            "name": "砂糖",
+            "ref": "character:砂糖"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "火神队",
+        "members": [
+          {
+            "name": "玛薇卡",
+            "ref": "character:玛薇卡"
+          },
+          {
+            "name": "茜特菈莉",
+            "ref": "character:茜特菈莉"
+          },
+          {
+            "name": "砂糖",
+            "ref": "character:砂糖"
+          },
+          {
+            "name": "班尼特",
+            "ref": "character:班尼特"
+          }
+        ],
+        "text": ""
+      }
+    ]
+  },
   "tags": [
     {
       "text": "建议等级：60级突破",
       "style": "level"
     },
     {
-      "text": "定位：增伤辅/精通拐",
+      "text": "定位：精通拐/减抗辅",
       "style": "role"
     }
   ],
@@ -15,8 +217,8 @@
     {
       "title": "1. 武器推荐",
       "lines": [
-        "攻击主C队：讨龙英杰谭（精5） > 其他辅助武器",
-        "月耀队：祭礼残章（精5） > 265精通武器"
+        "攻击主C队：讨龙英杰谭 > 其他辅助武器",
+        "月耀队：祭礼残章 > 265精通武器"
       ]
     },
     {
@@ -51,7 +253,7 @@
     {
       "title": "6. 配队推荐",
       "lines": [
-        "月感电：哥伦比娅 + 菲林斯 + 伊涅芙 + 希诺宁 / 砂糖",
+        "月感电：哥伦比娅 + 菲林斯 + 伊涅芙 + 希诺宁 + 砂糖",
         "月绽放：哥伦比娅 + 奈芙尔 + 菈乌玛 + 砂糖",
         "火神队：玛薇卡 + 茜特菈莉 + 砂糖 + 班尼特"
       ]

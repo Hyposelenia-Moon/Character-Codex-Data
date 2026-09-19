@@ -1,6 +1,212 @@
 {
+  "schema": 2,
   "name": "兹白",
   "game": "gi",
+  "highlight": "100级提升：约 5.7%",
+  "meta": {
+    "建议等级": "90级",
+    "定位": "月结晶站场主C",
+    "100级提升": "约 5.7%"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "朏魄含光",
+            "ref": "weapon:朏魄含光"
+          },
+          {
+            "name": "有乐御簾切",
+            "ref": "weapon:有乐御簾切"
+          },
+          {
+            "name": "黎明神剑",
+            "note": "精五",
+            "ref": "weapon:黎明神剑"
+          }
+        ]
+      },
+      {
+        "label": null,
+        "tier": 2,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "岩峰巡歌",
+            "ref": "weapon:岩峰巡歌"
+          },
+          {
+            "name": "裁叶萃光",
+            "ref": "weapon:裁叶萃光"
+          },
+          {
+            "name": "静水流涌之辉",
+            "ref": "weapon:静水流涌之辉"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "穹境示现之夜",
+            "ref": "artifact:穹境示现之夜"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "防御力"
+          ],
+          "空之杯": [
+            "防御力"
+          ],
+          "理之冠": [
+            "暴击伤害",
+            "暴击率",
+            "防御力（特殊）"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "双爆",
+          "防御力"
+        ],
+        "sep": " > "
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "E",
+            "ref": "talent:E"
+          },
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          },
+          {
+            "name": "A",
+            "ref": "talent:A"
+          }
+        ],
+        "raw": "E > Q > A"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "E",
+            "level": "必须",
+            "ref": "talent:E"
+          },
+          {
+            "name": "Q",
+            "level": "建议",
+            "ref": "talent:Q"
+          }
+        ]
+      }
+    ],
+    "panels": [
+      {
+        "label": null,
+        "k": "防御力",
+        "v": "2400+"
+      },
+      {
+        "label": null,
+        "k": "暴击率",
+        "v": "60-70%（根据队友拐力）"
+      },
+      {
+        "label": null,
+        "k": "暴击伤害",
+        "v": "240%+"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "一命",
+        "index": 1,
+        "text": "改变输出轴"
+      },
+      {
+        "name": "二命",
+        "index": 2,
+        "text": "提升输出上限"
+      },
+      {
+        "name": "六命",
+        "index": 6,
+        "text": "大幅增加输出上限"
+      }
+    ],
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "兹白",
+            "ref": "character:兹白"
+          },
+          {
+            "name": "叶洛亚",
+            "ref": "character:叶洛亚"
+          },
+          {
+            "name": "哥伦比娅",
+            "ref": "character:哥伦比娅"
+          },
+          {
+            "name": "莉奈娅",
+            "ref": "character:莉奈娅"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "其他",
+        "members": [
+          {
+            "name": "兹白",
+            "ref": "character:兹白"
+          },
+          {
+            "name": "叶洛亚",
+            "ref": "character:叶洛亚"
+          },
+          {
+            "name": "哥伦比娅",
+            "ref": "character:哥伦比娅"
+          },
+          {
+            "name": "五郎",
+            "ref": "character:五郎"
+          },
+          {
+            "name": "希诺宁（二命）",
+            "ref": "character:希诺宁（二命）"
+          }
+        ],
+        "text": ""
+      }
+    ]
+  },
   "tags": [
     {
       "text": "建议等级：90级",
@@ -9,16 +215,18 @@
     {
       "text": "定位：月结晶站场主C",
       "style": "role"
+    },
+    {
+      "text": "100级提升：约 5.7%",
+      "style": "power"
     }
   ],
-  "highlight": "100级提升：约 5.7%",
   "sections": [
     {
       "title": "1. 武器推荐",
       "lines": [
-        "第一档：朏魄含光 > 有乐御簾切",
-        "第二档：黎明神剑（精五） > 岩峰巡歌",
-        "第三档：裁叶萃光 > 静水流涌之辉"
+        "第一档：朏魄含光 > 有乐御簾切 > 黎明神剑（精五）",
+        "第二档：岩峰巡歌 > 裁叶萃光 > 静水流涌之辉"
       ]
     },
     {
@@ -33,7 +241,7 @@
       "title": "3. 天赋加点",
       "lines": [
         "优先级：E > Q > A",
-        "皇冠：E（**必须**）Q（建议）"
+        "皇冠：E（必须）Q（建议）"
       ]
     },
     {
@@ -56,7 +264,7 @@
       "title": "6. 配队推荐",
       "lines": [
         "首选：兹白 + 叶洛亚 + 哥伦比娅 + 莉奈娅",
-        "其他：兹白 + 叶洛亚 + 哥伦比娅 + 五郎 / 希诺宁（二命）"
+        "其他：兹白 + 叶洛亚 + 哥伦比娅 + 五郎 + 希诺宁（二命）"
       ]
     }
   ],

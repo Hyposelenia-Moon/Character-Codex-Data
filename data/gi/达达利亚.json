@@ -1,0 +1,203 @@
+{
+  "schema": 2,
+  "name": "达达利亚",
+  "game": "gi",
+  "meta": {
+    "建议等级": "90级",
+    "定位": "战场主c",
+    "100级提升": "___%"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "冬极白星",
+            "ref": "weapon:冬极白星"
+          },
+          {
+            "name": "若水",
+            "ref": "weapon:若水"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "水仙之梦",
+            "ref": "artifact:水仙之梦"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "攻击力"
+          ],
+          "空之杯": [
+            "水元素伤害加成"
+          ],
+          "理之冠": [
+            "暴击伤害",
+            "暴击率"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "暴击率",
+          "暴击伤害",
+          "攻击力"
+        ],
+        "sep": " > "
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          },
+          {
+            "name": "E",
+            "ref": "talent:E"
+          },
+          {
+            "name": "A",
+            "ref": "talent:A"
+          }
+        ],
+        "raw": "Q > E > A"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          }
+        ]
+      }
+    ],
+    "panels": [
+      {
+        "label": null,
+        "k": "暴击率",
+        "v": "80-90%"
+      },
+      {
+        "label": null,
+        "k": "暴击伤害",
+        "v": "180-200%"
+      },
+      {
+        "label": null,
+        "k": "元素精通",
+        "v": "150"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "六命",
+        "index": 6,
+        "text": "清除战技cd"
+      }
+    ],
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "达达利亚",
+            "ref": "character:达达利亚"
+          },
+          {
+            "name": "枫原万叶",
+            "ref": "character:枫原万叶"
+          },
+          {
+            "name": "行秋",
+            "ref": "character:行秋"
+          },
+          {
+            "name": "班尼特",
+            "ref": "character:班尼特"
+          }
+        ],
+        "text": ""
+      }
+    ]
+  },
+  "tags": [
+    {
+      "text": "建议等级：90级",
+      "style": "level"
+    },
+    {
+      "text": "定位：战场主c",
+      "style": "role"
+    },
+    {
+      "text": "100级提升：___%",
+      "style": "power"
+    }
+  ],
+  "sections": [
+    {
+      "title": "1. 武器推荐",
+      "lines": [
+        "第一档：冬极白星 > 若水"
+      ]
+    },
+    {
+      "title": "2. 圣遗物推荐",
+      "lines": [
+        "首选：水仙之梦",
+        "主词条：时之沙：攻击力 / 空之杯：水元素伤害加成 / 理之冠：暴击伤害 / 暴击率",
+        "副词条：暴击率 > 暴击伤害 > 攻击力"
+      ]
+    },
+    {
+      "title": "3. 天赋加点",
+      "lines": [
+        "优先级：Q > E > A",
+        "皇冠：Q"
+      ]
+    },
+    {
+      "title": "4. 毕业面板参考",
+      "lines": [
+        "暴击率：80-90%",
+        "暴击伤害：180-200%",
+        "元素精通：150"
+      ]
+    },
+    {
+      "title": "5. 命座推荐",
+      "lines": [
+        "六命——清除战技cd"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：达达利亚 + 枫原万叶 + 行秋 + 班尼特"
+      ]
+    }
+  ],
+  "source": {
+    "guide": "原神·角色攻略.docx"
+  }
+}

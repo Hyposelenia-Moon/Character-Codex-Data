@@ -1,6 +1,231 @@
 {
+  "schema": 2,
   "name": "菲林斯",
   "game": "gi",
+  "highlight": "100级提升：约 8%",
+  "meta": {
+    "建议等级": "90级",
+    "定位": "月感电站场主C",
+    "100级提升": "约 8%"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "血染荒城",
+            "ref": "weapon:血染荒城"
+          },
+          {
+            "name": "赤沙之杖",
+            "ref": "weapon:赤沙之杖"
+          },
+          {
+            "name": "支离轮光",
+            "ref": "weapon:支离轮光"
+          }
+        ]
+      },
+      {
+        "label": null,
+        "tier": 2,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "护摩之杖",
+            "ref": "weapon:护摩之杖"
+          },
+          {
+            "name": "和璞鸢",
+            "ref": "weapon:和璞鸢"
+          },
+          {
+            "name": "柔灯挽歌",
+            "ref": "weapon:柔灯挽歌"
+          }
+        ]
+      },
+      {
+        "label": null,
+        "tier": 3,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "决斗之枪",
+            "ref": "weapon:决斗之枪"
+          },
+          {
+            "name": "峡湾长歌",
+            "ref": "weapon:峡湾长歌"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "穹境示现之夜",
+            "ref": "artifact:穹境示现之夜"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "攻击力"
+          ],
+          "空之杯": [
+            "攻击力"
+          ],
+          "理之冠": [
+            "暴击伤害",
+            "暴击率"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "双爆",
+          "攻击力",
+          "充能"
+        ],
+        "sep": " > "
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          },
+          {
+            "name": "E",
+            "ref": "talent:E"
+          },
+          {
+            "name": "A",
+            "ref": "talent:A"
+          }
+        ],
+        "raw": "Q > E > A"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "E",
+            "level": "建议",
+            "ref": "talent:E"
+          },
+          {
+            "name": "Q",
+            "level": "必须",
+            "ref": "talent:Q"
+          }
+        ]
+      }
+    ],
+    "panels": [
+      {
+        "label": null,
+        "k": "暴击率",
+        "v": "70%"
+      },
+      {
+        "label": null,
+        "k": "暴击伤害",
+        "v": "200%+"
+      },
+      {
+        "label": null,
+        "k": "攻击力",
+        "v": "2200+"
+      },
+      {
+        "label": null,
+        "k": "充能效率",
+        "v": "130%+"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "一命",
+        "index": 1,
+        "text": "改变输出轴"
+      },
+      {
+        "name": "二命",
+        "index": 2,
+        "text": "核心输出质变"
+      },
+      {
+        "name": "六命",
+        "index": 6,
+        "text": "大幅增加输出上限"
+      }
+    ],
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "菲林斯",
+            "ref": "character:菲林斯"
+          },
+          {
+            "name": "伊涅芙",
+            "ref": "character:伊涅芙"
+          },
+          {
+            "name": "哥伦比娅",
+            "ref": "character:哥伦比娅"
+          },
+          {
+            "name": "希诺宁",
+            "ref": "character:希诺宁"
+          },
+          {
+            "name": "砂糖",
+            "ref": "character:砂糖"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "平民",
+        "members": [
+          {
+            "name": "菲林斯",
+            "ref": "character:菲林斯"
+          },
+          {
+            "name": "爱诺",
+            "ref": "character:爱诺"
+          },
+          {
+            "name": "行秋",
+            "ref": "character:行秋"
+          },
+          {
+            "name": "砂糖",
+            "ref": "character:砂糖"
+          }
+        ],
+        "text": ""
+      }
+    ]
+  },
   "tags": [
     {
       "text": "建议等级：90级",
@@ -9,16 +234,19 @@
     {
       "text": "定位：月感电站场主C",
       "style": "role"
+    },
+    {
+      "text": "100级提升：约 8%",
+      "style": "power"
     }
   ],
-  "highlight": "100级提升：约 8%",
   "sections": [
     {
       "title": "1. 武器推荐",
       "lines": [
         "第一档：血染荒城 > 赤沙之杖 > 支离轮光",
         "第二档：护摩之杖 > 和璞鸢 > 柔灯挽歌",
-        "第三档：决斗之枪（精5） > 峡湾长歌（精5）"
+        "第三档：决斗之枪 > 峡湾长歌"
       ]
     },
     {
@@ -33,7 +261,7 @@
       "title": "3. 天赋加点",
       "lines": [
         "优先级：Q > E > A",
-        "皇冠：E（建议）Q（**必须**）"
+        "皇冠：E（建议）Q（必须）"
       ]
     },
     {
@@ -56,7 +284,7 @@
     {
       "title": "6. 配队推荐",
       "lines": [
-        "首选：菲林斯 + 伊涅芙 + 哥伦比娅 + 希诺宁 / 砂糖",
+        "首选：菲林斯 + 伊涅芙 + 哥伦比娅 + 希诺宁 + 砂糖",
         "平民：菲林斯 + 爱诺 + 行秋 + 砂糖"
       ]
     }

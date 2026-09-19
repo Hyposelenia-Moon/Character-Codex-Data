@@ -1,6 +1,198 @@
 {
+  "schema": 2,
   "name": "班尼特",
   "game": "gi",
+  "meta": {
+    "建议等级": "81-90级",
+    "定位": "加攻/治疗辅助",
+    "100级提升": "___%"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": "加攻",
+        "tier": null,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "任意674白值武器",
+            "ref": "weapon:任意674白值武器"
+          }
+        ]
+      },
+      {
+        "label": "均衡",
+        "tier": null,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "天空之刃",
+            "ref": "weapon:天空之刃"
+          },
+          {
+            "name": "其他高白值充能武器",
+            "ref": "weapon:其他高白值充能武器"
+          }
+        ]
+      },
+      {
+        "label": "特殊",
+        "tier": null,
+        "sep": " / ",
+        "items": [
+          {
+            "name": "苍古自由之誓",
+            "ref": "weapon:苍古自由之誓"
+          },
+          {
+            "name": "圣显之钥",
+            "ref": "weapon:圣显之钥"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "昔日宗室之仪",
+            "ref": "artifact:昔日宗室之仪"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "元素充能效率"
+          ],
+          "空之杯": [
+            "生命值"
+          ],
+          "理之冠": [
+            "治疗加成",
+            "生命值"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "充能",
+          "大生命"
+        ],
+        "sep": " > "
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          },
+          {
+            "name": "E",
+            "ref": "talent:E"
+          },
+          {
+            "name": "A",
+            "ref": "talent:A"
+          }
+        ],
+        "raw": "Q > E > A"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "Q",
+            "level": "必须",
+            "ref": "talent:Q"
+          }
+        ]
+      }
+    ],
+    "panels": [
+      {
+        "label": null,
+        "k": "充能效率",
+        "v": "240%+"
+      },
+      {
+        "label": null,
+        "k": "生命值",
+        "v": "25000+"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "一命",
+        "index": 1,
+        "text": "解除加攻限制"
+      },
+      {
+        "name": "五命",
+        "index": 5,
+        "text": "Q等级+3"
+      },
+      {
+        "name": "六命",
+        "index": 6,
+        "text": "提升火伤"
+      }
+    ],
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "玛薇卡",
+            "ref": "character:玛薇卡"
+          },
+          {
+            "name": "希诺宁",
+            "ref": "character:希诺宁"
+          },
+          {
+            "name": "班尼特",
+            "ref": "character:班尼特"
+          },
+          {
+            "name": "茜特菈莉",
+            "ref": "character:茜特菈莉"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "其他",
+        "members": [
+          {
+            "name": "任意攻击主C",
+            "ref": "character:任意攻击主C"
+          },
+          {
+            "name": "班尼特",
+            "ref": "character:班尼特"
+          },
+          {
+            "name": "行秋",
+            "ref": "character:行秋"
+          },
+          {
+            "name": "香菱",
+            "ref": "character:香菱"
+          }
+        ],
+        "text": ""
+      }
+    ]
+  },
   "tags": [
     {
       "text": "建议等级：81-90级",
@@ -9,6 +201,10 @@
     {
       "text": "定位：加攻/治疗辅助",
       "style": "role"
+    },
+    {
+      "text": "100级提升：___%",
+      "style": "power"
     }
   ],
   "sections": [
@@ -17,7 +213,7 @@
       "lines": [
         "加攻：任意674白值武器",
         "均衡：天空之刃 > 其他高白值充能武器",
-        "特殊：苍古自由之誓，圣显之钥"
+        "特殊：苍古自由之誓 / 圣显之钥"
       ]
     },
     {
@@ -32,7 +228,7 @@
       "title": "3. 天赋加点",
       "lines": [
         "优先级：Q > E > A",
-        "皇冠：Q（**必须**）"
+        "皇冠：Q（必须）"
       ]
     },
     {

@@ -1,0 +1,154 @@
+{
+  "schema": 2,
+  "name": "妮露",
+  "game": "gi",
+  "meta": {
+    "建议等级": "___级",
+    "定位": "___",
+    "100级提升": "___%"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "圣显之钥",
+            "ref": "weapon:圣显之钥"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " + / + / / + ",
+        "sets": [
+          {
+            "name": "千岩牢固",
+            "ref": "artifact:千岩牢固"
+          },
+          {
+            "name": "花海甘露之光",
+            "ref": "artifact:花海甘露之光"
+          },
+          {
+            "name": "沉沦之心",
+            "ref": "artifact:沉沦之心"
+          },
+          {
+            "name": "水仙之梦",
+            "ref": "artifact:水仙之梦"
+          },
+          {
+            "name": "深林的记忆",
+            "ref": "artifact:深林的记忆"
+          },
+          {
+            "name": "战狂",
+            "ref": "artifact:战狂"
+          },
+          {
+            "name": "赌徒",
+            "ref": "artifact:赌徒"
+          }
+        ]
+      },
+      {
+        "kind": "transition",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "教官",
+            "ref": "artifact:教官"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "生命值"
+          ],
+          "空之杯": [
+            "生命值"
+          ],
+          "理之冠": [
+            "生命值"
+          ]
+        }
+      }
+    ],
+    "talents": [],
+    "panels": [
+      {
+        "label": null,
+        "k": "生命值",
+        "v": "74400"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "二命",
+        "index": 2,
+        "text": ""
+      },
+      {
+        "name": "六命",
+        "index": 6,
+        "text": ""
+      }
+    ],
+    "teams": []
+  },
+  "tags": [
+    {
+      "text": "建议等级：___级",
+      "style": "level"
+    },
+    {
+      "text": "定位：___",
+      "style": "role"
+    },
+    {
+      "text": "100级提升：___%",
+      "style": "power"
+    }
+  ],
+  "sections": [
+    {
+      "title": "1. 武器推荐",
+      "lines": [
+        "第一档：圣显之钥"
+      ]
+    },
+    {
+      "title": "2. 圣遗物推荐",
+      "lines": [
+        "首选：千岩牢固 + / + / / + 花海甘露之光 + / + / / + 沉沦之心 + / + / / + 水仙之梦 + / + / / + 深林的记忆 + / + / / + 战狂 + / + / / + 赌徒",
+        "过渡：教官",
+        "主词条：时之沙：生命值 / 空之杯：生命值 / 理之冠：生命值"
+      ]
+    },
+    {
+      "title": "4. 毕业面板参考",
+      "lines": [
+        "生命值：74400"
+      ]
+    },
+    {
+      "title": "5. 命座推荐",
+      "lines": [
+        "二命",
+        "六命"
+      ]
+    }
+  ],
+  "source": {
+    "guide": "原神·角色攻略.docx"
+  }
+}

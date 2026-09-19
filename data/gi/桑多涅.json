@@ -1,0 +1,295 @@
+{
+  "schema": 2,
+  "name": "桑多涅",
+  "game": "gi",
+  "meta": {
+    "建议等级": "90级",
+    "定位": "冰系星超导主c",
+    "100级提升": "___%"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "超越之匙",
+            "ref": "weapon:超越之匙"
+          },
+          {
+            "name": "焚曜千阳",
+            "ref": "weapon:焚曜千阳"
+          },
+          {
+            "name": "苇海信标",
+            "ref": "weapon:苇海信标"
+          }
+        ]
+      },
+      {
+        "label": null,
+        "tier": 2,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "裁断",
+            "ref": "weapon:裁断"
+          },
+          {
+            "name": "无工之剑",
+            "ref": "weapon:无工之剑"
+          },
+          {
+            "name": "狼的末路",
+            "ref": "weapon:狼的末路"
+          }
+        ]
+      },
+      {
+        "label": null,
+        "tier": 3,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "金律铸影",
+            "ref": "weapon:金律铸影"
+          },
+          {
+            "name": "救赎之斩",
+            "ref": "weapon:救赎之斩"
+          },
+          {
+            "name": "浪影阔剑",
+            "ref": "weapon:浪影阔剑"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " / ",
+        "sets": [
+          {
+            "name": "影中沉凝的幻灭",
+            "ref": "artifact:影中沉凝的幻灭"
+          },
+          {
+            "name": "饰金之梦",
+            "ref": "artifact:饰金之梦"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "攻击力"
+          ],
+          "空之杯": [
+            "攻击力"
+          ],
+          "理之冠": [
+            "暴击伤害",
+            "暴击率"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "暴击率",
+          "暴击伤害",
+          "百分比攻击力",
+          "元素精通"
+        ],
+        "sep": " / "
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "A",
+            "ref": "talent:A"
+          },
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          },
+          {
+            "name": "E",
+            "ref": "talent:E"
+          }
+        ],
+        "raw": "A＞Q＞E"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "A",
+            "level": "必须",
+            "ref": "talent:A"
+          },
+          {
+            "name": "Q",
+            "level": "可选",
+            "ref": "talent:Q"
+          }
+        ]
+      }
+    ],
+    "panels": [
+      {
+        "label": null,
+        "k": "攻击力",
+        "v": "2850"
+      },
+      {
+        "label": null,
+        "k": "暴击率",
+        "v": "70"
+      },
+      {
+        "label": null,
+        "k": "暴击伤害",
+        "v": "200"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "二命",
+        "index": 2,
+        "text": "提升暴击伤害"
+      },
+      {
+        "name": "六命",
+        "index": 6,
+        "text": "新增多段星超导直伤"
+      }
+    ],
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "桑多涅",
+            "ref": "character:桑多涅"
+          },
+          {
+            "name": "八重神子",
+            "ref": "character:八重神子"
+          },
+          {
+            "name": "奥黛塔",
+            "ref": "character:奥黛塔"
+          },
+          {
+            "name": "爱可菲",
+            "ref": "character:爱可菲"
+          },
+          {
+            "name": "尼可",
+            "ref": "character:尼可"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "其他",
+        "members": [
+          {
+            "name": "桑多涅",
+            "ref": "character:桑多涅"
+          },
+          {
+            "name": "阿罗夏",
+            "ref": "character:阿罗夏"
+          },
+          {
+            "name": "七七",
+            "ref": "character:七七"
+          },
+          {
+            "name": "砂糖",
+            "ref": "character:砂糖"
+          },
+          {
+            "name": "希诺宁",
+            "ref": "character:希诺宁"
+          }
+        ],
+        "text": ""
+      }
+    ]
+  },
+  "tags": [
+    {
+      "text": "建议等级：90级",
+      "style": "level"
+    },
+    {
+      "text": "定位：冰系星超导主c",
+      "style": "role"
+    },
+    {
+      "text": "100级提升：___%",
+      "style": "power"
+    }
+  ],
+  "sections": [
+    {
+      "title": "1. 武器推荐",
+      "lines": [
+        "第一档：超越之匙 > 焚曜千阳 > 苇海信标",
+        "第二档：裁断 > 无工之剑 > 狼的末路",
+        "第三档：金律铸影 > 救赎之斩 > 浪影阔剑"
+      ]
+    },
+    {
+      "title": "2. 圣遗物推荐",
+      "lines": [
+        "首选：影中沉凝的幻灭 / 饰金之梦",
+        "主词条：时之沙：攻击力 / 空之杯：攻击力 / 理之冠：暴击伤害 / 暴击率",
+        "副词条：暴击率 / 暴击伤害 / 百分比攻击力 / 元素精通"
+      ]
+    },
+    {
+      "title": "3. 天赋加点",
+      "lines": [
+        "优先级：A > Q > E",
+        "皇冠：A（必须）Q（可选）"
+      ]
+    },
+    {
+      "title": "4. 毕业面板参考",
+      "lines": [
+        "攻击力：2850",
+        "暴击率：70",
+        "暴击伤害：200"
+      ]
+    },
+    {
+      "title": "5. 命座推荐",
+      "lines": [
+        "二命——提升暴击伤害",
+        "六命——新增多段星超导直伤"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：桑多涅 + 八重神子 + 奥黛塔 + 爱可菲 + 尼可",
+        "其他：桑多涅 + 阿罗夏 + 七七 + 砂糖 + 希诺宁"
+      ]
+    }
+  ],
+  "source": {
+    "guide": "原神·角色攻略.docx"
+  }
+}

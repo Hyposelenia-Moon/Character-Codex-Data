@@ -1,0 +1,220 @@
+{
+  "schema": 2,
+  "name": "可莉",
+  "game": "gi",
+  "meta": {
+    "建议等级": "90级",
+    "定位": "魔导主c",
+    "100级提升": "___%"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "四风原典",
+            "ref": "weapon:四风原典"
+          },
+          {
+            "name": "千夜浮梦",
+            "ref": "weapon:千夜浮梦"
+          },
+          {
+            "name": "嘟嘟可故事集",
+            "ref": "weapon:嘟嘟可故事集"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "风起之日",
+            "ref": "artifact:风起之日"
+          }
+        ]
+      },
+      {
+        "kind": "transition",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "炽烈的炎之魔女",
+            "ref": "artifact:炽烈的炎之魔女"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "攻击力"
+          ],
+          "空之杯": [
+            "火元素伤害加成"
+          ],
+          "理之冠": [
+            "暴击率",
+            "暴击伤害"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "暴击率",
+          "暴击伤害",
+          "攻击力",
+          "元素精通"
+        ],
+        "sep": " > "
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "A",
+            "ref": "talent:A"
+          },
+          {
+            "name": "E",
+            "ref": "talent:E"
+          },
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          }
+        ],
+        "raw": "A＞E＞Q"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "A",
+            "ref": "talent:A"
+          }
+        ]
+      }
+    ],
+    "panels": [
+      {
+        "label": null,
+        "k": "暴击率",
+        "v": "80%"
+      },
+      {
+        "label": null,
+        "k": "暴击伤害",
+        "v": "180%"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "一命",
+        "index": 1,
+        "text": "提升攻击力"
+      },
+      {
+        "name": "四命",
+        "index": 4,
+        "text": "减防"
+      }
+    ],
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "可莉",
+            "ref": "character:可莉"
+          },
+          {
+            "name": "杜林",
+            "ref": "character:杜林"
+          },
+          {
+            "name": "尼可",
+            "ref": "character:尼可"
+          },
+          {
+            "name": "芙宁娜",
+            "ref": "character:芙宁娜"
+          }
+        ],
+        "text": ""
+      }
+    ]
+  },
+  "tags": [
+    {
+      "text": "建议等级：90级",
+      "style": "level"
+    },
+    {
+      "text": "定位：魔导主c",
+      "style": "role"
+    },
+    {
+      "text": "100级提升：___%",
+      "style": "power"
+    }
+  ],
+  "sections": [
+    {
+      "title": "1. 武器推荐",
+      "lines": [
+        "第一档：四风原典 > 千夜浮梦 > 嘟嘟可故事集"
+      ]
+    },
+    {
+      "title": "2. 圣遗物推荐",
+      "lines": [
+        "首选：风起之日",
+        "过渡：炽烈的炎之魔女",
+        "主词条：时之沙：攻击力 / 空之杯：火元素伤害加成 / 理之冠：暴击率 / 暴击伤害",
+        "副词条：暴击率 > 暴击伤害 > 攻击力 > 元素精通"
+      ]
+    },
+    {
+      "title": "3. 天赋加点",
+      "lines": [
+        "优先级：A > E > Q",
+        "皇冠：A"
+      ]
+    },
+    {
+      "title": "4. 毕业面板参考",
+      "lines": [
+        "暴击率：80%",
+        "暴击伤害：180%"
+      ]
+    },
+    {
+      "title": "5. 命座推荐",
+      "lines": [
+        "一命——提升攻击力",
+        "四命——减防"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：可莉 + 杜林 + 尼可 + 芙宁娜"
+      ]
+    }
+  ],
+  "source": {
+    "guide": "原神·角色攻略.docx"
+  }
+}

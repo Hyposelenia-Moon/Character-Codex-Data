@@ -1,0 +1,162 @@
+{
+  "schema": 2,
+  "name": "娜维娅",
+  "game": "gi",
+  "meta": {
+    "建议等级": "___级",
+    "定位": "___",
+    "100级提升": "___%"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "螭骨剑",
+            "ref": "weapon:螭骨剑"
+          },
+          {
+            "name": "裁断",
+            "ref": "weapon:裁断"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "回声之林夜话",
+            "ref": "artifact:回声之林夜话"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [],
+          "空之杯": [],
+          "理之冠": []
+        }
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "E",
+            "ref": "talent:E"
+          },
+          {
+            "name": "A",
+            "ref": "talent:A"
+          },
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          }
+        ],
+        "raw": "E > A > Q"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "E",
+            "ref": "talent:E"
+          }
+        ]
+      }
+    ],
+    "panels": [
+      {
+        "label": null,
+        "k": "暴击率",
+        "v": "80-90%"
+      },
+      {
+        "label": null,
+        "k": "暴击伤害",
+        "v": "160-180%"
+      },
+      {
+        "label": null,
+        "k": "元素充能效率",
+        "v": "120%"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "二命",
+        "index": 2,
+        "text": ""
+      },
+      {
+        "name": "六命",
+        "index": 6,
+        "text": ""
+      }
+    ],
+    "teams": []
+  },
+  "tags": [
+    {
+      "text": "建议等级：___级",
+      "style": "level"
+    },
+    {
+      "text": "定位：___",
+      "style": "role"
+    },
+    {
+      "text": "100级提升：___%",
+      "style": "power"
+    }
+  ],
+  "sections": [
+    {
+      "title": "1. 武器推荐",
+      "lines": [
+        "第一档：螭骨剑 > 裁断"
+      ]
+    },
+    {
+      "title": "2. 圣遗物推荐",
+      "lines": [
+        "首选：回声之林夜话"
+      ]
+    },
+    {
+      "title": "3. 天赋加点",
+      "lines": [
+        "优先级：E > A > Q",
+        "皇冠：E"
+      ]
+    },
+    {
+      "title": "4. 毕业面板参考",
+      "lines": [
+        "暴击率：80-90%",
+        "暴击伤害：160-180%",
+        "元素充能效率：120%"
+      ]
+    },
+    {
+      "title": "5. 命座推荐",
+      "lines": [
+        "二命",
+        "六命"
+      ]
+    }
+  ],
+  "source": {
+    "guide": "原神·角色攻略.docx"
+  }
+}

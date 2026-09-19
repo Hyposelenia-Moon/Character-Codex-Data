@@ -1,6 +1,199 @@
 {
+  "schema": 2,
   "name": "希诺宁",
   "game": "gi",
+  "meta": {
+    "建议等级": "81-90级",
+    "定位": "减抗/治疗辅助",
+    "100级提升": "___%"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": "辅助",
+        "tier": null,
+        "sep": " / ",
+        "items": [
+          {
+            "name": "岩峰巡歌",
+            "ref": "weapon:岩峰巡歌"
+          },
+          {
+            "name": "圣显之钥",
+            "ref": "weapon:圣显之钥"
+          },
+          {
+            "name": "苍古自由之誓",
+            "ref": "weapon:苍古自由之誓"
+          }
+        ]
+      },
+      {
+        "label": "充能",
+        "tier": null,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "西风剑",
+            "ref": "weapon:西风剑"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " / ",
+        "sets": [
+          {
+            "name": "教官",
+            "ref": "artifact:教官"
+          },
+          {
+            "name": "烬城勇者绘卷",
+            "ref": "artifact:烬城勇者绘卷"
+          }
+        ]
+      },
+      {
+        "kind": "preferred",
+        "label": "二命茜特菈莉",
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "悠古的磐岩",
+            "ref": "artifact:悠古的磐岩"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "防御力",
+            "元素充能效率"
+          ],
+          "空之杯": [
+            "防御力"
+          ],
+          "理之冠": [
+            "治疗加成",
+            "暴击率（带西风时）"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "暴击（带西风时）",
+          "大防御",
+          "充能"
+        ],
+        "sep": " > "
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "E",
+            "ref": "talent:E"
+          },
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          },
+          {
+            "name": "A",
+            "ref": "talent:A"
+          }
+        ],
+        "raw": "E > Q > A"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "E",
+            "level": "必须",
+            "ref": "talent:E"
+          },
+          {
+            "name": "Q",
+            "level": "可选",
+            "ref": "talent:Q"
+          }
+        ]
+      }
+    ],
+    "panels": [
+      {
+        "label": null,
+        "k": "暴击率",
+        "v": "60%+"
+      },
+      {
+        "label": null,
+        "k": "防御力",
+        "v": "2500+"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "二命",
+        "index": 2,
+        "text": "提升辅助能力，可进多岩队伍"
+      }
+    ],
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "玛薇卡",
+            "ref": "character:玛薇卡"
+          },
+          {
+            "name": "希诺宁",
+            "ref": "character:希诺宁"
+          },
+          {
+            "name": "班尼特",
+            "ref": "character:班尼特"
+          },
+          {
+            "name": "茜特菈莉",
+            "ref": "character:茜特菈莉"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "二命进月结晶",
+        "members": [
+          {
+            "name": "兹白",
+            "ref": "character:兹白"
+          },
+          {
+            "name": "哥伦比娅",
+            "ref": "character:哥伦比娅"
+          },
+          {
+            "name": "莉奈娅",
+            "ref": "character:莉奈娅"
+          },
+          {
+            "name": "希诺宁",
+            "ref": "character:希诺宁"
+          }
+        ],
+        "text": ""
+      }
+    ]
+  },
   "tags": [
     {
       "text": "建议等级：81-90级",
@@ -9,14 +202,18 @@
     {
       "text": "定位：减抗/治疗辅助",
       "style": "role"
+    },
+    {
+      "text": "100级提升：___%",
+      "style": "power"
     }
   ],
   "sections": [
     {
       "title": "1. 武器推荐",
       "lines": [
-        "辅助：岩峰巡歌，圣显之钥，苍古自由之誓",
-        "充能：西风剑（精5）"
+        "辅助：岩峰巡歌 / 圣显之钥 / 苍古自由之誓",
+        "充能：西风剑"
       ]
     },
     {
@@ -32,7 +229,7 @@
       "title": "3. 天赋加点",
       "lines": [
         "优先级：E > Q > A",
-        "皇冠：E（**必须**） Q（可选）"
+        "皇冠：E（必须）Q（可选）"
       ]
     },
     {

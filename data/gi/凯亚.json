@@ -1,0 +1,153 @@
+{
+  "schema": 2,
+  "name": "凯亚",
+  "game": "gi",
+  "meta": {
+    "建议等级": "81级",
+    "定位": "挂冰位"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "风鹰剑",
+            "ref": "weapon:风鹰剑"
+          },
+          {
+            "name": "天空之刃",
+            "ref": "weapon:天空之刃"
+          },
+          {
+            "name": "黑剑",
+            "ref": "weapon:黑剑"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " / ",
+        "sets": [
+          {
+            "name": "绝缘之旗印",
+            "ref": "artifact:绝缘之旗印"
+          },
+          {
+            "name": "冰风迷途的勇士",
+            "ref": "artifact:冰风迷途的勇士"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "攻击力"
+          ],
+          "空之杯": [
+            "冰元素伤害加成"
+          ],
+          "理之冠": [
+            "暴击率",
+            "暴击伤害"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "暴击率",
+          "暴击伤害",
+          "攻击力"
+        ],
+        "sep": " > "
+      }
+    ],
+    "talents": [],
+    "panels": [],
+    "constellations": [
+      {
+        "name": "二命",
+        "index": 2,
+        "text": "延长挂冰时间"
+      },
+      {
+        "name": "六命",
+        "index": 6,
+        "text": "回能"
+      }
+    ],
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "迪卢克",
+            "ref": "character:迪卢克"
+          },
+          {
+            "name": "凯亚",
+            "ref": "character:凯亚"
+          },
+          {
+            "name": "枫原万叶",
+            "ref": "character:枫原万叶"
+          },
+          {
+            "name": "班尼特",
+            "ref": "character:班尼特"
+          }
+        ],
+        "text": ""
+      }
+    ]
+  },
+  "tags": [
+    {
+      "text": "建议等级：81级",
+      "style": "level"
+    },
+    {
+      "text": "定位：挂冰位",
+      "style": "role"
+    }
+  ],
+  "sections": [
+    {
+      "title": "1. 武器推荐",
+      "lines": [
+        "第一档：风鹰剑 > 天空之刃 > 黑剑"
+      ]
+    },
+    {
+      "title": "2. 圣遗物推荐",
+      "lines": [
+        "首选：绝缘之旗印 / 冰风迷途的勇士",
+        "主词条：时之沙：攻击力 / 空之杯：冰元素伤害加成 / 理之冠：暴击率 / 暴击伤害",
+        "副词条：暴击率 > 暴击伤害 > 攻击力"
+      ]
+    },
+    {
+      "title": "5. 命座推荐",
+      "lines": [
+        "二命——延长挂冰时间",
+        "六命——回能"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：迪卢克 + 凯亚 + 枫原万叶 + 班尼特"
+      ]
+    }
+  ],
+  "source": {
+    "guide": "原神·角色攻略.docx"
+  }
+}

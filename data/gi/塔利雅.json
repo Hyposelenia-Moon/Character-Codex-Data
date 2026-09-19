@@ -1,0 +1,190 @@
+{
+  "schema": 2,
+  "name": "塔利雅",
+  "game": "gi",
+  "meta": {
+    "建议等级": "81-90级",
+    "定位": "加攻速盾辅"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "西风剑",
+            "ref": "weapon:西风剑"
+          },
+          {
+            "name": "祭礼剑",
+            "ref": "weapon:祭礼剑"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "昔日宗室之仪",
+            "ref": "artifact:昔日宗室之仪"
+          }
+        ]
+      },
+      {
+        "kind": "transition",
+        "label": null,
+        "sep": " + ",
+        "sets": [
+          {
+            "name": "2生命",
+            "ref": "artifact:2生命"
+          },
+          {
+            "name": "2生命",
+            "ref": "artifact:2生命"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "元素充能效率",
+            "生命值"
+          ],
+          "空之杯": [
+            "生命值"
+          ],
+          "理之冠": [
+            "生命值"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "充能效率",
+          "生命值",
+          "暴击率"
+        ],
+        "sep": " / "
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          }
+        ],
+        "raw": "Q"
+      }
+    ],
+    "panels": [
+      {
+        "label": null,
+        "k": "暴击率",
+        "v": "70%+"
+      },
+      {
+        "label": null,
+        "k": "元素充能效率",
+        "v": "220%+"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "六命",
+        "index": 6,
+        "text": "加攻速，复活队友"
+      }
+    ],
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "丝柯克",
+            "ref": "character:丝柯克"
+          },
+          {
+            "name": "芙宁娜",
+            "ref": "character:芙宁娜"
+          },
+          {
+            "name": "塔利雅",
+            "ref": "character:塔利雅"
+          },
+          {
+            "name": "莫娜",
+            "ref": "character:莫娜"
+          }
+        ],
+        "text": ""
+      }
+    ]
+  },
+  "tags": [
+    {
+      "text": "建议等级：81-90级",
+      "style": "level"
+    },
+    {
+      "text": "定位：加攻速盾辅",
+      "style": "role"
+    }
+  ],
+  "sections": [
+    {
+      "title": "1. 武器推荐",
+      "lines": [
+        "第一档：西风剑 > 祭礼剑"
+      ]
+    },
+    {
+      "title": "2. 圣遗物推荐",
+      "lines": [
+        "首选：昔日宗室之仪",
+        "过渡：2生命 + 2生命",
+        "主词条：时之沙：元素充能效率 / 生命值 / 空之杯：生命值 / 理之冠：生命值",
+        "副词条：充能效率 / 生命值 / 暴击率"
+      ]
+    },
+    {
+      "title": "3. 天赋加点",
+      "lines": [
+        "优先级：Q"
+      ]
+    },
+    {
+      "title": "4. 毕业面板参考",
+      "lines": [
+        "暴击率：70%+",
+        "元素充能效率：220%+"
+      ]
+    },
+    {
+      "title": "5. 命座推荐",
+      "lines": [
+        "六命——加攻速，复活队友"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：丝柯克 + 芙宁娜 + 塔利雅 + 莫娜"
+      ]
+    }
+  ],
+  "source": {
+    "guide": "原神·角色攻略.docx"
+  }
+}

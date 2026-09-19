@@ -1,0 +1,186 @@
+{
+  "schema": 2,
+  "name": "魈",
+  "game": "gi",
+  "meta": {
+    "建议等级": "___级",
+    "定位": "___",
+    "100级提升": "___%"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "护摩之杖",
+            "ref": "weapon:护摩之杖"
+          },
+          {
+            "name": "和璞鸢",
+            "ref": "weapon:和璞鸢"
+          },
+          {
+            "name": "决斗之枪",
+            "ref": "weapon:决斗之枪"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " / ",
+        "sets": [
+          {
+            "name": "辰砂往生录",
+            "ref": "artifact:辰砂往生录"
+          },
+          {
+            "name": "逐影猎人",
+            "ref": "artifact:逐影猎人"
+          }
+        ]
+      },
+      {
+        "kind": "transition",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "战狂",
+            "ref": "artifact:战狂"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "攻击力"
+          ],
+          "空之杯": [
+            "风元素伤害加成",
+            "攻击力"
+          ],
+          "理之冠": [
+            "暴击伤害",
+            "暴击率"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "暴击率",
+          "暴击伤害",
+          "攻击力",
+          "元素充能效率"
+        ],
+        "sep": " / "
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "A",
+            "ref": "talent:A"
+          },
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          },
+          {
+            "name": "E",
+            "ref": "talent:E"
+          }
+        ],
+        "raw": "A > Q > E"
+      }
+    ],
+    "panels": [
+      {
+        "label": null,
+        "k": "暴击率",
+        "v": "90%"
+      },
+      {
+        "label": null,
+        "k": "暴击伤害",
+        "v": "180-200%"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "二命",
+        "index": 2,
+        "text": ""
+      },
+      {
+        "name": "六命",
+        "index": 6,
+        "text": ""
+      }
+    ],
+    "teams": []
+  },
+  "tags": [
+    {
+      "text": "建议等级：___级",
+      "style": "level"
+    },
+    {
+      "text": "定位：___",
+      "style": "role"
+    },
+    {
+      "text": "100级提升：___%",
+      "style": "power"
+    }
+  ],
+  "sections": [
+    {
+      "title": "1. 武器推荐",
+      "lines": [
+        "第一档：护摩之杖 > 和璞鸢 > 决斗之枪"
+      ]
+    },
+    {
+      "title": "2. 圣遗物推荐",
+      "lines": [
+        "首选：辰砂往生录 / 逐影猎人",
+        "过渡：战狂",
+        "主词条：时之沙：攻击力 / 空之杯：风元素伤害加成 / 攻击力 / 理之冠：暴击伤害 / 暴击率",
+        "副词条：暴击率 / 暴击伤害 / 攻击力 / 元素充能效率"
+      ]
+    },
+    {
+      "title": "3. 天赋加点",
+      "lines": [
+        "优先级：A > Q > E"
+      ]
+    },
+    {
+      "title": "4. 毕业面板参考",
+      "lines": [
+        "暴击率：90%",
+        "暴击伤害：180-200%"
+      ]
+    },
+    {
+      "title": "5. 命座推荐",
+      "lines": [
+        "二命",
+        "六命"
+      ]
+    }
+  ],
+  "source": {
+    "guide": "原神·角色攻略.docx"
+  }
+}

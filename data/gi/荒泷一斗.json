@@ -1,0 +1,172 @@
+{
+  "schema": 2,
+  "name": "荒泷一斗",
+  "game": "gi",
+  "meta": {
+    "建议等级": "___级",
+    "定位": "___",
+    "100级提升": "___%"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "赤角石溃杵",
+            "ref": "weapon:赤角石溃杵"
+          },
+          {
+            "name": "螭骨剑",
+            "ref": "weapon:螭骨剑"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " / / ",
+        "sets": [
+          {
+            "name": "华馆梦醒形骸记",
+            "ref": "artifact:华馆梦醒形骸记"
+          },
+          {
+            "name": "回声之林夜话",
+            "ref": "artifact:回声之林夜话"
+          },
+          {
+            "name": "逆飞的流星",
+            "ref": "artifact:逆飞的流星"
+          }
+        ]
+      },
+      {
+        "kind": "transition",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "武人",
+            "ref": "artifact:武人"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [],
+          "空之杯": [],
+          "理之冠": []
+        }
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "A",
+            "ref": "talent:A"
+          },
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          },
+          {
+            "name": "E",
+            "ref": "talent:E"
+          }
+        ],
+        "raw": "A > Q > E"
+      }
+    ],
+    "panels": [
+      {
+        "label": null,
+        "k": "暴击率",
+        "v": "92%"
+      },
+      {
+        "label": null,
+        "k": "暴击伤害",
+        "v": "200%"
+      },
+      {
+        "label": null,
+        "k": "防御力",
+        "v": "2400+"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "二命",
+        "index": 2,
+        "text": ""
+      },
+      {
+        "name": "六命",
+        "index": 6,
+        "text": ""
+      }
+    ],
+    "teams": []
+  },
+  "tags": [
+    {
+      "text": "建议等级：___级",
+      "style": "level"
+    },
+    {
+      "text": "定位：___",
+      "style": "role"
+    },
+    {
+      "text": "100级提升：___%",
+      "style": "power"
+    }
+  ],
+  "sections": [
+    {
+      "title": "1. 武器推荐",
+      "lines": [
+        "第一档：赤角石溃杵 > 螭骨剑"
+      ]
+    },
+    {
+      "title": "2. 圣遗物推荐",
+      "lines": [
+        "首选：华馆梦醒形骸记 / / 回声之林夜话 / / 逆飞的流星",
+        "过渡：武人"
+      ]
+    },
+    {
+      "title": "3. 天赋加点",
+      "lines": [
+        "优先级：A > Q > E"
+      ]
+    },
+    {
+      "title": "4. 毕业面板参考",
+      "lines": [
+        "暴击率：92%",
+        "暴击伤害：200%",
+        "防御力：2400+"
+      ]
+    },
+    {
+      "title": "5. 命座推荐",
+      "lines": [
+        "二命",
+        "六命"
+      ]
+    }
+  ],
+  "source": {
+    "guide": "原神·角色攻略.docx"
+  }
+}

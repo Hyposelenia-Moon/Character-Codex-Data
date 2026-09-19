@@ -1,6 +1,208 @@
 {
+  "schema": 2,
   "name": "莉奈娅",
   "game": "gi",
+  "meta": {
+    "建议等级": "90级",
+    "定位": "月结晶专辅/副C",
+    "100级提升": "___%"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "霜结的誓金枝",
+            "ref": "weapon:霜结的誓金枝"
+          },
+          {
+            "name": "霜雪誓约",
+            "ref": "weapon:霜雪誓约"
+          },
+          {
+            "name": "88爆伤",
+            "ref": "weapon:88爆伤"
+          },
+          {
+            "name": "44暴击武器",
+            "ref": "weapon:44暴击武器"
+          }
+        ]
+      },
+      {
+        "label": null,
+        "tier": 2,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "弹弓",
+            "ref": "weapon:弹弓"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": "零命",
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "晨星与月的晓歌",
+            "ref": "artifact:晨星与月的晓歌"
+          }
+        ]
+      },
+      {
+        "kind": "preferred",
+        "label": "一命及以上",
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "华馆梦醒形骸记",
+            "ref": "artifact:华馆梦醒形骸记"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "防御力"
+          ],
+          "空之杯": [
+            "防御力"
+          ],
+          "理之冠": [
+            "暴击率",
+            "暴击伤害",
+            "防御力（华馆）"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "双爆",
+          "大防御"
+        ],
+        "sep": " > "
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "E",
+            "ref": "talent:E"
+          },
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          },
+          {
+            "name": "A",
+            "ref": "talent:A"
+          }
+        ],
+        "raw": "E > Q > A"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "E",
+            "level": "必须",
+            "ref": "talent:E"
+          },
+          {
+            "name": "Q",
+            "level": "可选",
+            "ref": "talent:Q"
+          }
+        ]
+      }
+    ],
+    "panels": [
+      {
+        "label": null,
+        "k": "防御力",
+        "v": "2500+"
+      },
+      {
+        "label": null,
+        "k": "暴击率",
+        "v": "70%+"
+      },
+      {
+        "label": null,
+        "k": "暴击伤害",
+        "v": "200%+"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "二命",
+        "index": 2,
+        "text": "提升爆伤，月笼协奏"
+      },
+      {
+        "name": "六命",
+        "index": 6,
+        "text": "提升羽毛拐力"
+      }
+    ],
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "兹白",
+            "ref": "character:兹白"
+          },
+          {
+            "name": "莉奈娅",
+            "ref": "character:莉奈娅"
+          },
+          {
+            "name": "叶洛亚",
+            "ref": "character:叶洛亚"
+          },
+          {
+            "name": "哥伦比娅",
+            "ref": "character:哥伦比娅"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "其他",
+        "members": [
+          {
+            "name": "岩元素主C",
+            "ref": "character:岩元素主C"
+          },
+          {
+            "name": "莉奈娅",
+            "ref": "character:莉奈娅"
+          },
+          {
+            "name": "五郎",
+            "ref": "character:五郎"
+          },
+          {
+            "name": "哥伦比娅",
+            "ref": "character:哥伦比娅"
+          }
+        ],
+        "text": ""
+      }
+    ]
+  },
   "tags": [
     {
       "text": "建议等级：90级",
@@ -9,14 +211,18 @@
     {
       "text": "定位：月结晶专辅/副C",
       "style": "role"
+    },
+    {
+      "text": "100级提升：___%",
+      "style": "power"
     }
   ],
   "sections": [
     {
       "title": "1. 武器推荐",
       "lines": [
-        "第一档：霜结的誓金枝 > 88爆伤 / 44暴击武器",
-        "第二档：霜雪誓约（7.0锻造） > 弹弓"
+        "第一档：霜结的誓金枝 > 霜雪誓约 > 88爆伤 > 44暴击武器",
+        "第二档：弹弓"
       ]
     },
     {
@@ -32,15 +238,15 @@
       "title": "3. 天赋加点",
       "lines": [
         "优先级：E > Q > A",
-        "皇冠：E（**必须**）Q（可选）"
+        "皇冠：E（必须）Q（可选）"
       ]
     },
     {
-      "title": "4. 毕业面板参考（输出）",
+      "title": "4. 毕业面板参考",
       "lines": [
-        "防御力：2600+",
+        "防御力：2500+",
         "暴击率：70%+",
-        "暴击伤害：180%+"
+        "暴击伤害：200%+"
       ]
     },
     {

@@ -1,31 +1,168 @@
 {
+  "schema": 2,
   "name": "钟离",
   "game": "gi",
-  "tags": [],
+  "meta": {
+    "建议等级": "90级",
+    "定位": "减抗盾辅",
+    "100级提升": "___%"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "黑缨枪",
+            "ref": "weapon:黑缨枪"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "千岩牢固",
+            "ref": "artifact:千岩牢固"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "生命值"
+          ],
+          "空之杯": [
+            "生命值"
+          ],
+          "理之冠": [
+            "生命值"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "生命值"
+        ],
+        "sep": " > "
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "E",
+            "ref": "talent:E"
+          }
+        ],
+        "raw": "E"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "E",
+            "ref": "talent:E"
+          }
+        ]
+      }
+    ],
+    "panels": [
+      {
+        "label": null,
+        "k": "生命值",
+        "v": "55000+"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "二命",
+        "index": 2,
+        "text": "联机盾"
+      },
+      {
+        "name": "六命",
+        "index": 6,
+        "text": "前台回血"
+      }
+    ],
+    "teams": [
+      {
+        "label": "首选",
+        "members": [],
+        "text": "生存位"
+      },
+      {
+        "label": "其他",
+        "members": [],
+        "text": "摔门"
+      }
+    ]
+  },
+  "tags": [
+    {
+      "text": "建议等级：90级",
+      "style": "level"
+    },
+    {
+      "text": "定位：减抗盾辅",
+      "style": "role"
+    },
+    {
+      "text": "100级提升：___%",
+      "style": "power"
+    }
+  ],
   "sections": [
     {
       "title": "1. 武器推荐",
-      "lines": []
+      "lines": [
+        "第一档：黑缨枪"
+      ]
     },
     {
       "title": "2. 圣遗物推荐",
-      "lines": []
+      "lines": [
+        "首选：千岩牢固",
+        "主词条：时之沙：生命值 / 空之杯：生命值 / 理之冠：生命值",
+        "副词条：生命值"
+      ]
     },
     {
       "title": "3. 天赋加点",
-      "lines": []
+      "lines": [
+        "优先级：E",
+        "皇冠：E"
+      ]
     },
     {
       "title": "4. 毕业面板参考",
-      "lines": []
+      "lines": [
+        "生命值：55000+"
+      ]
     },
     {
       "title": "5. 命座推荐",
-      "lines": []
+      "lines": [
+        "二命——联机盾",
+        "六命——前台回血"
+      ]
     },
     {
       "title": "6. 配队推荐",
-      "lines": []
+      "lines": [
+        "首选：生存位",
+        "其他：摔门"
+      ]
     }
   ],
   "source": {

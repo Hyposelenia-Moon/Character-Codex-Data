@@ -1,0 +1,146 @@
+{
+  "schema": 2,
+  "name": "奇偶·女性",
+  "game": "gi",
+  "meta": {
+    "建议等级": "81-90级"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "波乱月白经津",
+            "ref": "weapon:波乱月白经津"
+          },
+          {
+            "name": "雾切之回光",
+            "ref": "weapon:雾切之回光"
+          },
+          {
+            "name": "磐岩结绿",
+            "ref": "weapon:磐岩结绿"
+          }
+        ]
+      },
+      {
+        "label": null,
+        "tier": 2,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "黑剑",
+            "ref": "weapon:黑剑"
+          },
+          {
+            "name": "弥坚骨",
+            "ref": "weapon:弥坚骨"
+          },
+          {
+            "name": "厄水之祸",
+            "ref": "weapon:厄水之祸"
+          }
+        ]
+      },
+      {
+        "label": null,
+        "tier": 3,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "海渊终曲",
+            "ref": "weapon:海渊终曲"
+          },
+          {
+            "name": "黎明神剑",
+            "ref": "weapon:黎明神剑"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "追忆之注连",
+            "ref": "artifact:追忆之注连"
+          }
+        ]
+      },
+      {
+        "kind": "transition",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "角斗士的终幕礼",
+            "ref": "artifact:角斗士的终幕礼"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "攻击力百分比"
+          ],
+          "空之杯": [
+            "元素伤害加成",
+            "攻击力百分比"
+          ],
+          "理之冠": [
+            "暴击率",
+            "暴击伤害"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "暴击率",
+          "暴击伤害",
+          "攻击力百分比"
+        ],
+        "sep": " / "
+      }
+    ],
+    "talents": [],
+    "panels": [],
+    "constellations": [],
+    "teams": []
+  },
+  "tags": [
+    {
+      "text": "建议等级：81-90级",
+      "style": "level"
+    }
+  ],
+  "sections": [
+    {
+      "title": "1. 武器推荐",
+      "lines": [
+        "第一档：波乱月白经津 > 雾切之回光 > 磐岩结绿",
+        "第二档：黑剑 > 弥坚骨 > 厄水之祸",
+        "第三档：海渊终曲 > 黎明神剑"
+      ]
+    },
+    {
+      "title": "2. 圣遗物推荐",
+      "lines": [
+        "首选：追忆之注连",
+        "过渡：角斗士的终幕礼",
+        "主词条：时之沙：攻击力百分比 / 空之杯：元素伤害加成 / 攻击力百分比 / 理之冠：暴击率 / 暴击伤害",
+        "副词条：暴击率 / 暴击伤害 / 攻击力百分比"
+      ]
+    }
+  ],
+  "source": {
+    "guide": "原神·角色攻略.docx"
+  }
+}

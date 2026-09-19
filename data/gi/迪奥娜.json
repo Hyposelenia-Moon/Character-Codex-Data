@@ -1,0 +1,183 @@
+{
+  "schema": 2,
+  "name": "迪奥娜",
+  "game": "gi",
+  "meta": {
+    "建议等级": "81级",
+    "定位": "精通奶辅"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "西风猎弓",
+            "ref": "weapon:西风猎弓"
+          },
+          {
+            "name": "终末嗟叹之诗",
+            "ref": "weapon:终末嗟叹之诗"
+          },
+          {
+            "name": "祭礼弓",
+            "ref": "weapon:祭礼弓"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "昔日宗室之仪",
+            "ref": "artifact:昔日宗室之仪"
+          }
+        ]
+      },
+      {
+        "kind": "transition",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "教官",
+            "ref": "artifact:教官"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "元素充能效率"
+          ],
+          "空之杯": [
+            "生命值"
+          ],
+          "理之冠": [
+            "治疗加成",
+            "暴击率"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "元素充能效率",
+          "生命值"
+        ],
+        "sep": " > "
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          }
+        ],
+        "raw": "Q"
+      }
+    ],
+    "panels": [
+      {
+        "label": null,
+        "k": "元素充能效率",
+        "v": "220%+"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "六命",
+        "index": 6,
+        "text": "提升前台精通"
+      }
+    ],
+    "teams": [
+      {
+        "label": "星超导",
+        "members": [
+          {
+            "name": "桑多涅",
+            "ref": "character:桑多涅"
+          },
+          {
+            "name": "奥黛塔",
+            "ref": "character:奥黛塔"
+          },
+          {
+            "name": "八重神子",
+            "ref": "character:八重神子"
+          },
+          {
+            "name": "迪奥娜",
+            "ref": "character:迪奥娜"
+          }
+        ],
+        "text": ""
+      }
+    ]
+  },
+  "tags": [
+    {
+      "text": "建议等级：81级",
+      "style": "level"
+    },
+    {
+      "text": "定位：精通奶辅",
+      "style": "role"
+    }
+  ],
+  "sections": [
+    {
+      "title": "1. 武器推荐",
+      "lines": [
+        "第一档：西风猎弓 > 终末嗟叹之诗 > 祭礼弓"
+      ]
+    },
+    {
+      "title": "2. 圣遗物推荐",
+      "lines": [
+        "首选：昔日宗室之仪",
+        "过渡：教官",
+        "主词条：时之沙：元素充能效率 / 空之杯：生命值 / 理之冠：治疗加成 / 暴击率",
+        "副词条：元素充能效率 > 生命值"
+      ]
+    },
+    {
+      "title": "3. 天赋加点",
+      "lines": [
+        "优先级：Q"
+      ]
+    },
+    {
+      "title": "4. 毕业面板参考",
+      "lines": [
+        "元素充能效率：220%+"
+      ]
+    },
+    {
+      "title": "5. 命座推荐",
+      "lines": [
+        "六命——提升前台精通"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "星超导：桑多涅 + 奥黛塔 + 八重神子 + 迪奥娜"
+      ]
+    }
+  ],
+  "source": {
+    "guide": "原神·角色攻略.docx"
+  }
+}

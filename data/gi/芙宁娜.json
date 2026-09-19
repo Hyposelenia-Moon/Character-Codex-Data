@@ -1,6 +1,208 @@
 {
+  "schema": 2,
   "name": "芙宁娜",
   "game": "gi",
+  "meta": {
+    "建议等级": "90级",
+    "定位": "元素增伤辅助",
+    "100级提升": "___%"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": "辅助向",
+        "tier": null,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "西风剑",
+            "ref": "weapon:西风剑"
+          }
+        ]
+      },
+      {
+        "label": "输出向",
+        "tier": null,
+        "sep": " ≥ ",
+        "items": [
+          {
+            "name": "有乐御簾切",
+            "ref": "weapon:有乐御簾切"
+          },
+          {
+            "name": "圣显之钥",
+            "ref": "weapon:圣显之钥"
+          },
+          {
+            "name": "静水流涌之辉",
+            "ref": "weapon:静水流涌之辉"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": "辅助向",
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "千岩牢固",
+            "ref": "artifact:千岩牢固"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "元素充能效率"
+          ],
+          "空之杯": [
+            "生命值"
+          ],
+          "理之冠": [
+            "暴击率"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "充能",
+          "暴击",
+          "生命值"
+        ],
+        "sep": " > "
+      },
+      {
+        "kind": "preferred",
+        "label": "输出向",
+        "sep": " / ",
+        "sets": [
+          {
+            "name": "黄金剧团",
+            "ref": "artifact:黄金剧团"
+          },
+          {
+            "name": "逐影猎人",
+            "ref": "artifact:逐影猎人"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "生命值"
+          ],
+          "空之杯": [
+            "水元素伤害加成（二命）",
+            "生命值"
+          ],
+          "理之冠": [
+            "暴击伤害",
+            "暴击率"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "双爆",
+          "大生命",
+          "充能"
+        ],
+        "sep": " > "
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          },
+          {
+            "name": "E",
+            "ref": "talent:E"
+          },
+          {
+            "name": "A",
+            "ref": "talent:A"
+          }
+        ],
+        "raw": "Q > E > A"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "E",
+            "level": "建议",
+            "ref": "talent:E"
+          },
+          {
+            "name": "Q",
+            "level": "必须",
+            "ref": "talent:Q"
+          }
+        ]
+      }
+    ],
+    "panels": [
+      {
+        "label": "辅助向",
+        "text": "暴击率70%+ / 充能240%+"
+      },
+      {
+        "label": "输出向",
+        "text": "暴击率70% / 暴伤220%+ / 生命值40000+"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "二命",
+        "index": 2,
+        "text": "加快增伤叠层速度"
+      },
+      {
+        "name": "六命",
+        "index": 6,
+        "text": "解放队伍奶位，解锁战场主C玩法"
+      }
+    ],
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "丝柯克",
+            "ref": "character:丝柯克"
+          },
+          {
+            "name": "爱可菲",
+            "ref": "character:爱可菲"
+          },
+          {
+            "name": "芙宁娜",
+            "ref": "character:芙宁娜"
+          },
+          {
+            "name": "莫娜",
+            "ref": "character:莫娜"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "其他",
+        "members": [],
+        "text": "自由选择"
+      }
+    ]
+  },
   "tags": [
     {
       "text": "建议等级：90级",
@@ -9,14 +211,18 @@
     {
       "text": "定位：元素增伤辅助",
       "style": "role"
+    },
+    {
+      "text": "100级提升：___%",
+      "style": "power"
     }
   ],
   "sections": [
     {
       "title": "1. 武器推荐",
       "lines": [
-        "辅助向：西风剑（精5） > 圣显之钥",
-        "输出向：静水流涌之辉 ≥ 有乐御簾切 > 圣显之钥"
+        "辅助向：西风剑",
+        "输出向：有乐御簾切 ≥ 圣显之钥 ≥ 静水流涌之辉"
       ]
     },
     {
@@ -34,7 +240,7 @@
       "title": "3. 天赋加点",
       "lines": [
         "优先级：Q > E > A",
-        "皇冠：E（建议）Q（**必须**）"
+        "皇冠：E（建议）Q（必须）"
       ]
     },
     {

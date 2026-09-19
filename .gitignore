@@ -17,3 +17,10 @@ Thumbs.db
 .dsh/
 CLAUDE.md
 AGENTS.md
+.plugin-v2/
+.plugin-v2-dev/
+.plugin-v2-final/
+.plugin-v2-final-dev/
+.plugin-conflict/
+.tmp/
+out/

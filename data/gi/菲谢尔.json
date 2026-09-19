@@ -1,0 +1,219 @@
+{
+  "schema": 2,
+  "name": "菲谢尔",
+  "game": "gi",
+  "meta": {
+    "建议等级": "81级",
+    "定位": "魔导挂雷辅"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "终末嗟叹之诗",
+            "ref": "weapon:终末嗟叹之诗"
+          },
+          {
+            "name": "绝弦",
+            "ref": "weapon:绝弦"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "风起之日",
+            "ref": "artifact:风起之日"
+          }
+        ]
+      },
+      {
+        "kind": "transition",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "黄金剧团",
+            "ref": "artifact:黄金剧团"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "攻击力"
+          ],
+          "空之杯": [
+            "雷元素伤害加成"
+          ],
+          "理之冠": [
+            "暴击率",
+            "暴击伤害"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "暴击率",
+          "暴击伤害",
+          "攻击力"
+        ],
+        "sep": " > "
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "E",
+            "ref": "talent:E"
+          },
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          }
+        ],
+        "raw": "E＞Q"
+      }
+    ],
+    "panels": [
+      {
+        "label": null,
+        "k": "暴击率",
+        "v": "70-80%"
+      },
+      {
+        "label": null,
+        "k": "暴击伤害",
+        "v": "160-180%"
+      },
+      {
+        "label": null,
+        "k": "元素精通",
+        "v": "100"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "六命",
+        "index": 6,
+        "text": "提升攻击力/精通"
+      }
+    ],
+    "teams": [
+      {
+        "label": "超载",
+        "members": [
+          {
+            "name": "瓦雷莎",
+            "ref": "character:瓦雷莎"
+          },
+          {
+            "name": "菲谢尔",
+            "ref": "character:菲谢尔"
+          },
+          {
+            "name": "夏沃蕾",
+            "ref": "character:夏沃蕾"
+          },
+          {
+            "name": "班尼特",
+            "ref": "character:班尼特"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "月感电",
+        "members": [
+          {
+            "name": "菲林斯",
+            "ref": "character:菲林斯"
+          },
+          {
+            "name": "哥伦比娅",
+            "ref": "character:哥伦比娅"
+          },
+          {
+            "name": "菲谢尔",
+            "ref": "character:菲谢尔"
+          },
+          {
+            "name": "砂糖",
+            "ref": "character:砂糖"
+          }
+        ],
+        "text": ""
+      }
+    ]
+  },
+  "tags": [
+    {
+      "text": "建议等级：81级",
+      "style": "level"
+    },
+    {
+      "text": "定位：魔导挂雷辅",
+      "style": "role"
+    }
+  ],
+  "sections": [
+    {
+      "title": "1. 武器推荐",
+      "lines": [
+        "第一档：终末嗟叹之诗 > 绝弦"
+      ]
+    },
+    {
+      "title": "2. 圣遗物推荐",
+      "lines": [
+        "首选：风起之日",
+        "过渡：黄金剧团",
+        "主词条：时之沙：攻击力 / 空之杯：雷元素伤害加成 / 理之冠：暴击率 / 暴击伤害",
+        "副词条：暴击率 > 暴击伤害 > 攻击力"
+      ]
+    },
+    {
+      "title": "3. 天赋加点",
+      "lines": [
+        "优先级：E > Q"
+      ]
+    },
+    {
+      "title": "4. 毕业面板参考",
+      "lines": [
+        "暴击率：70-80%",
+        "暴击伤害：160-180%",
+        "元素精通：100"
+      ]
+    },
+    {
+      "title": "5. 命座推荐",
+      "lines": [
+        "六命——提升攻击力/精通"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "超载：瓦雷莎 + 菲谢尔 + 夏沃蕾 + 班尼特",
+        "月感电：菲林斯 + 哥伦比娅 + 菲谢尔 + 砂糖"
+      ]
+    }
+  ],
+  "source": {
+    "guide": "原神·角色攻略.docx"
+  }
+}

@@ -1,31 +1,226 @@
 {
+  "schema": 2,
   "name": "尼可",
   "game": "gi",
-  "tags": [],
+  "meta": {
+    "建议等级": "90级",
+    "定位": "加攻增伤辅",
+    "100级提升": "___%"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "尘光七谕",
+            "ref": "weapon:尘光七谕"
+          },
+          {
+            "name": "祭星者之望",
+            "ref": "weapon:祭星者之望"
+          },
+          {
+            "name": "鹤鸣余音",
+            "ref": "weapon:鹤鸣余音"
+          }
+        ]
+      },
+      {
+        "label": null,
+        "tier": 2,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "天空之卷",
+            "ref": "weapon:天空之卷"
+          },
+          {
+            "name": "千夜浮梦",
+            "ref": "weapon:千夜浮梦"
+          },
+          {
+            "name": "证誓之明瞳",
+            "ref": "weapon:证誓之明瞳"
+          }
+        ]
+      },
+      {
+        "label": null,
+        "tier": 3,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "讨龙英杰谭",
+            "ref": "weapon:讨龙英杰谭"
+          },
+          {
+            "name": "纯水流华",
+            "ref": "weapon:纯水流华"
+          },
+          {
+            "name": "寸心余响",
+            "ref": "weapon:寸心余响"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "天之美赐",
+            "ref": "artifact:天之美赐"
+          }
+        ]
+      },
+      {
+        "kind": "transition",
+        "label": null,
+        "sep": " + ",
+        "sets": [
+          {
+            "name": "2攻击",
+            "ref": "artifact:2攻击"
+          },
+          {
+            "name": "2攻击",
+            "ref": "artifact:2攻击"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "攻击力"
+          ],
+          "空之杯": [
+            "攻击力"
+          ],
+          "理之冠": [
+            "攻击力"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "攻击力"
+        ],
+        "sep": " > "
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "E",
+            "ref": "talent:E"
+          }
+        ],
+        "raw": "E"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "E",
+            "ref": "talent:E"
+          }
+        ]
+      }
+    ],
+    "panels": [
+      {
+        "label": null,
+        "k": "攻击力",
+        "v": "4000（双火）"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "二命",
+        "index": 2,
+        "text": "前台加攻"
+      },
+      {
+        "name": "六命",
+        "index": 6,
+        "text": "减防"
+      }
+    ],
+    "teams": [
+      {
+        "label": "其他",
+        "members": [],
+        "text": "任意攻击主c队"
+      }
+    ]
+  },
+  "tags": [
+    {
+      "text": "建议等级：90级",
+      "style": "level"
+    },
+    {
+      "text": "定位：加攻增伤辅",
+      "style": "role"
+    },
+    {
+      "text": "100级提升：___%",
+      "style": "power"
+    }
+  ],
   "sections": [
     {
       "title": "1. 武器推荐",
-      "lines": []
+      "lines": [
+        "第一档：尘光七谕 > 祭星者之望 > 鹤鸣余音",
+        "第二档：天空之卷 > 千夜浮梦 > 证誓之明瞳",
+        "第三档：讨龙英杰谭 > 纯水流华 > 寸心余响"
+      ]
     },
     {
       "title": "2. 圣遗物推荐",
-      "lines": []
+      "lines": [
+        "首选：天之美赐",
+        "过渡：2攻击 + 2攻击",
+        "主词条：时之沙：攻击力 / 空之杯：攻击力 / 理之冠：攻击力",
+        "副词条：攻击力"
+      ]
     },
     {
       "title": "3. 天赋加点",
-      "lines": []
+      "lines": [
+        "优先级：E",
+        "皇冠：E"
+      ]
     },
     {
       "title": "4. 毕业面板参考",
-      "lines": []
+      "lines": [
+        "攻击力：4000（双火）"
+      ]
     },
     {
       "title": "5. 命座推荐",
-      "lines": []
+      "lines": [
+        "二命——前台加攻",
+        "六命——减防"
+      ]
     },
     {
       "title": "6. 配队推荐",
-      "lines": []
+      "lines": [
+        "其他：任意攻击主c队"
+      ]
     }
   ],
   "source": {

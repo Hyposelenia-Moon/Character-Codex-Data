@@ -1,0 +1,229 @@
+{
+  "schema": 2,
+  "name": "雷泽",
+  "game": "gi",
+  "meta": {
+    "建议等级": "81-90级",
+    "定位": "魔导主c"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "焚曜千阳",
+            "ref": "weapon:焚曜千阳"
+          },
+          {
+            "name": "松籁响起之时",
+            "ref": "weapon:松籁响起之时"
+          },
+          {
+            "name": "苇海信标",
+            "ref": "weapon:苇海信标"
+          }
+        ]
+      },
+      {
+        "label": null,
+        "tier": 2,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "无工之剑",
+            "ref": "weapon:无工之剑"
+          },
+          {
+            "name": "狼的末路",
+            "ref": "weapon:狼的末路"
+          },
+          {
+            "name": "螭骨剑",
+            "ref": "weapon:螭骨剑"
+          }
+        ]
+      },
+      {
+        "label": null,
+        "tier": 3,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "雪葬的星银",
+            "ref": "weapon:雪葬的星银"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "风起之日",
+            "ref": "artifact:风起之日"
+          }
+        ]
+      },
+      {
+        "kind": "transition",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "角斗士的终幕礼",
+            "ref": "artifact:角斗士的终幕礼"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "攻击力"
+          ],
+          "空之杯": [
+            "雷元素伤害加成"
+          ],
+          "理之冠": [
+            "暴击率",
+            "暴击伤害"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "暴击率",
+          "暴击伤害",
+          "攻击力",
+          "元素精通",
+          "元素充能效率"
+        ],
+        "sep": " / "
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          }
+        ],
+        "raw": "Q"
+      }
+    ],
+    "panels": [],
+    "constellations": [
+      {
+        "name": "六命",
+        "index": 6,
+        "text": "加快印记积攒，提升双爆"
+      }
+    ],
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "雷泽",
+            "ref": "character:雷泽"
+          },
+          {
+            "name": "杜林",
+            "ref": "character:杜林"
+          },
+          {
+            "name": "夏沃蕾",
+            "ref": "character:夏沃蕾"
+          },
+          {
+            "name": "尼可",
+            "ref": "character:尼可"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "过渡",
+        "members": [
+          {
+            "name": "雷泽",
+            "ref": "character:雷泽"
+          },
+          {
+            "name": "纳西妲",
+            "ref": "character:纳西妲"
+          },
+          {
+            "name": "行秋",
+            "ref": "character:行秋"
+          },
+          {
+            "name": "久岐忍",
+            "ref": "character:久岐忍"
+          }
+        ],
+        "text": ""
+      }
+    ]
+  },
+  "tags": [
+    {
+      "text": "建议等级：81-90级",
+      "style": "level"
+    },
+    {
+      "text": "定位：魔导主c",
+      "style": "role"
+    }
+  ],
+  "sections": [
+    {
+      "title": "1. 武器推荐",
+      "lines": [
+        "第一档：焚曜千阳 > 松籁响起之时 > 苇海信标",
+        "第二档：无工之剑 > 狼的末路 > 螭骨剑",
+        "第三档：雪葬的星银"
+      ]
+    },
+    {
+      "title": "2. 圣遗物推荐",
+      "lines": [
+        "首选：风起之日",
+        "过渡：角斗士的终幕礼",
+        "主词条：时之沙：攻击力 / 空之杯：雷元素伤害加成 / 理之冠：暴击率 / 暴击伤害",
+        "副词条：暴击率 / 暴击伤害 / 攻击力 / 元素精通 / 元素充能效率"
+      ]
+    },
+    {
+      "title": "3. 天赋加点",
+      "lines": [
+        "优先级：Q"
+      ]
+    },
+    {
+      "title": "5. 命座推荐",
+      "lines": [
+        "六命——加快印记积攒，提升双爆"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：雷泽 + 杜林 + 夏沃蕾 + 尼可",
+        "过渡：雷泽 + 纳西妲 + 行秋 + 久岐忍"
+      ]
+    }
+  ],
+  "source": {
+    "guide": "原神·角色攻略.docx"
+  }
+}

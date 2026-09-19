@@ -1,0 +1,273 @@
+{
+  "schema": 2,
+  "name": "旅行者·冰",
+  "game": "gi",
+  "meta": {
+    "建议等级": "90级",
+    "定位": "星超导主c/副c",
+    "100级提升": "___%"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "星锋剑",
+            "ref": "weapon:星锋剑"
+          },
+          {
+            "name": "白湖冬羽",
+            "ref": "weapon:白湖冬羽"
+          },
+          {
+            "name": "磐岩结绿",
+            "ref": "weapon:磐岩结绿"
+          }
+        ]
+      },
+      {
+        "label": null,
+        "tier": 2,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "苍耀",
+            "ref": "weapon:苍耀"
+          },
+          {
+            "name": "赦罪",
+            "ref": "weapon:赦罪"
+          },
+          {
+            "name": "引火之源",
+            "ref": "weapon:引火之源"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "影中沉凝的幻灭",
+            "ref": "artifact:影中沉凝的幻灭"
+          }
+        ]
+      },
+      {
+        "kind": "optional",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "炉火融炼之心",
+            "ref": "artifact:炉火融炼之心"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "攻击力"
+          ],
+          "空之杯": [
+            "攻击力"
+          ],
+          "理之冠": [
+            "暴击伤害",
+            "暴击率"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "暴击率",
+          "暴击伤害",
+          "攻击力百分比",
+          "元素精通"
+        ],
+        "sep": " > "
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          },
+          {
+            "name": "E",
+            "ref": "talent:E"
+          },
+          {
+            "name": "A",
+            "ref": "talent:A"
+          }
+        ],
+        "raw": "Q＞E＞A"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          }
+        ]
+      }
+    ],
+    "panels": [
+      {
+        "label": null,
+        "k": "攻击力",
+        "v": "2200"
+      },
+      {
+        "label": null,
+        "k": "暴击率",
+        "v": "70%"
+      },
+      {
+        "label": null,
+        "k": "暴击伤害",
+        "v": "200%"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "二命",
+        "index": 2,
+        "text": "提升前台精通"
+      },
+      {
+        "name": "六命",
+        "index": 6,
+        "text": "提升星烁反应伤害"
+      }
+    ],
+    "teams": [
+      {
+        "label": "星超导",
+        "members": [
+          {
+            "name": "旅行者·冰",
+            "ref": "character:旅行者·冰"
+          },
+          {
+            "name": "奥黛塔",
+            "ref": "character:奥黛塔"
+          },
+          {
+            "name": "八重神子",
+            "ref": "character:八重神子"
+          },
+          {
+            "name": "迪奥娜",
+            "ref": "character:迪奥娜"
+          },
+          {
+            "name": "阿罗夏",
+            "ref": "character:阿罗夏"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "星扩散",
+        "members": [
+          {
+            "name": "梦见月瑞希",
+            "ref": "character:梦见月瑞希"
+          },
+          {
+            "name": "奥黛塔",
+            "ref": "character:奥黛塔"
+          },
+          {
+            "name": "沃雅妮莎",
+            "ref": "character:沃雅妮莎"
+          },
+          {
+            "name": "旅行者·冰",
+            "ref": "character:旅行者·冰"
+          }
+        ],
+        "text": ""
+      }
+    ]
+  },
+  "tags": [
+    {
+      "text": "建议等级：90级",
+      "style": "level"
+    },
+    {
+      "text": "定位：星超导主c/副c",
+      "style": "role"
+    },
+    {
+      "text": "100级提升：___%",
+      "style": "power"
+    }
+  ],
+  "sections": [
+    {
+      "title": "1. 武器推荐",
+      "lines": [
+        "第一档：星锋剑 > 白湖冬羽 > 磐岩结绿",
+        "第二档：苍耀 > 赦罪 > 引火之源"
+      ]
+    },
+    {
+      "title": "2. 圣遗物推荐",
+      "lines": [
+        "首选：影中沉凝的幻灭",
+        "可选：炉火融炼之心",
+        "主词条：时之沙：攻击力 / 空之杯：攻击力 / 理之冠：暴击伤害 / 暴击率",
+        "副词条：暴击率 > 暴击伤害 > 攻击力百分比 > 元素精通"
+      ]
+    },
+    {
+      "title": "3. 天赋加点",
+      "lines": [
+        "优先级：Q > E > A",
+        "皇冠：Q"
+      ]
+    },
+    {
+      "title": "4. 毕业面板参考",
+      "lines": [
+        "攻击力：2200",
+        "暴击率：70%",
+        "暴击伤害：200%"
+      ]
+    },
+    {
+      "title": "5. 命座推荐",
+      "lines": [
+        "二命——提升前台精通",
+        "六命——提升星烁反应伤害"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "星超导：旅行者·冰 + 奥黛塔 + 八重神子 + 迪奥娜 + 阿罗夏",
+        "星扩散：梦见月瑞希 + 奥黛塔 + 沃雅妮莎 + 旅行者·冰"
+      ]
+    }
+  ],
+  "source": {
+    "guide": "原神·角色攻略.docx"
+  }
+}

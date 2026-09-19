@@ -1,0 +1,196 @@
+{
+  "schema": 2,
+  "name": "提纳里",
+  "game": "gi",
+  "meta": {
+    "建议等级": "___级",
+    "定位": "___",
+    "100级提升": "___%"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "猎人之径",
+            "ref": "weapon:猎人之径"
+          },
+          {
+            "name": "若水",
+            "ref": "weapon:若水"
+          },
+          {
+            "name": "天空之翼",
+            "ref": "weapon:天空之翼"
+          }
+        ]
+      },
+      {
+        "label": null,
+        "tier": 2,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "冬极白星",
+            "ref": "weapon:冬极白星"
+          },
+          {
+            "name": "飞雷之弦振",
+            "ref": "weapon:飞雷之弦振"
+          },
+          {
+            "name": "苍翠猎弓",
+            "ref": "weapon:苍翠猎弓"
+          }
+        ]
+      },
+      {
+        "label": null,
+        "tier": 3,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "烈阳之嗣",
+            "ref": "weapon:烈阳之嗣"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "流浪大地的乐团",
+            "ref": "artifact:流浪大地的乐团"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "元素精通"
+          ],
+          "空之杯": [
+            "草元素伤害加成"
+          ],
+          "理之冠": [
+            "暴击率",
+            "暴击伤害"
+          ]
+        }
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "A",
+            "ref": "talent:A"
+          },
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          },
+          {
+            "name": "E",
+            "ref": "talent:E"
+          }
+        ],
+        "raw": "A > Q > E"
+      }
+    ],
+    "panels": [
+      {
+        "label": null,
+        "k": "暴击率",
+        "v": "80%"
+      },
+      {
+        "label": null,
+        "k": "暴击伤害",
+        "v": "180%"
+      },
+      {
+        "label": null,
+        "k": "元素精通",
+        "v": "350"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "二命",
+        "index": 2,
+        "text": ""
+      },
+      {
+        "name": "六命",
+        "index": 6,
+        "text": ""
+      }
+    ],
+    "teams": []
+  },
+  "tags": [
+    {
+      "text": "建议等级：___级",
+      "style": "level"
+    },
+    {
+      "text": "定位：___",
+      "style": "role"
+    },
+    {
+      "text": "100级提升：___%",
+      "style": "power"
+    }
+  ],
+  "sections": [
+    {
+      "title": "1. 武器推荐",
+      "lines": [
+        "第一档：猎人之径 > 若水 > 天空之翼",
+        "第二档：冬极白星 > 飞雷之弦振 > 苍翠猎弓",
+        "第三档：烈阳之嗣"
+      ]
+    },
+    {
+      "title": "2. 圣遗物推荐",
+      "lines": [
+        "首选：流浪大地的乐团",
+        "主词条：时之沙：元素精通 / 空之杯：草元素伤害加成 / 理之冠：暴击率 / 暴击伤害"
+      ]
+    },
+    {
+      "title": "3. 天赋加点",
+      "lines": [
+        "优先级：A > Q > E"
+      ]
+    },
+    {
+      "title": "4. 毕业面板参考",
+      "lines": [
+        "暴击率：80%",
+        "暴击伤害：180%",
+        "元素精通：350"
+      ]
+    },
+    {
+      "title": "5. 命座推荐",
+      "lines": [
+        "二命",
+        "六命"
+      ]
+    }
+  ],
+  "source": {
+    "guide": "原神·角色攻略.docx"
+  }
+}

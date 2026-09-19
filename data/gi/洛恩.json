@@ -1,0 +1,225 @@
+{
+  "schema": 2,
+  "name": "洛恩",
+  "game": "gi",
+  "meta": {
+    "建议等级": "90级",
+    "定位": "魔导主c",
+    "100级提升": "___%"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "灾悔",
+            "ref": "weapon:灾悔"
+          },
+          {
+            "name": "和璞鸢",
+            "ref": "weapon:和璞鸢"
+          },
+          {
+            "name": "赤月之形",
+            "ref": "weapon:赤月之形"
+          }
+        ]
+      },
+      {
+        "label": null,
+        "tier": 2,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "护摩之杖",
+            "ref": "weapon:护摩之杖"
+          },
+          {
+            "name": "支离轮光",
+            "ref": "weapon:支离轮光"
+          },
+          {
+            "name": "香韵奏者",
+            "ref": "weapon:香韵奏者"
+          }
+        ]
+      },
+      {
+        "label": null,
+        "tier": 3,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "贯虹之槊",
+            "ref": "weapon:贯虹之槊"
+          },
+          {
+            "name": "息灾",
+            "ref": "weapon:息灾"
+          },
+          {
+            "name": "决斗之枪",
+            "ref": "weapon:决斗之枪"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "风起之日",
+            "ref": "artifact:风起之日"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "攻击力"
+          ],
+          "空之杯": [
+            "冰元素伤害加成"
+          ],
+          "理之冠": [
+            "暴击伤害",
+            "暴击率"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "暴击率",
+          "暴击伤害",
+          "百分比攻击力"
+        ],
+        "sep": " / "
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "E",
+            "ref": "talent:E"
+          },
+          {
+            "name": "Q",
+            "ref": "talent:Q"
+          }
+        ],
+        "raw": "E＞Q"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "E",
+            "ref": "talent:E"
+          }
+        ]
+      }
+    ],
+    "panels": [],
+    "constellations": [
+      {
+        "name": "二命",
+        "index": 2,
+        "text": ""
+      },
+      {
+        "name": "六命",
+        "index": 6,
+        "text": ""
+      }
+    ],
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "洛恩",
+            "ref": "character:洛恩"
+          },
+          {
+            "name": "杜林",
+            "ref": "character:杜林"
+          },
+          {
+            "name": "尼可",
+            "ref": "character:尼可"
+          },
+          {
+            "name": "布伦妮",
+            "ref": "character:布伦妮"
+          }
+        ],
+        "text": ""
+      }
+    ]
+  },
+  "tags": [
+    {
+      "text": "建议等级：90级",
+      "style": "level"
+    },
+    {
+      "text": "定位：魔导主c",
+      "style": "role"
+    },
+    {
+      "text": "100级提升：___%",
+      "style": "power"
+    }
+  ],
+  "sections": [
+    {
+      "title": "1. 武器推荐",
+      "lines": [
+        "第一档：灾悔 > 和璞鸢 > 赤月之形",
+        "第二档：护摩之杖 > 支离轮光 > 香韵奏者",
+        "第三档：贯虹之槊 > 息灾 > 决斗之枪"
+      ]
+    },
+    {
+      "title": "2. 圣遗物推荐",
+      "lines": [
+        "首选：风起之日",
+        "主词条：时之沙：攻击力 / 空之杯：冰元素伤害加成 / 理之冠：暴击伤害 / 暴击率",
+        "副词条：暴击率 / 暴击伤害 / 百分比攻击力"
+      ]
+    },
+    {
+      "title": "3. 天赋加点",
+      "lines": [
+        "优先级：E > Q",
+        "皇冠：E"
+      ]
+    },
+    {
+      "title": "5. 命座推荐",
+      "lines": [
+        "二命",
+        "六命"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：洛恩 + 杜林 + 尼可 + 布伦妮"
+      ]
+    }
+  ],
+  "source": {
+    "guide": "原神·角色攻略.docx"
+  }
+}

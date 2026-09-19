@@ -1,0 +1,106 @@
+{
+  "schema": 2,
+  "name": "夏洛蒂",
+  "game": "gi",
+  "meta": {
+    "建议等级": "81-90级",
+    "定位": "奶辅"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "试作金珀",
+            "ref": "weapon:试作金珀"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "昔时之歌",
+            "ref": "artifact:昔时之歌"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [],
+          "空之杯": [],
+          "理之冠": []
+        }
+      }
+    ],
+    "talents": [],
+    "panels": [
+      {
+        "label": null,
+        "k": "元素充能效率",
+        "v": "200%+"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "二命",
+        "index": 2,
+        "text": ""
+      },
+      {
+        "name": "六命",
+        "index": 6,
+        "text": ""
+      }
+    ],
+    "teams": []
+  },
+  "tags": [
+    {
+      "text": "建议等级：81-90级",
+      "style": "level"
+    },
+    {
+      "text": "定位：奶辅",
+      "style": "role"
+    }
+  ],
+  "sections": [
+    {
+      "title": "1. 武器推荐",
+      "lines": [
+        "第一档：试作金珀"
+      ]
+    },
+    {
+      "title": "2. 圣遗物推荐",
+      "lines": [
+        "首选：昔时之歌"
+      ]
+    },
+    {
+      "title": "4. 毕业面板参考",
+      "lines": [
+        "元素充能效率：200%+"
+      ]
+    },
+    {
+      "title": "5. 命座推荐",
+      "lines": [
+        "二命",
+        "六命"
+      ]
+    }
+  ],
+  "source": {
+    "guide": "原神·角色攻略.docx"
+  }
+}

@@ -1,0 +1,260 @@
+{
+  "schema": 2,
+  "name": "迪卢克",
+  "game": "gi",
+  "meta": {
+    "建议等级": "90级",
+    "定位": "融化主c",
+    "100级提升": "___%"
+  },
+  "v2": {
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "狼的末路",
+            "ref": "weapon:狼的末路"
+          },
+          {
+            "name": "苇海信标",
+            "ref": "weapon:苇海信标"
+          },
+          {
+            "name": "焚曜千阳",
+            "ref": "weapon:焚曜千阳"
+          }
+        ]
+      },
+      {
+        "label": null,
+        "tier": 2,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "螭骨剑",
+            "ref": "weapon:螭骨剑"
+          },
+          {
+            "name": "硕果钩",
+            "ref": "weapon:硕果钩"
+          },
+          {
+            "name": "赤角石溃杵",
+            "ref": "weapon:赤角石溃杵"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "kind": "preferred",
+        "label": null,
+        "sep": " > ",
+        "sets": [
+          {
+            "name": "炽烈的炎之魔女",
+            "ref": "artifact:炽烈的炎之魔女"
+          }
+        ]
+      },
+      {
+        "kind": "main",
+        "stats": {
+          "时之沙": [
+            "攻击力",
+            "元素精通"
+          ],
+          "空之杯": [
+            "火元素伤害加成"
+          ],
+          "理之冠": [
+            "暴击率",
+            "暴击伤害"
+          ]
+        }
+      },
+      {
+        "kind": "sub",
+        "stats": [
+          "暴击率",
+          "暴击伤害",
+          "攻击力",
+          "精通"
+        ],
+        "sep": " > "
+      }
+    ],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "A",
+            "ref": "talent:A"
+          },
+          {
+            "name": "E",
+            "ref": "talent:E"
+          }
+        ],
+        "raw": "A=Q＞E"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "A",
+            "level": "必须",
+            "ref": "talent:A"
+          },
+          {
+            "name": "E",
+            "level": "必须",
+            "ref": "talent:E"
+          }
+        ]
+      }
+    ],
+    "panels": [
+      {
+        "label": null,
+        "k": "暴击率",
+        "v": "80%+"
+      },
+      {
+        "label": null,
+        "k": "暴击伤害",
+        "v": "200%+"
+      },
+      {
+        "label": null,
+        "k": "元素精通",
+        "v": "200+"
+      }
+    ],
+    "constellations": [
+      {
+        "name": "二命",
+        "index": 2,
+        "text": "提升攻击力和攻速"
+      },
+      {
+        "name": "六命",
+        "index": 6,
+        "text": "提升伤害和攻速"
+      }
+    ],
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "迪卢克",
+            "ref": "character:迪卢克"
+          },
+          {
+            "name": "茜特菈莉",
+            "ref": "character:茜特菈莉"
+          },
+          {
+            "name": "希诺宁",
+            "ref": "character:希诺宁"
+          },
+          {
+            "name": "尼可",
+            "ref": "character:尼可"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "其他",
+        "members": [
+          {
+            "name": "迪卢克",
+            "ref": "character:迪卢克"
+          },
+          {
+            "name": "凯亚",
+            "ref": "character:凯亚"
+          },
+          {
+            "name": "枫原万叶",
+            "ref": "character:枫原万叶"
+          },
+          {
+            "name": "班尼特",
+            "ref": "character:班尼特"
+          }
+        ],
+        "text": ""
+      }
+    ]
+  },
+  "tags": [
+    {
+      "text": "建议等级：90级",
+      "style": "level"
+    },
+    {
+      "text": "定位：融化主c",
+      "style": "role"
+    },
+    {
+      "text": "100级提升：___%",
+      "style": "power"
+    }
+  ],
+  "sections": [
+    {
+      "title": "1. 武器推荐",
+      "lines": [
+        "第一档：狼的末路 > 苇海信标 > 焚曜千阳",
+        "第二档：螭骨剑 > 硕果钩 > 赤角石溃杵"
+      ]
+    },
+    {
+      "title": "2. 圣遗物推荐",
+      "lines": [
+        "首选：炽烈的炎之魔女",
+        "主词条：时之沙：攻击力 / 元素精通 / 空之杯：火元素伤害加成 / 理之冠：暴击率 / 暴击伤害",
+        "副词条：暴击率 > 暴击伤害 > 攻击力 > 精通"
+      ]
+    },
+    {
+      "title": "3. 天赋加点",
+      "lines": [
+        "优先级：A > E",
+        "皇冠：A（必须）E（必须）"
+      ]
+    },
+    {
+      "title": "4. 毕业面板参考",
+      "lines": [
+        "暴击率：80%+",
+        "暴击伤害：200%+",
+        "元素精通：200+"
+      ]
+    },
+    {
+      "title": "5. 命座推荐",
+      "lines": [
+        "二命——提升攻击力和攻速",
+        "六命——提升伤害和攻速"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：迪卢克 + 茜特菈莉 + 希诺宁 + 尼可",
+        "其他：迪卢克 + 凯亚 + 枫原万叶 + 班尼特"
+      ]
+    }
+  ],
+  "source": {
+    "guide": "原神·角色攻略.docx"
+  }
+}
