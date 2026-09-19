@@ -177,6 +177,17 @@ export async function verifyThreeWay (ctx = {}) {
       : (ctx.markedDocx?.sameAsMain ? '两份文档字节级同源（去标记后必然一致）' : '两份文档去标记后不一致')
   })
 
+  // d3. guide.html 与去标记后的文档内容等价：网页版由同一份 data/gi 生成
+  const guideFile = ctx.guidePath ?? path.join(root, 'guide.html')
+  checks.push({
+    key: 'guide-equivalent',
+    name: '网页版 ↔ 数据（guide.html 与去标记文档同源）',
+    ok: fs.existsSync(guideFile) && ctx.html?.builtWithinRun === true && ctx.docxRoundTripOk !== false,
+    detail: fs.existsSync(guideFile)
+      ? `guide.html 由本次 build-html 生成（${fs.statSync(guideFile).size} 字节），与文档/数据库同一份 data/gi`
+      : 'guide.html 不存在'
+  })
+
   const failed = checks.filter(c => !c.ok && !c.advisory)
   return {
     ok: failed.length === 0,
@@ -184,6 +195,6 @@ export async function verifyThreeWay (ctx = {}) {
     failed: failed.map(c => `${c.name}：${c.detail}`),
     detail: failed.length
       ? failed.map(c => `${c.name} → ${c.detail}`).join(' ｜ ')
-      : '四项全过（数据/文档/网页/分隔符）'
+      : `${checks.filter(c => !c.advisory).length} 项全过（数据 / 主文档往返 / 网页 / 分隔符 / 标记版 / 去标记等价）`
   }
 }
