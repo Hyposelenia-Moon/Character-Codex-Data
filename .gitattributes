@@ -1,2 +1,6 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# 自动识别文本文件并统一换行（工作区/暂存区都用 LF）
+* text=auto eol=lf
+
+# 二进制：不要做换行转换 / diff
+*.docx binary
+*.bundle binary

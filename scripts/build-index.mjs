@@ -213,34 +213,27 @@ function readRefNamesFromData () {
   return into
 }
 
-function main () {
-  const backend = path.resolve(process.argv[2] ?? DEFAULT_BACKEND)
-
+/**
+ * 构建索引对象并（可选）落盘 —— 供 scripts/editor.mjs 保存角色后自动重建复用。
+ *
+ * @param {object} [opts]
+ * @param {string} [opts.backend] 图鉴后端目录（默认 DEFAULT_BACKEND）
+ * @param {string} [opts.outFile] 输出文件（默认 data/_index.json；传 null 只返回不写盘）
+ * @returns {{index: object, outFile: string|null, weapons: number, characters: number, artifacts: number,
+ *            artifactFiles: number, badFiles: string[], added: object, fromFiles: number, wrote: boolean}}
+ */
+export function buildIndex (opts = {}) {
+  const backend = path.resolve(opts.backend ?? DEFAULT_BACKEND)
+  const out = opts.outFile === undefined ? outFile : opts.outFile
   if (!fs.existsSync(backend) || !fs.statSync(backend).isDirectory()) {
-    console.error(`找不到图鉴后端目录：${backend}`)
-    console.error('用法：node scripts/build-index.mjs [后端目录]')
-    console.error(`默认：${DEFAULT_BACKEND}`)
-    process.exit(1)
+    throw new Error(`找不到图鉴后端目录：${backend}`)
   }
-  console.log(`图鉴后端：${backend}`)
 
-  let weapons = []
-  let characters = []
-  let artifacts = []
-  let artifactFiles = 0
-
-  try {
-    const map = readMapNames(backend)
-    weapons = map.weapons
-    characters = map.characters
-    const art = readArtifactNames(backend)
-    artifacts = art.names
-    artifactFiles = art.files
-    if (art.badFiles.length) console.warn(`警告：${art.badFiles.length} 个圣遗物文件无法解析，已跳过（例：${art.badFiles[0]}）`)
-  } catch (err) {
-    console.error(String(err?.message ?? err))
-    process.exit(1)
-  }
+  const map = readMapNames(backend)
+  let weapons = map.weapons
+  let characters = map.characters
+  const art = readArtifactNames(backend)
+  let artifacts = art.names
 
   // 并入 data/gi 里实际在用的名字：文件名 + 数据里的 ref 名
   const fromData = readRefNamesFromData()
@@ -255,22 +248,53 @@ function main () {
     artifacts: artifacts.length - before.artifacts
   }
 
-  if (!weapons.length) console.warn('警告：武器清单为空（map.json 里没读到 games.gi.locales.zh.pages.weapon.records[].name）')
-  if (!characters.length) console.warn('警告：角色清单为空（map.json 里没读到 games.gi.locales.zh.pages.character.records[].name）')
-  if (!artifacts.length) console.warn('警告：圣遗物套装清单为空（content.list.set[].name.zh 一个都没读到）')
+  const index = { generatedAt: new Date().toISOString(), weapons, characters, artifacts }
+  let wrote = false
+  if (out) {
+    if (!fs.existsSync(path.dirname(out))) fs.mkdirSync(path.dirname(out), { recursive: true })
+    fs.writeFileSync(out, JSON.stringify(index, null, 2) + '\n', 'utf8')
+    wrote = true
+  }
+  return {
+    index,
+    outFile: out,
+    backend,
+    weapons: weapons.length,
+    characters: characters.length,
+    artifacts: artifacts.length,
+    artifactFiles: art.files,
+    badFiles: art.badFiles,
+    added,
+    fromFiles: fromFiles.length,
+    wrote
+  }
+}
 
-  const index = {
-    generatedAt: new Date().toISOString(),
-    weapons,
-    characters,
-    artifacts
+function main () {
+  const backend = path.resolve(process.argv[2] ?? DEFAULT_BACKEND)
+  if (!fs.existsSync(backend) || !fs.statSync(backend).isDirectory()) {
+    console.error(`找不到图鉴后端目录：${backend}`)
+    console.error('用法：node scripts/build-index.mjs [后端目录]')
+    console.error(`默认：${DEFAULT_BACKEND}`)
+    process.exit(1)
+  }
+  console.log(`图鉴后端：${backend}`)
+
+  let info
+  try {
+    info = buildIndex({ backend })
+  } catch (err) {
+    console.error(String(err?.message ?? err))
+    process.exit(1)
   }
 
-  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true })
-  fs.writeFileSync(outFile, JSON.stringify(index, null, 2) + '\n', 'utf8')
+  if (!info.weapons) console.warn('警告：武器清单为空（map.json 里没读到 games.gi.locales.zh.pages.weapon.records[].name）')
+  if (!info.characters) console.warn('警告：角色清单为空（map.json 里没读到 games.gi.locales.zh.pages.character.records[].name）')
+  if (!info.artifacts) console.warn('警告：圣遗物套装清单为空（content.list.set[].name.zh 一个都没读到）')
+  if (info.badFiles.length) console.warn(`警告：${info.badFiles.length} 个圣遗物文件无法解析，已跳过（例：${info.badFiles[0]}）`)
 
-  console.log(`武器 ${weapons.length} 条 / 角色 ${characters.length} 条 / 圣遗物套装 ${artifacts.length} 条（来自 ${artifactFiles} 个文件）`)
-  console.log(`其中来自 data/gi 的补充：武器 +${added.weapons} / 角色 +${added.characters}（含 ${fromFiles.length} 个文件名）/ 圣遗物 +${added.artifacts}`)
+  console.log(`武器 ${info.weapons} 条 / 角色 ${info.characters} 条 / 圣遗物套装 ${info.artifacts} 条（来自 ${info.artifactFiles} 个文件）`)
+  console.log(`其中来自 data/gi 的补充：武器 +${info.added.weapons} / 角色 +${info.added.characters}（含 ${info.fromFiles} 个文件名）/ 圣遗物 +${info.added.artifacts}`)
   console.log(`已写入 ${path.relative(root, outFile)}`)
 }
 

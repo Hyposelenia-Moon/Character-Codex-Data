@@ -14,7 +14,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readDocx, SEPARATOR } from './lib/docx.mjs'
-import { makeRef, parseRef, deriveSections, deriveTags, validate, constellationIndex, extractMarks } from './lib/schema.mjs'
+import { makeRef, parseRef, deriveSections, deriveTags, validate, constellationIndex, extractMarks, stripMarks, MARK_RE } from './lib/schema.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '..')
@@ -28,6 +28,9 @@ const STAT_LABELS = ['暴击率', '暴击伤害', '暴伤', '攻击力', '生命
 const BUDGET_SETS = new Set(['战狂', '武人', '教官', '流放者', '游医', '冒险家', '幸运儿', '学士', '赌徒', '奇迹', '守护之心', '勇士之心', '祭冰之人', '祭火之人', '祭水之人', '祭雷之人'])
 
 const CN_TIER = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6 }
+
+/** 命座序号 → 中文位（1 → 一） */
+const CN_NUM_CHAR = ['', '一', '二', '三', '四', '五', '六']
 
 function readJson (file) {
   return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''))
@@ -53,26 +56,60 @@ function splitItems (text) {
   return { items, sep }
 }
 
+/**
+ * `[[t:Q]]` 这类标记在按分隔符切分时不能被切开（`]]` 里的 `]` 会变成空段，
+ * 所以先把标记换成不含分隔符的占位符，切完再还原。
+ * 占位符用私有区字符，正常文本里不会出现。
+ */
+const MARK_HOLD = '\uE000'
+const MARK_HOLD_END = '\uE001'
+function holdMarks (text) {
+  const held = []
+  const masked = String(text ?? '').replace(new RegExp(MARK_RE.source, 'g'), (raw) => {
+    held.push(raw)
+    return MARK_HOLD + (held.length - 1) + MARK_HOLD_END
+  })
+  return { masked, held }
+}
+function releaseMarks (token, held) {
+  return token.replace(new RegExp(MARK_HOLD + '(\\d+)' + MARK_HOLD_END, 'g'), (_, i) => held[Number(i)] ?? '')
+}
+
+/**
+ * 按分隔符切分，且不破坏 `[[x:..]]` 标记（标记内部的分隔符不参与切分）。
+ * @param {string} text
+ * @returns {string[]}
+ */
 function splitStats (text) {
-  return String(text ?? '').split(/\s*(?:[/／>＞、,，]|≥)\s*/).map(x => x.trim()).filter(Boolean)
+  const { masked, held } = holdMarks(text)
+  return masked.split(/\s*(?:[/／>＞、,，]|≥)\s*/).map(x => releaseMarks(x.trim(), held)).filter(Boolean)
+}
+
+/**
+ * 配队成员 / 武器条目的「名称（备注）」拆分：
+ *   纳西妲（二命）→ { name: '纳西妲', note: '二命' }
+ *   [[c:纳西妲]]（二命）→ { name: '纳西妲', note: '二命' }（标记名优先）
+ * 括注内容原样进 note（由 schema.mjs 的 itemText 渲染成「（二命）」），名称走标准名。
+ * 末尾没有括注时 note 为 ''。
+ * @param {string} token
+ * @returns {{name: string, note: string}}
+ */
+function splitNameNote (token) {
+  const raw = String(token ?? '').trim()
+  const marks = extractMarks(raw)
+  if (marks.length) {
+    const mk = marks[0]
+    return { name: mk.name, note: raw.replace(mk.raw, '').trim().replace(/^[（(]|[）)]$/g, '').trim() }
+  }
+  const m = raw.match(/^(.+?)\s*[（(]([^（()）]+)[）)]\s*$/)
+  if (m) return { name: m[1].trim(), note: m[2].trim() }
+  return { name: raw, note: '' }
 }
 
 /** 「名称（备注）」或「[[w:名称]]」→ {name, note, ref} */
 function parseWeaponItem (token, index) {
-  const marks = extractMarks(token)
-  let name = token.trim()
-  let note = ''
-  if (marks.length) {
-    const mk = marks[0]
-    name = mk.name
-    note = token.replace(mk.raw, '').trim().replace(/^[（(]|[）)]$/g, '').trim()
-  } else {
-    const m = name.match(/^(.+?)\s*[（(]([^（()）]+)[）)]\s*$/)
-    if (m) { name = m[1].trim(); note = m[2].trim() }
-  }
-  const ref = makeRef('weapon', name)
-  const known = index.weapons?.includes(name)
-  return { name, ...(note ? { note } : {}), ref: known === false && index.weapons?.length ? ref : ref }
+  const { name, note } = splitNameNote(token)
+  return { name, ...(note ? { note } : {}), ref: makeRef('weapon', name) }
 }
 
 /** 圣遗物套装 token（可能带件数说明或 [[a:..]]） */
@@ -152,15 +189,18 @@ function buildSetRow (segments, baseSep, parse) {
   }
 }
 
-/** 配队成员：认识的角色名 → ref，其余留文字 */
+/**
+ * 配队成员：认识的角色名 → ref，其余留文字。
+ * 成员带括注（纳西妲（二命））时拆成 {name:'纳西妲', note:'二命', ref:'character:纳西妲'}，
+ * note 由 schema.mjs 的 itemText 原样渲染回「（二命）」，所以回推文本逐字不变。
+ */
 function parseMembers (text, index) {
   const chars = index.characters ?? []
   const parts = String(text).split(/\s*[+＋/／、]\s*/).map(x => x.trim()).filter(Boolean)
   if (parts.length < 2) return null
   const members = parts.map(p => {
-    const marks = extractMarks(p)
-    const name = marks.length ? marks[0].name : p
-    return { name, ref: makeRef('character', name) }
+    const { name, note } = splitNameNote(p)
+    return { name, ...(note ? { note } : {}), ref: makeRef('character', name) }
   })
   // 至少一半能对上角色名才认为是队伍
   const hit = members.filter(x => chars.includes(x.name)).length
@@ -186,24 +226,49 @@ function parseMainStats (text, into = { 时之沙: [], 空之杯: [], 理之冠:
   return into
 }
 
-/** 天赋字母 */
+/**
+ * 天赋字母：`Q` / `[[t:Q]]` 都能取到 Q。
+ * 先 stripMarks 再取首字母，这样带标记的写法与纯文本写法解析结果完全一致。
+ */
 function talentItem (token) {
-  const m = String(token).trim().match(/^([AEQaeq])/)
+  const m = stripMarks(String(token)).trim().match(/^([AEQaeq])/)
   if (!m) return null
   const name = m[1].toUpperCase()
   return { name, ref: makeRef('talent', name) }
 }
 
-/** 皇冠行：E（建议）Q（必须） */
+/**
+ * 皇冠行：E（建议）Q（必须）
+ * 也支持标记写法 `[[t:E]]（建议）Q（必须）` —— 先把标记逐个取出来（level 取标记后面紧跟的括注），
+ * 标记都摘掉后再对剩下的纯字母跑老逻辑，最后按 name+level 去重，保证两种写法结果一致。
+ */
 function parseCrown (text) {
   const out = []
   const re = /([AEQaeq])\s*(?:[（(]([^）)]*)[）)])?/g
-  let m
-  while ((m = re.exec(text)) !== null) {
-    const name = m[1].toUpperCase()
-    const level = (m[2] ?? '').trim()
+  const seen = new Set()
+  const push = (name, level) => {
+    const key = `${name}|${level}`
+    if (seen.has(key)) return
+    seen.add(key)
     out.push({ name, ...(level ? { level } : {}), ref: makeRef('talent', name) })
   }
+  let rest = String(text ?? '')
+  for (const mk of extractMarks(rest)) {
+    const m = mk.name.match(/[AEQaeq]/)
+    if (!m) continue
+    const name = m[0].toUpperCase()
+    const at = rest.indexOf(mk.raw)
+    // 备注也可能写在标记里面：[[t:E（建议）]]
+    const inline = mk.name.match(/[（(]([^）)]*)[）)]/)
+    let after = rest.slice(at + mk.raw.length)
+    const lv = after.match(/^\s*[（(]([^）)]*)[）)]/)
+    push(name, lv ? lv[1].trim() : (inline ? inline[1].trim() : ''))
+    if (lv) after = after.slice(lv[0].length)
+    rest = rest.slice(0, at) + after
+  }
+  let m
+  const re2 = new RegExp(re.source, 'g')
+  while ((m = re2.exec(rest)) !== null) push(m[1].toUpperCase(), (m[2] ?? '').trim())
   return out
 }
 
@@ -293,8 +358,10 @@ function parseBlock (lines, index) {
     if (section === '天赋加点') {
       const pri = line.match(/^优先级[:：]\s*(.*)$/)
       if (pri) {
+        // raw 保留原文的分隔符写法（A＞E＞Q / E ≥ Q / E / Q），但要去掉标记 ——
+        // 标记只影响 order 的解析；raw 带 [[t:]] 会让「标记版解析 == 原文档解析」出现无意义差异
         const order = splitStats(pri[1]).map(talentItem).filter(Boolean)
-        if (order.length) { data.v2.talents.push({ kind: 'priority', order, raw: pri[1].trim() }); continue }
+        if (order.length) { data.v2.talents.push({ kind: 'priority', order, raw: stripMarks(pri[1]).trim() }); continue }
       }
       const crown = line.match(/^皇冠[:：]\s*(.*)$/)
       if (crown) {
@@ -322,7 +389,14 @@ function parseBlock (lines, index) {
     if (section === '命座推荐') {
       const c = line.match(/^(.*?)——\s*(.*)$/)
       if (c) {
-        data.v2.constellations.push({ name: c[1].trim(), index: constellationIndex(c[1]), text: c[2].trim() })
+        // name 先 stripMarks 再归一：`[[k:2]]` / `[[k:二命]]` / `二命` 都要得到 name='二命'、index=2
+        const rawName = c[1].trim()
+        const stripped = stripMarks(rawName).trim()
+        const index = constellationIndex(stripped)
+        const name = /^[一二三四五六]命/.test(stripped)
+          ? stripped
+          : (index ? `${CN_NUM_CHAR[index]}命` : stripped)
+        data.v2.constellations.push({ name, index, text: c[2].trim() })
         continue
       }
       un(); continue

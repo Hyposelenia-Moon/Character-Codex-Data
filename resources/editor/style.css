@@ -370,6 +370,17 @@ textarea { resize: vertical; min-height: 54px; }
 
 .member .ref-field .badge { width: 34px; }
 .member .ref-field input { border: none; background: transparent; padding: 3px 4px; min-width: 84px; }
+.member .member-note {
+  width: 48px;
+  min-width: 0;
+  border: none;
+  border-left: 1px solid var(--line);
+  background: transparent;
+  padding: 3px 2px 3px 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.member .member-note:focus { color: var(--text); outline: none; }
 
 .talent-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .talent-row .handle { cursor: grab; color: var(--text-soft); user-select: none; }

@@ -173,9 +173,15 @@ function markArtifactItems (value, off, add, refs) {
   }
 }
 
-/** 天赋行：优先级 Q > E > A ｜ 皇冠 E（建议）Q（必须） */
+/**
+ * 天赋行：优先级 Q > E > A ｜ 皇冠 E（建议）Q（必须）
+ *
+ * 只包字母本身，不把 `（建议）` 一起包进去 —— 备注留在标记外面，
+ * 回推（parse-docx 的 parseCrown）会把它当成 level，语义逐字不变。
+ * 优先级行同理：`[[t:Q]]` 由 parse-docx 的 splitStats（标记内不切分）+ talentItem（先 stripMarks）还原成 Q。
+ */
 function markTalents (value, off, add, kind) {
-  const re = kind === 'crown' ? /[AEQ](\s*[（(][^）)]*[）)])?/g : /[AEQ]/g
+  const re = /[AEQ]/g
   for (const m of value.matchAll(re)) {
     add({ from: off + m.index, to: off + m.index + m[0].length, type: 't', name: m[0] })
   }
@@ -190,6 +196,25 @@ function markMembers (value, off, add, refs) {
     const trail = seg.text.length - seg.text.trimEnd().length
     add({ from: off + seg.start + lead, to: off + seg.end - trail, type: 'c', name })
   }
+}
+
+/** 命座行前缀：`二命`（中文数字）或 `2命`（阿拉伯数字）—— 两种写法的解析都由 parse-docx 归一 */
+const CONST_HEAD_RE = /^([一二三四五六]命|\d{1,2}命)([\s\S]*)$/
+
+/**
+ * 命座行：[[k:二命]]——说明
+ *
+ * 只包「几命」这一段（不含后面的说明），parse-docx 的命座分支会先 stripMarks 再归一：
+ * `[[k:二命]]` / `[[k:2]]` / `二命` 都得到 name='二命'、index=2，所以回推逐字不变。
+ */
+function markConstellations (text, lead, add) {
+  const m = text.match(CONST_HEAD_RE)
+  if (!m) return
+  const num = m[1].replace('命', '')
+  const isCn = /^[一二三四五六]$/.test(num)
+  const n = isCn ? CN_NUM[num] : Number(num)
+  if (!n || n < 1 || n > 6) return
+  add({ from: lead, to: lead + m[1].length, type: 'k', name: m[1] })
 }
 
 /**
@@ -226,8 +251,7 @@ export function markLine (line, section, refs, counters) {
     if (m) markTalents(m[3], lead + m[1].length + m[2].length, add, 'priority')
     else if ((m = text.match(/^(皇冠)([:：])([\s\S]*)$/))) markTalents(m[3], lead + m[1].length + m[2].length, add, 'crown')
   } else if (section === '命座推荐') {
-    const m = text.match(/^([一二三四五六]命)([\s\S]*)$/)
-    if (m && CN_NUM[m[1][0]]) add({ from: lead, to: lead + m[1].length, type: 'k', name: m[1] })
+    markConstellations(text, lead, add)
   } else if (section === '配队推荐') {
     const m = text.match(/^([^：:]{1,12})([:：])([\s\S]*)$/)
     if (m) {
@@ -637,16 +661,12 @@ async function main () {
     marks: { w: 0, a: 0, c: 0, t: 0, k: 0 }, intent: { w: 0, a: 0, c: 0, t: 0, k: 0 },
     markedLines: 0, rejects: [], dropped: [], problems: [],
     leftover: {}, idempotent: null, zip: null, verify: null, parse: null,
-    note: '标记只覆盖「回推无损」的三类：[[w:武器]] [[a:圣遗物套装]] [[c:角色]]。' +
-      '[[t:天赋]] 与 [[k:命座]] 未落盘：未修改的 scripts/parse-docx.mjs 会把标记原样带进 v2 —— ' +
-      '天赋 `优先级：[[t:Q]] > [[t:E]]` 会被 splitStats 按 `[[`/`]]` 切开导致 order 变成空数组、' +
-      '`皇冠：[[t:E]]（建议）` 因 parseCrown 的 `[（(]` 被 `]]` 隔开而丢掉 level；' +
-      '命座分支不做 stripMarks，`[[k:二命]]` 会原样进 name 且 constellationIndex → 0。' +
-      '所以本脚本对每个候选标记逐行做回推校验，凡会改变 v2 的一律撤回（见 dropped）。' +
-      '将来若允许改 parse-docx.mjs，需要动三处：' +
-      '(1) splitStats/priority 分支（约 56 行 / 280-284 行）：对 `[[t:X]]` 每个标记单独取字母，或在 splitItems/splitStats 前先 stripMarks 再解析；' +
-      '(2) parseCrown（约 183-194 行）：先按标记逐个解析 `[[t:X]]`，再把紧随其后的 `（建议）` 作为 level；' +
-      '(3) 命座分支（约 308-312 行）：name 先 stripMarks 再 constellationIndex，index 取数字。'
+    note: '标记覆盖全部五类：[[w:武器]] [[a:圣遗物套装]] [[c:角色]] [[t:天赋]] [[k:命座]]。' +
+      'parse-docx.mjs 已修好三处回推无损，因此 t/k 现在也能落盘：' +
+      '(1) 天赋优先级行：splitStats 先保护 `[[t:X]]` 不被 `]]` 切开，talentItem 再 stripMarks 取字母；' +
+      '(2) 皇冠行：parseCrown 先按标记取字母（备注取标记后面紧跟的括注），剩下的纯字母走老逻辑，最后按 name+level 去重；' +
+      '(3) 命座行：name 先 stripMarks 再 constellationIndex，`[[k:2]]` / `[[k:二命]]` 都归一成 name=「二命」、index=2。' +
+      '本脚本仍然对每个候选标记逐行做回推校验，凡会改变 v2 的一律撤回（见 dropped）。'
   }
 
   const src = readDocx(args.src)

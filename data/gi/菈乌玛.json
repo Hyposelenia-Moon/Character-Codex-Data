@@ -190,12 +190,14 @@
             "ref": "character:砂糖"
           },
           {
-            "name": "纳西妲（二命）",
-            "ref": "character:纳西妲（二命）"
+            "name": "纳西妲",
+            "note": "二命",
+            "ref": "character:纳西妲"
           },
           {
-            "name": "妮露（高金）",
-            "ref": "character:妮露（高金）"
+            "name": "妮露",
+            "note": "高金",
+            "ref": "character:妮露"
           }
         ],
         "text": ""

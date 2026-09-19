@@ -11,10 +11,15 @@
  *   GET    /api/characters             → { order, items:[{name,weapons,artifacts,hasUnparsed}], missing }
  *   GET    /api/character?name=X       → 角色 JSON + issues（validate 结果）
  *   PUT    /api/character?name=X       → 保存（body 为完整 JSON；强制 schema:2，tags/sections 由服务器重建）
+ *                                        保存后自动重建 data/_index.json，响应带 indexRefreshed / indexWarning
  *   POST   /api/character              → { name } 新建空白 v2 模板（已存在 409）
  *   POST   /api/rename                 → { from, to } 改文件名 + _order.json
  *   DELETE /api/character?name=X       → 软删除到 data/_trash/
  *   POST   /api/reorder                → { order: [...] } 重写 _order.json
+ *
+ * 索引自动刷新：保存 / 新增 / 重命名 / 删除之后调用 build-index.mjs 的 buildIndex() 重建
+ * data/_index.json（含新角色文件名）。重建失败不影响保存本身 —— 保存照常 200，
+ * 只在响应里带 indexWarning 说明原因。
  *
  * 安全：name 必须是单层文件名（拒绝 / \ .. : 等），所有文件操作限制在 data/gi/ 下。
  */
@@ -24,6 +29,7 @@ import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { deriveSections, deriveTags, validate } from './lib/schema.mjs'
+import { buildIndex } from './build-index.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '..')
@@ -175,6 +181,29 @@ function readIndex () {
     }
   } catch {
     return { generatedAt: null, weapons: [], characters: [], artifacts: [] }
+  }
+}
+
+/**
+ * 重建 data/_index.json（保存 / 新增 / 重命名 / 删除之后调用）。
+ *
+ * 索引是「标准名白名单」，除图鉴后端外还会并入 data/gi 的文件名（新角色因此立刻能被 validate 认识），
+ * 所以数据变动后必须重建。重建失败**不能**影响保存本身：这里捕获异常，
+ * 由调用方把 message 放进响应的 indexWarning。
+ * @returns {{refreshed: boolean, generatedAt?: string, weapons?: number, characters?: number, artifacts?: number, warning?: string}}
+ */
+function refreshIndexFile () {
+  try {
+    const info = buildIndex({ outFile: indexPath })
+    return {
+      refreshed: true,
+      generatedAt: info.index.generatedAt,
+      weapons: info.weapons,
+      characters: info.characters,
+      artifacts: info.artifacts
+    }
+  } catch (e) {
+    return { refreshed: false, warning: `索引重建失败：${String(e?.message ?? e)}` }
   }
 }
 
@@ -412,8 +441,12 @@ function normalizeV2 (v2) {
       const members = asArray(row.members)
         .filter(m => m && typeof m === 'object')
         .map(m => {
-          const ref = hasText(m.ref) ? String(m.ref).trim() : `character:${String(m.name ?? '').trim()}`
-          return { name: typeof m.name === 'string' ? m.name.trim() : '', ref }
+          // 字段顺序跟仓库既有写法一致：name, [note], ref
+          const name = typeof m.name === 'string' ? m.name.trim() : ''
+          const member = { name }
+          if (hasText(m.note)) member.note = String(m.note).trim()
+          member.ref = hasText(m.ref) ? String(m.ref).trim() : `character:${name}`
+          return member
         })
       return {
         label: hasText(row.label) ? row.label.trim() : null,
@@ -624,9 +657,16 @@ async function apiPutCharacter (req, res, url) {
   const data = buildCharacter(body, name, prev)
   writeJsonFile(file, data)
   appendOrder(name)
+  const idx = refreshIndexFile()
   const issues = validate(data, readIndex())
-  // 保存成功一律 200：issues 是「名称不在图鉴」之类的提醒，不是保存失败
-  sendJson(res, 200, { ok: true, issues })
+  // 保存成功一律 200：issues 是「名称不在图鉴」之类的提醒，indexWarning 是索引重建失败的提醒，都不是保存失败
+  sendJson(res, 200, {
+    ok: true,
+    issues,
+    indexRefreshed: idx.refreshed,
+    ...(idx.refreshed ? { indexGeneratedAt: idx.generatedAt } : {}),
+    ...(idx.warning ? { indexWarning: idx.warning } : {})
+  })
 }
 
 async function apiCreateCharacter (req, res) {
@@ -637,7 +677,13 @@ async function apiCreateCharacter (req, res) {
   if (!fs.existsSync(giDir)) fs.mkdirSync(giDir, { recursive: true })
   writeJsonFile(file, emptyCharacter(name))
   appendOrder(name)
-  sendJson(res, 200, { ok: true, name })
+  const idx = refreshIndexFile()
+  sendJson(res, 200, {
+    ok: true,
+    name,
+    indexRefreshed: idx.refreshed,
+    ...(idx.warning ? { indexWarning: idx.warning } : {})
+  })
 }
 
 async function apiRename (req, res) {
@@ -667,7 +713,13 @@ async function apiRename (req, res) {
     order[i] = to
     writeOrder(order)
   }
-  sendJson(res, 200, { ok: true, name: to })
+  const idx = refreshIndexFile()
+  sendJson(res, 200, {
+    ok: true,
+    name: to,
+    indexRefreshed: idx.refreshed,
+    ...(idx.warning ? { indexWarning: idx.warning } : {})
+  })
 }
 
 function apiDeleteCharacter (res, url) {
@@ -677,7 +729,14 @@ function apiDeleteCharacter (res, url) {
   if (!fs.existsSync(trashDir)) fs.mkdirSync(trashDir, { recursive: true })
   fs.renameSync(file, path.join(trashDir, `${name}.json`))
   removeFromOrder(name)
-  sendJson(res, 200, { ok: true, name, trashed: path.relative(root, path.join(trashDir, `${name}.json`)).split(path.sep).join('/') })
+  const idx = refreshIndexFile()
+  sendJson(res, 200, {
+    ok: true,
+    name,
+    trashed: path.relative(root, path.join(trashDir, `${name}.json`)).split(path.sep).join('/'),
+    indexRefreshed: idx.refreshed,
+    ...(idx.warning ? { indexWarning: idx.warning } : {})
+  })
 }
 
 async function apiReorder (req, res) {

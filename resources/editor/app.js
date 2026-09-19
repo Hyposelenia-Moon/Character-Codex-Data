@@ -122,7 +122,7 @@ function normalizeData (data) {
       teams: asArray(v2.teams).map(function (r) {
         return {
           label: str(r && r.label),
-          members: asArray(r && r.members).map(function (m) { return { name: str(m && m.name) } }),
+          members: asArray(r && r.members).map(function (m) { return { name: str(m && m.name), note: str(m && m.note) } }),
           text: str(r && r.text)
         }
       })
@@ -589,6 +589,7 @@ function renderTeams () {
   var body = rowList('v2.teams', s.teams, function (row, i, p) {
     var members = row.members.map(function (m, j) {
       return '<span class="member">' + refField('character', m.name, p + '.members.' + j + '.name') +
+        '<input type="text" class="member-note" data-path="' + p + '.members.' + j + '.note" value="' + esc(m.note || '') + '" placeholder="备注" title="括注备注（如 二命 / 高金），输出为「名称（备注）」">' +
         actBtn('del-item', p + '.members', '×', 'row-del', '移除成员', j) + '</span>'
     }).join('')
     return '<div class="box"><div class="box-head">' +
@@ -843,7 +844,9 @@ function buildBody () {
 
   var teams = mv2.teams.map(function (row) {
     var members = asArray(row.members).filter(function (m) { return hasText(m.name) }).map(function (m) {
-      return { name: m.name.trim(), ref: 'character:' + m.name.trim() }
+      var o = { name: m.name.trim(), ref: 'character:' + m.name.trim() }
+      if (hasText(m.note)) o.note = m.note.trim()
+      return o
     })
     return { label: hasText(row.label) ? row.label : null, members: members, text: str(row.text).trim() }
   }).filter(function (row) { return row.members.length || hasText(row.text) || hasText(row.label) })
@@ -878,9 +881,15 @@ function save () {
     state.issueMap = buildIssueMap(state.issues)
     markDirty(false)
     renderForm()
-    return refreshList().then(function () {
-      if (state.issues.length) showStatus('已保存，但有 ' + state.issues.length + ' 处名称不在图鉴里（输入框旁的 ⚠ 可看详情）', 'warn', true)
-      else showStatus('已保存 ' + state.current + '.json', 'ok')
+    // 保存后服务器会自动重建 data/_index.json（索引已刷新 / 重建失败只算警告，不影响保存）
+    var idxNote = (res && res.indexRefreshed) ? '，索引已刷新' : ''
+    var idxWarn = (res && res.indexWarning) ? res.indexWarning : ''
+    return refreshIndex().then(refreshList).then(function () {
+      if (state.issues.length) {
+        showStatus('已保存' + idxNote + '；但有 ' + state.issues.length + ' 处名称不在图鉴里（输入框旁的 ⚠ 可看详情）' + (idxWarn ? '；' + idxWarn : ''), 'warn', true)
+      } else {
+        showStatus('已保存 ' + state.current + '.json' + idxNote + (idxWarn ? '；' + idxWarn : ''), idxWarn ? 'warn' : 'ok', !!idxWarn)
+      }
       return true
     })
   }).catch(function (e) {
@@ -934,7 +943,7 @@ function handleAction (act, path, i, el) {
     else if (/\.items$/.test(listPath)) {
       if (listPath.indexOf('v2.talents') === 0) target.push({ name: 'A', level: '' })
       else target.push({ name: '', note: '' })
-    } else if (/\.members$/.test(listPath)) target.push({ name: '' })
+    } else if (/\.members$/.test(listPath)) target.push({ name: '', note: '' })
     else target.push('')
   } else if (act === 'del-item') {
     target.splice(i, 1)
@@ -949,7 +958,7 @@ function handleAction (act, path, i, el) {
   } else if (act === 'add-crown') {
     model.v2.talents.push({ kind: 'crown', items: [{ name: 'A', level: '' }] })
   } else if (act === 'add-member') {
-    target.push({ name: nextTeamMember(getPath(model, path.replace(/\.members$/, '')), target) })
+    target.push({ name: nextTeamMember(getPath(model, path.replace(/\.members$/, '')), target), note: '' })
   } else if (act === 'panel-to-text') {
     var row = getPath(model, path)
     if (hasText(row.k)) {
@@ -1086,12 +1095,14 @@ function globalEvents () {
     modal({ title: '新增角色', message: '输入角色名（将创建 data/gi/<角色名>.json）', input: true, placeholder: '如 娜维娅', okText: '创建' })
       .then(function (name) {
         if (!name) return
-        return api('POST', '/api/character', { name: name }).then(function () {
-          return refreshList()
-        }).then(function () {
-          return openCharacter(name)
-        }).then(function () {
-          showStatus('已创建 ' + name + '.json（空白 v2 模板）', 'ok')
+        return api('POST', '/api/character', { name: name }).then(function (res) {
+          return refreshIndex().then(refreshList).then(function () { return res })
+        }).then(function (res) {
+          return openCharacter(name).then(function () {
+            var idxNote = (res && res.indexRefreshed) ? '，索引已刷新' : ''
+            var idxWarn = (res && res.indexWarning) ? '；' + res.indexWarning : ''
+            showStatus('已创建 ' + name + '.json（空白 v2 模板）' + idxNote + idxWarn, idxWarn ? 'warn' : 'ok', !!idxWarn)
+          })
         })
       })
       .catch(function (e) { showStatus('新增失败：' + e.message, 'error', true) })
@@ -1103,15 +1114,17 @@ function globalEvents () {
     modal({ title: '重命名角色', message: '同时改文件名和 _order.json：' + from, input: true, value: from, okText: '重命名' })
       .then(function (to) {
         if (!to || to === from) return
-        return api('POST', '/api/rename', { from: from, to: to }).then(function () {
+        return api('POST', '/api/rename', { from: from, to: to }).then(function (res) {
           state.current = null
           state.model = null
           markDirty(false)
-          return refreshList()
-        }).then(function () {
-          return openCharacter(to)
-        }).then(function () {
-          showStatus('已重命名为 ' + to, 'ok')
+          return refreshIndex().then(refreshList).then(function () { return res })
+        }).then(function (res) {
+          return openCharacter(to).then(function () {
+            var idxNote = (res && res.indexRefreshed) ? '，索引已刷新' : ''
+            var idxWarn = (res && res.indexWarning) ? '；' + res.indexWarning : ''
+            showStatus('已重命名为 ' + to + idxNote + idxWarn, idxWarn ? 'warn' : 'ok', !!idxWarn)
+          })
         })
       })
       .catch(function (e) { showStatus('重命名失败：' + e.message, 'error', true) })
@@ -1127,7 +1140,7 @@ function globalEvents () {
       danger: true
     }).then(function (yes) {
       if (!yes) return
-      return api('DELETE', '/api/character?name=' + encodeURIComponent(name)).then(function () {
+      return api('DELETE', '/api/character?name=' + encodeURIComponent(name)).then(function (res) {
         state.current = null
         state.model = null
         $('form').className = 'form hidden'
@@ -1136,7 +1149,11 @@ function globalEvents () {
         $('current-name').textContent = '未选择角色'
         markDirty(false)
         hideStatus()
-        return refreshList().then(function () { showStatus('已删除 ' + name + '（移入 data/_trash/）', 'ok') })
+        return refreshIndex().then(refreshList).then(function () {
+          var idxNote = (res && res.indexRefreshed) ? '，索引已刷新' : ''
+          var idxWarn = (res && res.indexWarning) ? '；' + res.indexWarning : ''
+          showStatus('已删除 ' + name + '（移入 data/_trash/）' + idxNote + idxWarn, idxWarn ? 'warn' : 'ok', !!idxWarn)
+        })
       })
     }).catch(function (e) { showStatus('删除失败：' + e.message, 'error', true) })
   })

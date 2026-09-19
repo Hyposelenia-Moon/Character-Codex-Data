@@ -1448,18 +1448,6 @@
       "reason": "圣遗物名不在图鉴"
     },
     {
-      "name": "菈乌玛",
-      "where": "配队推荐",
-      "ref": "character:纳西妲（二命）",
-      "reason": "角色名不在图鉴"
-    },
-    {
-      "name": "菈乌玛",
-      "where": "配队推荐",
-      "ref": "character:妮露（高金）",
-      "reason": "角色名不在图鉴"
-    },
-    {
       "name": "奈芙尔",
       "where": "武器推荐",
       "ref": "weapon:88爆伤武器",
@@ -1470,42 +1458,6 @@
       "where": "武器推荐",
       "ref": "weapon:44爆伤武器",
       "reason": "武器名不在图鉴"
-    },
-    {
-      "name": "奈芙尔",
-      "where": "配队推荐",
-      "ref": "character:纳西妲（2命）",
-      "reason": "角色名不在图鉴"
-    },
-    {
-      "name": "奈芙尔",
-      "where": "配队推荐",
-      "ref": "character:妮露（高金）",
-      "reason": "角色名不在图鉴"
-    },
-    {
-      "name": "哥伦比娅",
-      "where": "配队推荐",
-      "ref": "character:纳西妲（二命）",
-      "reason": "角色名不在图鉴"
-    },
-    {
-      "name": "哥伦比娅",
-      "where": "配队推荐",
-      "ref": "character:妮露（高金）",
-      "reason": "角色名不在图鉴"
-    },
-    {
-      "name": "哥伦比娅",
-      "where": "配队推荐",
-      "ref": "character:希诺宁（二命）",
-      "reason": "角色名不在图鉴"
-    },
-    {
-      "name": "兹白",
-      "where": "配队推荐",
-      "ref": "character:希诺宁（二命）",
-      "reason": "角色名不在图鉴"
     },
     {
       "name": "叶洛亚",
