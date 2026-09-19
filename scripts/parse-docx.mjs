@@ -14,15 +14,22 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readDocx, SEPARATOR } from './lib/docx.mjs'
-import { makeRef, parseRef, deriveSections, deriveTags, validate, constellationIndex, extractMarks, stripMarks, MARK_RE } from './lib/schema.mjs'
+import { makeRef, parseRef, deriveSections, deriveTags, validate, constellationIndex, extractMarks, stripMarks, MARK_RE, parseNoteLine, resolveNoteText, artifactStatPool, isNoteRow } from './lib/schema.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '..')
-const dataDir = path.join(root, 'data')
-const giDir = path.join(dataDir, 'gi')
+const dataDir = process.env.DSH_DATA_DIR ? path.resolve(process.env.DSH_DATA_DIR) : path.join(root, 'data')
+// DSH_GI_DIR 可指向 data/gi 的**冻结副本**：并发写 data/gi 时（编辑器多个窗口 / 批处理脚本），
+// build-docx 的往返校验用副本 + 同一份内存 bundle 比对，避免被别处的在途改动搅乱。
+const giDir = process.env.DSH_GI_DIR ? path.resolve(process.env.DSH_GI_DIR) : path.join(dataDir, 'gi')
 const DEFAULT_DOC = 'D:\\文件\\游戏\\原神\\原神·角色攻略.docx'
 
 const SECTION_TITLES = ['武器推荐', '圣遗物推荐', '天赋加点', '毕业面板参考', '命座推荐', '配队推荐']
+/** 小节 → v2 字段名（备注行 `注：` 落到所属小节的数组里） */
+const NOTE_SECTION_KEY = {
+  武器推荐: 'weapons', 圣遗物推荐: 'artifacts', 天赋加点: 'talents',
+  毕业面板参考: 'panels', 命座推荐: 'constellations', 配队推荐: 'teams'
+}
 const BUILD_LABELS = ['辅助向', '输出向', '辅助', '输出', '主c', '主C', '副c', '副C', '日常使用', '大世界', '深渊', '新手']
 const STAT_LABELS = ['暴击率', '暴击伤害', '暴伤', '攻击力', '生命值', '防御力', '元素精通', '元素充能效率', '充能效率', '充能', '精通', '双爆', '治疗加成', '护盾强效', '元素伤害加成']
 const BUDGET_SETS = new Set(['战狂', '武人', '教官', '流放者', '游医', '冒险家', '幸运儿', '学士', '赌徒', '奇迹', '守护之心', '勇士之心', '祭冰之人', '祭火之人', '祭水之人', '祭雷之人'])
@@ -44,7 +51,16 @@ function loadIndex () {
   }
 }
 
-/** 拆分「并列/优先级」条目，并记录原文用的分隔符（回写时保持一致） */
+/**
+ * 「并列/优先级」分隔符：`>` ＞、`≥`、`/` ／、`=` ＝、`，` `,` `、`
+ * 连写的分隔符（`> >`、`/ /`）算一个，切完不留空项。
+ */
+const ITEM_SEP_RE = /\s*(?:[>＞]|≥|[/／]|[=＝]|[，,、])\s*/
+
+/**
+ * 拆分「并列/优先级」条目，并记录原文用的分隔符（回写时保持一致）。
+ * 空项（`/ /` 这类连续分隔符造成的）一律丢掉，避免回推文本出现 ` / / `。
+ */
 function splitItems (text) {
   const s = String(text ?? '').trim()
   if (!s) return { items: [], sep: ' > ' }
@@ -52,7 +68,7 @@ function splitItems (text) {
   if (/[>＞]/.test(s)) sep = ' > '
   else if (s.includes('≥')) sep = ' ≥ '
   else if (/[/／=＝，,]/.test(s)) sep = ' / '
-  const items = s.split(/\s*(?:[>＞]|≥|[/／=＝，,])\s*/).map(x => x.trim()).filter(Boolean)
+  const items = s.split(ITEM_SEP_RE).map(x => x.trim()).filter(Boolean)
   return { items, sep }
 }
 
@@ -76,23 +92,55 @@ function releaseMarks (token, held) {
 }
 
 /**
- * 按分隔符切分，且不破坏 `[[x:..]]` 标记（标记内部的分隔符不参与切分）。
+ * 与 splitStats 同一套切分，但额外给出**每一项后面的分隔符原文**（末项为 ''）。
+ * `优先级：Q＞E＞A` 要连 `＞` 一起逐字写回，不能被归一成 `>`。
+ * @param {string} text
+ * @returns {Array<{text: string, sep: string}>}
+ */
+function splitStatsFull (text) {
+  const { masked, held } = holdMarks(text)
+  const out = []
+  let last = 0
+  const re = new RegExp(ITEM_SEP_RE.source, 'g')
+  let m
+  while ((m = re.exec(masked)) !== null) {
+    out.push({ text: releaseMarks(masked.slice(last, m.index).trim(), held), sep: m[0] })
+    last = m.index + m[0].length
+  }
+  out.push({ text: releaseMarks(masked.slice(last).trim(), held), sep: '' })
+  return out
+}
+
+/**
+ * 按分隔符切分（与 splitItems 同一套分隔符），且不破坏 `[[x:..]]` 标记
+ * —— 标记内部的分隔符不参与切分。空项一律丢掉。
  * @param {string} text
  * @returns {string[]}
  */
 function splitStats (text) {
   const { masked, held } = holdMarks(text)
-  return masked.split(/\s*(?:[/／>＞、,，]|≥)\s*/).map(x => releaseMarks(x.trim(), held)).filter(Boolean)
+  return masked.split(ITEM_SEP_RE)
+    .map(x => releaseMarks(x.trim(), held))
+    .filter(Boolean)
 }
 
 /**
- * 配队成员 / 武器条目的「名称（备注）」拆分：
- *   纳西妲（二命）→ { name: '纳西妲', note: '二命' }
- *   [[c:纳西妲]]（二命）→ { name: '纳西妲', note: '二命' }（标记名优先）
- * 括注内容原样进 note（由 schema.mjs 的 itemText 渲染成「（二命）」），名称走标准名。
- * 末尾没有括注时 note 为 ''。
- * @param {string} token
- * @returns {{name: string, note: string}}
+ * 括注 → 备注走廊：
+ *   `纳西妲（二命）`            → 成员 `纳西妲`，备注 `二命`
+ *   `螭骨剑（精5）`             → 条目 `螭骨剑`，note `精5`（精炼类**留在原地**，不进备注走廊）
+ *   `水元素伤害加成（二命）`      → 词条 `水元素伤害加成`，行内括注 `二命`
+ *   行末 `注：建议二命及以上…`    → 该段的备注行 `{kind:'note', text:'二命'}`
+ *
+ * 只有**命座 / 成本 / 随命座**这类括注会进备注走廊（`（精五）` `（叠满）` `（满命）`
+ * `（建议/必须/可选）` `（特殊）` `（华馆）` 等保持现状不动）。
+ */
+
+/** 括注尾巴：名称 +（备注） —— 只要末尾那一层括号 */
+const NAME_NOTE_RE = /^(.*?)\s*[（(]([^（()）]+)[）)]\s*$/
+
+/**
+ * 配队成员 / 武器条目：识别的角色名 + 末尾括注 → {name, note}
+ * 括注文本与 JSON 的 note 逐字相同（不润色），这样 build-docx 能写回。
  */
 function splitNameNote (token) {
   const raw = String(token ?? '').trim()
@@ -101,9 +149,18 @@ function splitNameNote (token) {
     const mk = marks[0]
     return { name: mk.name, note: raw.replace(mk.raw, '').trim().replace(/^[（(]|[）)]$/g, '').trim() }
   }
-  const m = raw.match(/^(.+?)\s*[（(]([^（()）]+)[）)]\s*$/)
+  const m = raw.match(NAME_NOTE_RE)
   if (m) return { name: m[1].trim(), note: m[2].trim() }
   return { name: raw, note: '' }
+}
+
+/**
+ * 去掉面板数值里的**命座括注**（`水元素伤害加成（二命）` → `水元素伤害加成`）。
+ * 保留 `（特殊）` `（华馆）` 这类部位/套装说明，保证解析与文档逐字一致。
+ * @param {string} text
+ */
+function stripCostParens (text) {
+  return String(text ?? '').replace(/[（(][一二三四五六\d]+\s*命[）)]/g, '')
 }
 
 /** 「名称（备注）」或「[[w:名称]]」→ {name, note, ref} */
@@ -125,7 +182,7 @@ function parseSetItem (token) {
     const m = name.match(/^(.+?)\s*[（(]([^（()）]+)[）)]\s*$/)
     if (m) { name = m[1].trim(); pieces = m[2].trim() }
     if (!pieces) {
-      const p = name.match(/^(.+?)(\d件套|\d\+\d件套|\d件套\+\d件套)$/)
+      const p = name.match(/^(.+?)(\d件套|\d[+＋＆&]\d件套|\d件套[+＋＆&]\d件套)$/)
       if (p) { name = p[1].trim(); pieces = p[2] }
     }
     if (!pieces) {
@@ -134,17 +191,30 @@ function parseSetItem (token) {
       if (q) { name = q[1].trim(); pieces = q[2] + '件套' }
     }
   }
-  return { name, ...(pieces ? { pieces } : {}), ref: makeRef('artifact', name) }
+  // 字段顺序与 data/gi 既有写法一致：name, ref, pieces —— 否则 JSON.stringify 的深比较会被键序影响
+  return { name, ref: makeRef('artifact', name), ...(pieces ? { pieces } : {}) }
 }
 
-/** 2+2 组合里的「+」 */
-const SET_PLUS_RE = /\s*[+＋]\s*/
+/**
+ * 套装组合分隔符：半角 `+`、全角 `＋`、全角 `＆`、半角 `&` —— 都表示「A 与 B 两套」。
+ * 统一按 `+` 处理，这样文档里写成 `A＆B` 也能拆成两个 set 并各自带 ref。
+ */
+const SET_PLUS_RE = /\s*[+＋＆&]\s*/
 
-/** 渲染器按 sep 连接条目，所以 sep 里的分隔符必须带空格（' / '、' + '） */
-const canonicalSep = (s) => String(s)
-  .replace(/\s*\/\s*/g, ' / ')
-  .replace(/\s*\+\s*/g, ' + ')
-  .replace(/ {2,}/g, ' ')
+/**
+ * 渲染器按 sep 连接条目，所以 sep 里的分隔符必须带空格（' / '、' + '）。
+ * `A / B + C` 这种「份间用 /、份内用 +」的混用写法归一成 `' / + '`，
+ * 与仓库既有 JSON 里的混合 sep 写法一致，保证 before/after 往返 sep 逐字不变。
+ * 纯 `/` 与纯 `+` 各自归一成 `' / '`、`' + '`。
+ */
+const canonicalSep = (s) => {
+  const toks = []
+  for (const m of String(s).matchAll(/[/／]|[+＋＆&]/g)) toks.push(/[/／]/.test(m[0]) ? '/' : '+')
+  if (!toks.length) return String(s).replace(/\s+/g, ' ').trim()
+  const uniq = [...new Set(toks)]
+  if (uniq.length > 1) return ' / + '
+  return uniq[0] === '/' ? ' / ' : ' + '
+}
 
 /**
  * 把「被 > ≥ / 拆出来的一份」再按 + 拆成 2+2 的两个套装。
@@ -161,10 +231,25 @@ function parseSetPlus (text, parse) {
   return parts.length > 1 ? parts.map(parse) : null
 }
 
+/** 每个条目两侧不应残留的分隔符 / 组合符（`如雷的盛怒 /` 这类带尾巴的名字要先清掉） */
+const ITEM_EDGE_RE = /^[\s>＞≥/／=＝+＋＆&、,，]+|[\s>＞≥/／=＝+＋＆&、,，]+$/g
+
+/** 拆出来的每份去掉首尾残留的分隔符 */
+function normalizeSegment (seg) {
+  return String(seg ?? '').replace(ITEM_EDGE_RE, '').replace(/\s+/g, ' ').trim()
+}
+
 /**
- * 套装行：把 sep 拆出来的每份交给 parseSetPlus，再按份数补上连接符，保证
- * sep.split(' ').length === sets.length - 1（渲染器按 sep 连接，份内用 ' + '，份间用原 sep）。
- * 字段顺序跟仓库既有写法一致：kind, label, sep, sets。
+ * 套装行：把 sep 拆出来的每份交给 parseSetPlus，再按份数补上连接符。
+ *
+ * sep 是**逐档**分隔符（schema.mjs 的 joinWithSep 与插件 gapSeps 都按 `sep.split(/\s+/)` 逐档读）。
+ * 规则：
+ *   - 份内（同一份里被 `+`/`＆` 拆开的）间隔一律 `+`：烟绯的 `A / B / C + D` → sep `/ / +`，逐档还原原文；
+ *   - 份间（splitItems 拆出来的）沿用原文的份间分隔符（统一成一个，避免 `' / / '` 这种连续分隔符）；
+ *   - 每份先 normalizeSegment，丢掉原文里悬挂的 `/`、`+`；
+ *   - 最后按 sets.length - 1 裁剪：多了丢掉、少了用 fallback 补齐，
+ *     保证 `sep.split(/\s+/).length === sets.length - 1`（否则渲染器 join 出来就会出现空条目）。
+ *
  * @param {string[]} segments
  * @param {string} baseSep splitItems 拆出来的份间分隔符
  * @param {(t: string) => object} parse
@@ -172,55 +257,91 @@ function parseSetPlus (text, parse) {
  */
 function buildSetRow (segments, baseSep, parse) {
   const base = canonicalSep(baseSep)
+  const raw = segments.map(normalizeSegment).filter(Boolean)
+  // 空项过滤后重新选一个份间连接符，免得沿用原文的 ' / / '（连续分隔符）导致 sep 对不上
+  const between = raw.length > 1 && base !== ' > ' && base !== ' ≥ ' ? ' / ' : base
   const sets = []
   const seps = []
-  segments.forEach((seg, i) => {
-    if (i > 0) seps.push(base)
+  raw.forEach((seg, i) => {
+    // parseSetPlus 会按 SET_PLUS_RE 过滤空项，所以「份内有几项」要按实际结果算
     const plus = parseSetPlus(seg, parse)
-    if (plus) plus.forEach((set, j) => { if (j > 0) seps.push(' + '); sets.push(set) })
-    else sets.push(parse(seg))
+    const group = plus ?? [parse(seg)]
+    group.forEach((set, j) => {
+      // 第一份的首项前面没有 gap；其余每一项前面都有 gap（份内 ' + '，跨份 between）
+      const isFirstOfRow = i === 0 && j === 0
+      if (!isFirstOfRow) seps.push(j > 0 ? ' + ' : between)
+      sets.push(set)
+    })
   })
-  // 份间分隔符只可能是 splitItems 给出的 ' > ' / ' ≥ ' / ' / '
-  const fallback = sets.length === 1 ? ' > ' : (base === ' > ' ? ' / ' : base)
-  while (seps.length < sets.length - 1) seps.push(fallback)
+  const fallback = sets.length === 1 ? ' > ' : (between === ' > ' ? ' / ' : between)
+  const used = seps.slice(0, Math.max(0, sets.length - 1))
+  while (used.length < sets.length - 1) used.push(fallback)
   return {
     sets,
-    sep: sets.length > 1 ? canonicalSep(seps.slice(0, sets.length - 1).join(' ')) : fallback
+    sep: sets.length > 1 ? canonicalSep(used.join(' ')) : fallback
   }
 }
 
 /**
  * 配队成员：认识的角色名 → ref，其余留文字。
- * 成员带括注（纳西妲（二命））时拆成 {name:'纳西妲', note:'二命', ref:'character:纳西妲'}，
- * note 由 schema.mjs 的 itemText 原样渲染回「（二命）」，所以回推文本逐字不变。
+ *
+ * 成员带**命座 / 成本类**括注（`纳西妲（二命）` `妮露（高金）`）时拆成
+ * `{name:'纳西妲', ref:'character:纳西妲'}` + 一条段末备注 `{kind:'note', text:'二命'}`
+ * —— 正文行保持干净标准名（ref 能取图标），括注进 `注：` 行。
+ * 精炼/其它类括注（`（精五）` 等）仍留在 note 字段里，由 itemText 写回 `（精五）`。
+ * @returns {{members: object[], notes: string[]} | null}
  */
 function parseMembers (text, index) {
   const chars = index.characters ?? []
-  const parts = String(text).split(/\s*[+＋/／、]\s*/).map(x => x.trim()).filter(Boolean)
+  const parts = String(text).split(/\s*[+＋＆&/／、]\s*/).map(x => x.trim()).filter(Boolean)
   if (parts.length < 2) return null
+  const notes = []
   const members = parts.map(p => {
-    const { name, note } = splitNameNote(p)
-    return { name, ...(note ? { note } : {}), ref: makeRef('character', name) }
+    const sn = splitNameNote(p)
+    let note = sn.note
+    if (resolveNoteText(note, { readPool: [] })) { notes.push(note); note = '' }
+    return { name: sn.name, ...(note ? { note } : {}), ref: makeRef('character', sn.name) }
   })
   // 至少一半能对上角色名才认为是队伍
   const hit = members.filter(x => chars.includes(x.name)).length
-  return hit >= Math.max(1, Math.floor(members.length / 2)) ? members : null
+  return hit >= Math.max(1, Math.floor(members.length / 2)) ? { members, notes } : null
 }
 
-/** 主词条一行 → {时之沙:[], 空之杯:[], 理之冠:[]} */
-function parseMainStats (text, into = { 时之沙: [], 空之杯: [], 理之冠: [] }) {
+/**
+ * 主词条一行 → {时之沙:[], 空之杯:[], 理之冠:[]}
+ *
+ * 词条值上的**命座/成本类括注**（`水元素伤害加成（二命）`）会被剥出来放进 `out`
+ * —— 它是「这个杯给二命以上用」，属于备注走廊（回到 JSON 的 `kind:'main'` 的 `note` +
+ * `noteSlot`，渲染时挂回**同一个部位**）。`（特殊）` `（华馆）` 这类词条本身的限定照旧留在值里。
+ * @param {string} text
+ * @param {object} [into]
+ * @param {{note?: string|null, slot?: string|null}} [out] 命中的括注与部位（第一个）
+ */
+function parseMainStats (text, into = { 时之沙: [], 空之杯: [], 理之冠: [] }, out = {}) {
   const slots = ['时之沙', '空之杯', '理之冠']
   let current = null
+  const take = (raw) => {
+    let v = String(raw ?? '').trim()
+    const m = v.match(NAME_NOTE_RE)
+    if (m && !out.note && resolveNoteText(m[2], { readPool: [] })) {
+      out.note = m[2]
+      out.slot = current
+      v = m[1].trim()
+    }
+    return stripCostParens(v).trim()
+  }
   for (const seg of splitStats(text)) {
     const hit = slots.find(s => seg.startsWith(s + '：') || seg.startsWith(s + ':'))
     if (hit) {
       current = hit
-      const v = seg.slice(hit.length + 1).trim()
+      const v = take(seg.slice(hit.length + 1))
       if (v) into[hit].push(v)
     } else if (current) {
-      into[current].push(seg)
+      const v = take(seg)
+      if (v) into[current].push(v)
     } else {
-      into['时之沙'].push(seg)
+      const v = take(seg)
+      if (v) into['时之沙'].push(v)
     }
   }
   return into
@@ -272,9 +393,18 @@ function parseCrown (text) {
   return out
 }
 
-/** 单个角色块 → v2 数据 */
+/** 主词条的括注字段（字段顺序固定 kind, note, [noteSlot], stats） */
+function mainNoteFields (out) {
+  if (!out.note) return {}
+  return { note: out.note, ...(out.slot ? { noteSlot: out.slot } : {}) }
+}
+
+/** 单个角色块 → v2 数据。`parsed.stray` = 文档里没认出来的行（必须为 0） */
 function parseBlock (lines, index) {
-  const data = { meta: {}, v2: { weapons: [], artifacts: [], talents: [], panels: [], constellations: [], teams: [] }, unparsed: {} }
+  const data = { meta: {}, v2: { weapons: [], artifacts: [], talents: [], panels: [], constellations: [], teams: [] } }
+  /** 段落行号（不含标题行）→ 认出来了没有 */
+  const stray = []
+  data.stray = stray
   let title = lines[0] ?? ''
   let name = title
   const dash = title.match(/^(.*?)\s*——\s*(.*)$/)
@@ -296,7 +426,28 @@ function parseBlock (lines, index) {
       const m = line.match(/^(定位|100级提升)[:：]\s*(.*)$/)
       if (m) { data.meta[m[1]] = m[2].trim(); continue }
     }
-    const un = (why) => { (data.unparsed[section || '其它'] ??= []).push(why ? `${line}` : line) }
+    const un = () => { stray.push({ section: section || '其它', line }) }
+
+    /**
+     * 段末备注行 `注：<文本>` → 该段的 `{kind:'note', text}`（放在所属数组末尾）。
+     * 同一段多条备注用 `；` 合并成一行，写回时也合并成一行，所以这里按 `；` 拆开存。
+     * 认不出语义的文本原样存（不丢内容）。
+     * @returns {string} 所属 v2 字段名；不是备注行则 ''
+     */
+    const takeNote = () => {
+      const text = parseNoteLine(line)
+      if (text == null) return ''
+      const key = NOTE_SECTION_KEY[section]
+      if (!key) return '' // 不在六个小节里（如抬头说明）→ 当普通行处理
+      const pool = section === '圣遗物推荐' ? artifactStatPool(data.v2.artifacts) : []
+      for (const part of text.split(/[；;]/).map(x => x.trim()).filter(Boolean)) {
+        const hit = resolveNoteText(part, { readPool: pool })
+        data.v2[key].push({ kind: 'note', text: hit ? hit.raw : part })
+      }
+      return key
+    }
+
+    if (takeNote()) continue
 
     if (section === '武器推荐') {
       const tier = line.match(/^第([一二三四五六1-6])[档挡][:：]\s*(.*)$/)
@@ -319,12 +470,23 @@ function parseBlock (lines, index) {
 
     if (section === '圣遗物推荐') {
       const main = line.match(/^主词条[:：]\s*(.*)$/)
-      if (main) { data.v2.artifacts.push({ kind: 'main', stats: parseMainStats(main[1]) }); continue }
+      if (main) {
+        const out = { note: null, slot: null }
+        const stats = parseMainStats(main[1], undefined, out)
+        data.v2.artifacts.push({ kind: 'main', ...mainNoteFields(out), stats })
+        continue
+      }
       const single = line.match(/^(时之沙|空之杯|理之冠)[:：]\s*(.*)$/)
       if (single) {
+        const out = { note: null, slot: null }
+        const stats = parseMainStats(`${single[1]}：${single[2]}`, undefined, out)
         const last = data.v2.artifacts[data.v2.artifacts.length - 1]
-        if (last && last.kind === 'main') last.stats[single[1]] = splitStats(single[2])
-        else data.v2.artifacts.push({ kind: 'main', stats: parseMainStats(`${single[1]}：${single[2]}`) })
+        if (last && last.kind === 'main') {
+          last.stats[single[1]] = stats[single[1]]
+          if (out.note && !last.note) Object.assign(last, mainNoteFields(out))
+        } else {
+          data.v2.artifacts.push({ kind: 'main', ...mainNoteFields(out), stats })
+        }
         continue
       }
       const sub = line.match(/^副词条[:：]\s*(.*)$/)
@@ -339,7 +501,8 @@ function parseBlock (lines, index) {
         const { items, sep } = splitItems(setRow[2])
         if (items.length) {
           const row = buildSetRow(items, sep, parseSetItem)
-          data.v2.artifacts.push({ kind, label: null, sep: row.sep, sets: row.sets })
+          // label 原样存下（首选 / 次选 / 可选 / 过渡 / 套装），build-docx 写回时逐字还原
+          data.v2.artifacts.push({ kind, label: setRow[1], sep: row.sep, sets: row.sets })
           continue
         }
       }
@@ -358,15 +521,25 @@ function parseBlock (lines, index) {
     if (section === '天赋加点') {
       const pri = line.match(/^优先级[:：]\s*(.*)$/)
       if (pri) {
-        // raw 保留原文的分隔符写法（A＞E＞Q / E ≥ Q / E / Q），但要去掉标记 ——
-        // 标记只影响 order 的解析；raw 带 [[t:]] 会让「标记版解析 == 原文档解析」出现无意义差异
-        const order = splitStats(pri[1]).map(talentItem).filter(Boolean)
-        if (order.length) { data.v2.talents.push({ kind: 'priority', order, raw: stripMarks(pri[1]).trim() }); continue }
+        // 分隔符原文逐字保留（A＞E＞Q / E ≥ Q / E / Q 各不相同），只去掉标记 ——
+        // 标记只影响 order 的解析；build-docx 写回时直接用 raw
+        const parts = splitStatsFull(pri[1])
+        const order = parts.filter(p => p.text).map(p => talentItem(p.text)).filter(Boolean)
+        if (order.length) {
+          // 逐项拼回：每一项后面跟**它自己的**分隔符（`A＞E＞Q` 的两段分隔符不能串位）
+          let raw = ''
+          for (const p of parts) if (p.text) raw += stripMarks(p.text) + p.sep
+          data.v2.talents.push({ kind: 'priority', order, raw: raw.trim() })
+          continue
+        }
       }
       const crown = line.match(/^皇冠[:：]\s*(.*)$/)
       if (crown) {
         const items = parseCrown(crown[1])
         if (items.length) { data.v2.talents.push({ kind: 'crown', items }); continue }
+        // 空皇冠（`皇冠：`）也落成空 items，这样回推文本与原文一致
+        data.v2.talents.push({ kind: 'crown', items: [] })
+        continue
       }
       un(); continue
     }
@@ -399,6 +572,14 @@ function parseBlock (lines, index) {
         data.v2.constellations.push({ name, index, text: c[2].trim() })
         continue
       }
+      // 只有命座号、没有说明的裸行（`[[k:2]]` / `二命` / `2命`）：与 `二命——`（说明为空）同结果，
+      // name 归一成「二命」、index=2、text='' —— 这样 build-docx 两种写法都无损
+      const bare = line.match(/^\s*(?:\[\[k[:：]\s*)?([一二三四五六]\s*命|\d{1,2}\s*命)\s*\]{0,2}\s*$/)
+      if (bare) {
+        const stripped = stripMarks(bare[1]).replace(/\s+/g, '').trim()
+        const idx = constellationIndex(stripped)
+        if (idx) { data.v2.constellations.push({ name: `${CN_NUM_CHAR[idx]}命`, index: idx, text: '' }); continue }
+      }
       un(); continue
     }
 
@@ -407,14 +588,24 @@ function parseBlock (lines, index) {
       if (row) {
         const label = row[1].trim()
         const value = row[2].trim()
-        const members = parseMembers(value, index)
-        if (members) data.v2.teams.push({ label, members, text: '' })
-        else data.v2.teams.push({ label, members: [], text: value })
+        const parsed = parseMembers(value, index)
+        if (parsed) {
+          // 成员上的命座/成本括注 → 段末备注行（正文行只留标准名）
+          data.v2.teams.push({ label, members: parsed.members, text: '' })
+          for (const note of parsed.notes) data.v2.teams.push({ kind: 'note', text: note })
+        } else {
+          data.v2.teams.push({ label, members: [], text: value })
+        }
         continue
       }
       un(); continue
     }
     un()
+  }
+  // 圣遗物小节有内容但没有主词条行 → 补一条空的主词条（时之沙/空之杯/理之冠 全空）。
+  // 现有 data/gi 里就是这么记的（16 个角色），补上才能与 build-docx 的「空栏位不写行」严格互逆。
+  if (data.v2.artifacts.length && !data.v2.artifacts.some(r => r.kind === 'main')) {
+    data.v2.artifacts.push({ kind: 'main', stats: { 时之沙: [], 空之杯: [], 理之冠: [] } })
   }
   return data
 }
@@ -436,7 +627,7 @@ function main () {
   }
   if (cur.some(x => x.trim())) blocks.push(cur)
 
-  const report = { doc: docFile, characters: [], totals: { characters: 0, weapons: 0, artifacts: 0, talents: 0, panels: 0, constellations: 0, teams: 0, unparsed: 0 }, issues: [] }
+  const report = { doc: docFile, characters: [], totals: { characters: 0, weapons: 0, artifacts: 0, talents: 0, panels: 0, constellations: 0, teams: 0, notes: 0, unparsed: 0 }, issues: [], stray: [] }
   for (const block of blocks) {
     const lines = block.filter(x => x !== '')
     if (!lines.length) continue
@@ -452,7 +643,6 @@ function main () {
       ...(prev.highlight ? { highlight: prev.highlight } : {}),
       meta: parsed.meta,
       v2: parsed.v2,
-      ...(Object.keys(parsed.unparsed).length ? { unparsed: parsed.unparsed } : {}),
       tags: [],
       sections: [],
       source: prev.source ?? { guide: '原神·角色攻略.docx' }
@@ -461,25 +651,31 @@ function main () {
     data.sections = deriveSections(data)
     const issues = validate(data, index)
     report.issues.push(...issues.map(x => ({ name: parsed.name, ...x })))
+    const noteCount = Object.values(data.v2).reduce((n, rows) => n + (rows ?? []).filter(isNoteRow).length, 0)
+    // 行数统计**不含备注行**（备注单独计），这样「配队行 79」这类数字在加备注前后不变
+    const rows = (k) => (data.v2[k] ?? []).filter(r => !isNoteRow(r)).length
     const cnt = {
       name: parsed.name,
-      weapons: data.v2.weapons.length,
-      artifacts: data.v2.artifacts.length,
-      talents: data.v2.talents.length,
-      panels: data.v2.panels.length,
-      constellations: data.v2.constellations.length,
-      teams: data.v2.teams.length,
-      unparsed: Object.values(parsed.unparsed).reduce((n, l) => n + l.length, 0)
+      weapons: rows('weapons'),
+      artifacts: rows('artifacts'),
+      talents: rows('talents'),
+      panels: rows('panels'),
+      constellations: rows('constellations'),
+      teams: rows('teams'),
+      notes: noteCount,
+      unparsed: parsed.stray.length
     }
+    if (parsed.stray.length) report.stray.push(...parsed.stray.map(s => ({ name: parsed.name, ...s })))
     report.characters.push(cnt)
     report.totals.characters++
-    for (const k of ['weapons', 'artifacts', 'talents', 'panels', 'constellations', 'teams', 'unparsed']) report.totals[k] += cnt[k]
+    for (const k of ['weapons', 'artifacts', 'talents', 'panels', 'constellations', 'teams', 'notes', 'unparsed']) report.totals[k] += cnt[k]
     if (!dry) {
       if (!fs.existsSync(giDir)) fs.mkdirSync(giDir, { recursive: true })
       fs.writeFileSync(prevFile, JSON.stringify(data, null, 2) + '\n', 'utf8')
     }
   }
   if (!dry) {
+    if (!fs.existsSync(giDir)) fs.mkdirSync(giDir, { recursive: true })
     fs.writeFileSync(path.join(dataDir, '_parse-report.json'), JSON.stringify(report, null, 2) + '\n', 'utf8')
     // 展示顺序按文档出现顺序重建（文档顺序 = 图鉴发布时间从远到近）
     const order = report.characters.map(c => c.name)
@@ -488,15 +684,16 @@ function main () {
   console.log(`文档：${docFile}`)
   console.log(`角色块：${report.totals.characters}`)
   console.log(`武器行 ${report.totals.weapons} / 圣遗物行 ${report.totals.artifacts} / 天赋行 ${report.totals.talents} / 面板行 ${report.totals.panels} / 命座 ${report.totals.constellations} / 配队行 ${report.totals.teams}`)
+  console.log(`备注行（注：）${report.totals.notes} 条`)
   console.log(`未识别行：${report.totals.unparsed}${dry ? '（--dry 未写文件）' : ''}`)
   if (report.issues.length) {
     console.log(`名称校验问题：${report.issues.length} 条（详见 data/_parse-report.json）`)
     for (const it of report.issues.slice(0, 8)) console.log(`  · ${it.name} ${it.where} ${it.ref} — ${it.reason}`)
   }
-  const worst = report.characters.filter(c => c.unparsed > 0).sort((a, b) => b.unparsed - a.unparsed).slice(0, 8)
-  if (worst.length) {
-    console.log('未识别行最多的角色：')
-    for (const c of worst) console.log(`  · ${c.name}：${c.unparsed} 行`)
+  if (report.stray.length) {
+    console.log('未识别行明细（应为 0；不为 0 说明文档里有解析器不认识的写法）：')
+    for (const s of report.stray.slice(0, 20)) console.log(`  · ${s.name} [${s.section}] ${s.line}`)
+    process.exitCode = 1
   }
 }
 

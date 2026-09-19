@@ -31,7 +31,7 @@
     "artifacts": [
       {
         "kind": "preferred",
-        "label": null,
+        "label": "首选",
         "sep": " > ",
         "sets": [
           {
@@ -42,7 +42,7 @@
       },
       {
         "kind": "transition",
-        "label": null,
+        "label": "过渡",
         "sep": " > ",
         "sets": [
           {

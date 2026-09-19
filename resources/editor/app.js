@@ -13,7 +13,8 @@ var ARTIFACT_KINDS = [
   { value: 'optional', label: '可选' },
   { value: 'main', label: '主词条' },
   { value: 'sub', label: '副词条' },
-  { value: 'text', label: '文本' }
+  { value: 'text', label: '文本' },
+  { value: 'note', label: '备注（注：）' }
 ]
 
 var REF_KINDS = {
@@ -25,16 +26,28 @@ var REF_KINDS = {
 var MAIN_SLOTS = ['时之沙', '空之杯', '理之冠']
 
 var state = {
-  index: { weapons: [], artifacts: [], characters: [] },
+  index: { weapons: [], artifacts: [], characters: [], talents: [], constellations: [] },
   order: [],
   missing: [],
   items: [],
   current: null,
   model: null,
+  before: null,          // 打开角色时的「形状快照」，保存后用来算改动摘要
   issues: [],
   issueMap: {},
   dirty: false,
-  filter: ''
+  filter: '',
+  view: 'search',        // 全局搜索框下拉里的内容：search | batch | library
+  pendingFocus: null,    // 跳转过来要高亮的 rowId
+  lastBackup: null,      // 最近一次批量替换的备份时间戳
+  backupHistory: [],     // 本次会话里做过的批量替换（可依次回滚）
+  usage: null,           // 名称库使用统计（/api/name-usage）
+  usageAt: 0,
+  toolsOpen: false,      // 工具箱面板是否展开
+  batch: { type: 'weapon', from: '', to: '', preview: null },
+  library: { type: 'weapon', filter: '', selected: null },
+  gq: '',                // 工具箱里最后一次搜索词
+  idleExit: 0            // 服务端开启的空闲自动退出秒数（0 = 未开启）
 }
 
 var $ = function (id) { return document.getElementById(id) }
@@ -191,6 +204,100 @@ function showStatus (text, kind, sticky) {
 
 function hideStatus () { showStatus('', 'hidden') }
 
+/** 右下角 toast：保存/发布/批量替换后的改动摘要都走这里；opts.copy 提供「复制」按钮 */
+var toastTimer = null
+function toast (title, lines, kind, opts) {
+  var el = $('toast')
+  if (!el) return
+  var body = asArray(lines).filter(Boolean)
+  var actions = (opts && opts.text)
+    ? '<div class="toast-actions"><button type="button" class="btn toast-copy">' + esc(opts.label || '复制') + '</button></div>'
+    : ''
+  el.innerHTML = '<div class="toast-title">' + esc(title) + '</div>' +
+    (body.length ? '<ul>' + body.map(function (l) { return '<li>' + esc(l) + '</li>' }).join('') + '</ul>' : '') +
+    actions
+  if (opts && opts.text) {
+    var btn = el.querySelector('.toast-copy')
+    if (btn) {
+      btn.addEventListener('click', function () {
+        copyText(opts.text).then(function (ok) {
+          btn.textContent = ok ? '已复制提交信息' : '复制失败（请手动选中）'
+          showStatus(ok ? '提交信息已复制到剪贴板：' + (opts.title || '') : '复制失败，请手动选中摘要文本', ok ? 'ok' : 'warn', true)
+        })
+      })
+    }
+  }
+  el.className = 'toast ' + (kind || 'ok')
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(function () { el.className = 'toast hidden' }, (opts && opts.text) ? 20000 : (kind === 'error' ? 9000 : 6200))
+}
+
+/** 把文本复制到剪贴板（优先 Clipboard API，退回临时 textarea） */
+function copyText (text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).then(function () { return true }).catch(function () { return fallbackCopy(text) })
+  }
+  return Promise.resolve(fallbackCopy(text))
+}
+
+function fallbackCopy (text) {
+  try {
+    var ta = document.createElement('textarea')
+    ta.value = text
+    ta.setAttribute('readonly', 'readonly')
+    ta.style.position = 'fixed'
+    ta.style.left = '-9999px'
+    document.body.appendChild(ta)
+    ta.select()
+    var ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return ok
+  } catch (e) {
+    return false
+  }
+}
+
+/**
+ * 模型「形状」快照：保存前后各取一次，用来算改动摘要。
+ * 只数条数，不比对内容 —— 目的是告诉用户「这次动了什么」，不是逐字 diff。
+ * @param {object} m 编辑器模型
+ */
+function snapshotShape (m) {
+  var v2 = (m && m.v2) || {}
+  var count = function (list, fn) {
+    var n = 0
+    asArray(list).forEach(function (r) { n += fn(r) ? 1 : 0 })
+    return n
+  }
+  return {
+    weapons: count(v2.weapons, function (r) { return asArray(r.items).length > 0 }),
+    weaponItems: asArray(v2.weapons).reduce(function (n, r) { return n + asArray(r.items).length }, 0),
+    artifacts: count(v2.artifacts, function () { return true }),
+    teams: count(v2.teams, function () { return true }),
+    members: asArray(v2.teams).reduce(function (n, r) { return n + asArray(r.members).length }, 0),
+    talents: count(v2.talents, function () { return true }),
+    panels: count(v2.panels, function () { return true }),
+    constellations: count(v2.constellations, function () { return true }),
+    meta: ['建议等级', '定位', '100级提升'].filter(function (k) { return hasText(m && m.meta && m.meta[k]) }).length
+  }
+}
+
+var SHAPE_LABELS = {
+  weapons: '武器行', weaponItems: '武器条目', artifacts: '圣遗物行', teams: '配队行',
+  members: '配队成员', talents: '天赋行', panels: '面板行', constellations: '命座行', meta: '已填基本信息'
+}
+
+/** 两个形状快照 → 人类可读的改动摘要（没变化就返回空数组） */
+function diffSummary (before, after) {
+  if (!before || !after) return []
+  var out = []
+  Object.keys(SHAPE_LABELS).forEach(function (k) {
+    var d = (after[k] || 0) - (before[k] || 0)
+    if (d) out.push(SHAPE_LABELS[k] + ' ' + (d > 0 ? '+' : '') + d + '（' + before[k] + ' → ' + after[k] + '）')
+  })
+  return out
+}
+
 function markDirty (on) {
   state.dirty = !!on
   $('dirty').className = state.dirty ? 'dirty' : 'dirty hidden'
@@ -235,7 +342,7 @@ function modal (opts) {
 
 /* ============================================================ 渲染：类型徽标 */
 
-/** 类型徽标 + 带 datalist 的输入 + ⚠ 提示 */
+/** 类型徽标 + 带 datalist 的输入 + ⚠ 提示 + 「从名称库选」 */
 function refField (kind, value, path) {
   var k = REF_KINDS[kind]
   var ref = kind + ':' + str(value).trim()
@@ -247,10 +354,12 @@ function refField (kind, value, path) {
     '<span class="ref-field">' +
     '<span class="badge ' + kind + '" title="' + esc(k.text) + '"><span class="badge-icon">' + k.icon + '</span>' + esc(k.text) + '</span>' +
     '<input type="text" list="' + k.list + '" value="' + esc(value) + '" data-path="' + esc(path) + '" data-ref-kind="' + kind + '">' +
-    '</span>' + warn + '</span>'
+    '</span>' + warn +
+    '<button type="button" class="pick-btn" data-pick="' + kind + '" data-path="' + esc(path) + '" title="从名称库选（可搜索 / 拼音首字母）">▾</button>' +
+    '</span>'
 }
 
-/** 天赋 A/E/Q 下拉（带徽标） */
+/** 天赋 A/E/Q 下拉（带徽标）。下拉本身就是候选清单，所以不再挂「从名称库选」按钮 */
 function talentField (value, path, extraClass) {
   var name = str(value).toUpperCase()
   if (TALENTS.indexOf(name) === -1) name = 'A'
@@ -285,6 +394,11 @@ function constellationIndex (name) {
   if (cn) return { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6 }[cn[1]]
   var n = s.match(/(\d+)\s*命/)
   return n ? Number(n[1]) : 0
+}
+
+/** 行级高亮标记：搜索命中 / 批量替换后可以用来闪烁定位 */
+function rowAttr (rowId) {
+  return rowId ? ' data-rowid="' + esc(rowId) + '"' : ''
 }
 
 /* ============================================================ 渲染：小控件 */
@@ -330,9 +444,11 @@ function rowVisible (row) {
   if (!row || typeof row !== 'object') return false
   switch (row.kind) {
     case 'main':
-      return MAIN_SLOTS.some(function (slot) { return asArray(row.stats && row.stats[slot]).length > 0 })
+      return MAIN_SLOTS.some(function (slot) { return asArray(row.stats && row.stats[slot]).length > 0 }) || hasText(row.note)
     case 'sub':
       return asArray(row.stats).length > 0
+    case 'note':
+      return hasText(row.text)
     case 'text':
       return hasText(row.text) || hasText(row.label)
     case 'priority':
@@ -360,10 +476,11 @@ function hiddenNote (list) {
   return '<div class="muted" style="font-size:12px;margin:6px 0 0">已隐藏 ' + hidden + ' 个空占位行（旧数据里的待填行，保存时原样保留；点「删除行」可清掉）</div>'
 }
 
-/** 行列表：rows → html 拼接 + 尾部「新增一行」按钮 */
+/** 行列表：rows → html 拼接 + 尾部「新增一行」按钮
+ *  renderRow(row, i, path, rowId) —— rowId 用于搜索结果高亮定位 */
 function rowList (path, rows, renderRow, addLabel) {
   var visible = visibleRows(rows)
-  var html = visible.map(function (v) { return renderRow(v.row, v.i, path + '.' + v.i) }).join('')
+  var html = visible.map(function (v) { return renderRow(v.row, v.i, path + '.' + v.i, path + '.' + v.i) }).join('')
   var body = visible.length ? html : emptyNote('还没有' + addLabel + '，点下面的按钮新增')
   return '<div class="row-list">' + body + '</div>' +
     '<div style="margin-top:8px">' + actBtn('add-row', path, '＋ ' + addLabel, 'btn mini') + '</div>' + hiddenNote(rows)
@@ -414,16 +531,18 @@ function renderBasic () {
 
 function renderWeapons () {
   var s = state.model.v2
-  var body = rowList('v2.weapons', s.weapons, function (row, i, p) {
+  var body = rowList('v2.weapons', s.weapons, function (row, i, p, rowId) {
     var items = row.items.map(function (it, j) {
       var q = p + '.items.' + j
+      var prev = j > 0 ? row.items[j - 1] : null
       return '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
         refField('weapon', it.name, q + '.name') +
         '<input type="text" class="w-sm" data-path="' + q + '.note" value="' + esc(it.note) + '" placeholder="备注（如 精5）">' +
+        (prev ? actBtn('copy-prev', q + '.name', '⧉ 上一条', 'btn mini', '复制上一条的武器名' + (prev.name ? '（' + prev.name + '）' : '')) : '') +
         actBtn('del-item', p + '.items', '×', 'row-del', '删除这个条目', j) +
         '</div>'
     }).join('')
-    return '<div class="box">' +
+    return '<div class="box"' + rowAttr(rowId) + '>' +
       '<div class="box-head">' +
       '<span class="box-title">行 ' + (i + 1) + '</span>' +
       '<input type="text" class="w-sm" data-path="' + p + '.label" value="' + esc(row.label) + '" placeholder="标签（可空，如 辅助向）">' +
@@ -442,7 +561,7 @@ function renderWeapons () {
 
 function renderArtifacts () {
   var s = state.model.v2
-  var body = rowList('v2.artifacts', s.artifacts, function (row, i, p) {
+  var body = rowList('v2.artifacts', s.artifacts, function (row, i, p, rowId) {
     var head = '<div class="box-head">' +
       '<span class="box-title">行 ' + (i + 1) + '</span>' +
       selectBox(p + '.kind', row.kind, ARTIFACT_KINDS, 'w-sm') +
@@ -457,25 +576,37 @@ function renderArtifacts () {
     if (row.kind === 'main') {
       body2 = '<div class="grid-3">' + MAIN_SLOTS.map(function (slot) {
         return multiValue(slot, p + '.stats.' + slot, row.stats[slot], '如 攻击力')
-      }).join('') + '</div>'
+      }).join('') + '</div>' +
+        '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px">' +
+        '<span class="muted" style="font-size:12px">主词条括注</span>' +
+        '<input type="text" class="w-sm" data-path="' + p + '.note" value="' + esc(row.note) + '" placeholder="可空，如 二命">' +
+        selectBox(p + '.noteSlot', row.noteSlot, [{ value: '', label: '挂在哪个部位？' }].concat(MAIN_SLOTS.map(function (s) { return { value: s, label: '挂在 ' + s } })), 'w-sm') +
+        '<span class="muted" style="font-size:12px">写成「词条（二命）」，指回具体那个杯/沙/冠</span>' +
+        '</div>'
     } else if (row.kind === 'sub') {
       body2 = multiValue('副词条（按优先级从左到右）', p + '.stats', row.stats, '如 双爆')
+    } else if (row.kind === 'note') {
+      body2 = '<div class="field"><span>备注（注：）</span>' +
+        '<input type="text" data-path="' + p + '.text" value="' + esc(row.text) + '" placeholder="该段落末尾的一行「注：…」，多条用「；」分隔">' +
+        '<div class="muted" style="font-size:12px">渲染在该段正文最后一行之后；与其它同段备注合并成一行</div></div>'
     } else if (row.kind === 'text') {
       body2 = '<div class="field"><span>文本</span>' +
         '<textarea data-path="' + p + '.text" placeholder="自由文本，会原样出现在旧版输出里">' + esc(row.text) + '</textarea></div>'
     } else {
       var sets = (row.sets || []).map(function (set, j) {
         var q = p + '.sets.' + j
+        var prev = j > 0 ? row.sets[j - 1] : null
         return '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
           refField('artifact', set.name, q + '.name') +
           '<input type="text" class="w-xs" data-path="' + q + '.pieces" value="' + esc(set.pieces) + '" placeholder="件数">' +
+          (prev ? actBtn('copy-prev', q + '.name', '⧉ 上一条', 'btn mini', '复制上一条的套装名' + (prev.name ? '（' + prev.name + '）' : '')) : '') +
           actBtn('del-item', p + '.sets', '×', 'row-del', '删除这个套装', j) +
           '</div>'
       }).join('')
       body2 = '<div class="sub-list">' + (sets || '<div class="muted" style="font-size:12px">还没有套装</div>') + '</div>' +
         '<div style="margin-top:6px">' + actBtn('add-item', p + '.sets', '＋ 套装', 'btn mini') + '</div>'
     }
-    return '<div class="box">' + head + body2 + '</div>'
+    return '<div class="box"' + rowAttr(rowId) + '>' + head + body2 + '</div>'
   }, '圣遗物行')
   return card('圣遗物推荐', s.artifacts.length + ' 行', body, true)
 }
@@ -502,7 +633,7 @@ function renderTalents () {
           actBtn('del-item', p + '.order', '×', 'row-del', '删除', j) +
           '</span>'
       }).join('<span class="muted"> &gt; </span>')
-      return '<div class="box"><div class="box-head">' +
+      return '<div class="box"' + rowAttr(p) + '><div class="box-head">' +
         '<span class="box-title">优先级（从左到右）</span><span class="spacer"></span>' +
         actBtn('add-item', p + '.order', '＋ 天赋', 'btn mini') +
         actBtn('del-row', 'v2.talents', '删除行', 'btn mini danger', '删除这一行', i) +
@@ -527,7 +658,7 @@ function renderTalents () {
           actBtn('del-item', p + '.items', '×', 'row-del', '删除', j) +
           '</div>'
       }).join('')
-      return '<div class="box"><div class="box-head">' +
+      return '<div class="box"' + rowAttr(p) + '><div class="box-head">' +
         '<span class="box-title">皇冠</span><span class="spacer"></span>' +
         actBtn('add-item', p + '.items', '＋ 天赋', 'btn mini') +
         actBtn('del-row', 'v2.talents', '删除行', 'btn mini danger', '删除这一行', i) +
@@ -543,7 +674,7 @@ function renderTalents () {
 
 function renderPanels () {
   var s = state.model.v2
-  var body = rowList('v2.panels', s.panels, function (row, i, p) {
+  var body = rowList('v2.panels', s.panels, function (row, i, p, rowId) {
     var isText = !hasText(row.k)
     var head = '<div class="box-head">' +
       '<span class="box-title">行 ' + (i + 1) + '</span>' +
@@ -560,16 +691,16 @@ function renderPanels () {
         '<label class="field" style="flex:0 0 220px"><span>键 k</span>' + plainInput(p + '.k', row.k, '', '如 暴击率') + '</label>' +
         '<label class="field" style="flex:1 1 260px"><span>值 v</span>' + plainInput(p + '.v', row.v, '', '如 70%+') + '</label>' +
         '</div>'
-    return '<div class="box">' + head + body2 + '</div>'
+    return '<div class="box"' + rowAttr(rowId) + '>' + head + body2 + '</div>'
   }, '面板行')
   return card('毕业面板参考', s.panels.length + ' 行', body, true)
 }
 
 function renderConstellations () {
   var s = state.model.v2
-  var body = rowList('v2.constellations', s.constellations, function (row, i, p) {
+  var body = rowList('v2.constellations', s.constellations, function (row, i, p, rowId) {
     var idx = constellationIndex(row.name)
-    return '<div class="box"><div class="box-head">' +
+    return '<div class="box"' + rowAttr(rowId) + '><div class="box-head">' +
       '<span class="box-title">行 ' + (i + 1) + '</span>' +
       constellationField(row.name, p + '.name') +
       (idx ? '<span class="muted" style="font-size:12px">序号 ' + idx + '</span>' : '') +
@@ -586,13 +717,16 @@ function renderConstellations () {
 
 function renderTeams () {
   var s = state.model.v2
-  var body = rowList('v2.teams', s.teams, function (row, i, p) {
+  var body = rowList('v2.teams', s.teams, function (row, i, p, rowId) {
     var members = row.members.map(function (m, j) {
-      return '<span class="member">' + refField('character', m.name, p + '.members.' + j + '.name') +
-        '<input type="text" class="member-note" data-path="' + p + '.members.' + j + '.note" value="' + esc(m.note || '') + '" placeholder="备注" title="括注备注（如 二命 / 高金），输出为「名称（备注）」">' +
+      var q = p + '.members.' + j
+      return '<span class="member" draggable="true" data-m="' + j + '" title="点名字打开选择器；左右拖动可排序">' +
+        '<span class="pk-av">' + esc(str(m.name).slice(0, 1)) + '</span>' +
+        '<button type="button" class="member-name" data-act="open-members" data-path="' + esc(p) + '">' + esc(m.name || '（未填）') + '</button>' +
+        '<input type="text" class="member-note" data-path="' + q + '.note" value="' + esc(m.note || '') + '" placeholder="备注" title="括注备注（如 二命 / 高金），输出为「名称（备注）」">' +
         actBtn('del-item', p + '.members', '×', 'row-del', '移除成员', j) + '</span>'
     }).join('')
-    return '<div class="box"><div class="box-head">' +
+    return '<div class="box"' + rowAttr(rowId) + '><div class="box-head">' +
       '<span class="box-title">行 ' + (i + 1) + '</span>' +
       '<input type="text" class="w-sm" data-path="' + p + '.label" value="' + esc(row.label) + '" placeholder="标签（如 首选）">' +
       '<span class="spacer"></span>' +
@@ -600,8 +734,9 @@ function renderTeams () {
       actBtn('move-row-down', 'v2.teams', '↓', 'btn mini', '下移', i) +
       actBtn('del-row', 'v2.teams', '删除行', 'btn mini danger', '删除这一行', i) +
       '</div>' +
-      '<div class="field"><span>成员（用角色名，自动带上角色图标引用）</span>' +
-      '<div class="members">' + members + actBtn('add-member', p + '.members', '＋ 成员', 'btn mini') + '</div></div>' +
+      '<div class="field"><span>成员（点名字打开可搜索选择器：中文 / 拼音首字母过滤，可多选、拖动排序）</span>' +
+      '<div class="members" data-members="' + esc(p) + '">' + members +
+      '<button type="button" class="btn mini" data-act="open-members" data-path="' + esc(p) + '">＋ 成员</button></div></div>' +
       '<div class="field" style="margin-top:8px"><span>文本' + (row.members.length ? '（成员之外的补充说明）' : '（没有拆成成员时，整行按文本输出）') + '</span>' +
       '<input type="text" data-path="' + p + '.text" value="' + esc(row.text) + '" placeholder="如 自由选择"></div>' +
       '</div>'
@@ -621,6 +756,11 @@ function renderUnparsed () {
         lines.map(function (l) { return '<li>' + esc(l) + '</li>' }).join('') + '</ul></div>'
     }).join('')
   return card('未识别行', keys.length + ' 组', body, false, true)
+}
+
+/** 只渲染「配队推荐」这一块（界面自检 / 手工调试用，方便检查成员选择器的 DOM） */
+function renderTeamsHtml () {
+  return state.model ? renderTeams() : ''
 }
 
 function card (title, count, body, open, readonly) {
@@ -655,6 +795,28 @@ function renderForm () {
     renderPanels() + renderConstellations() + renderTeams() + renderUnparsed()
   $('current-name').textContent = state.current + (state.model.name !== state.current ? '（文件内 name：' + state.model.name + '）' : '')
   renderIssueBar()
+  if (state.pendingFocus) {
+    var rowId = state.pendingFocus
+    state.pendingFocus = null
+    focusRow(rowId)
+  }
+}
+
+/**
+ * 高亮 + 滚动到某一行（全局搜索 / 批量替换后跳转用）
+ * @param {string} rowId 形如 v2.weapons.2
+ */
+function focusRow (rowId) {
+  var el = document.querySelector('#form [data-rowid="' + attrSelectorValue(rowId) + '"]')
+  if (!el) return false
+  try {
+    var details = el.closest ? el.closest('details') : null
+    if (details) details.open = true
+  } catch (e) { /* 忽略 */ }
+  el.classList.add('hl')
+  if (el.scrollIntoView) el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  setTimeout(function () { el.classList.remove('hl') }, 3600)
+  return true
 }
 
 function renderList () {
@@ -676,6 +838,14 @@ function renderList () {
   }).join('')
 }
 
+/** 当前列表里可见的角色名（键盘 ↑↓ 用） */
+function visibleListNames () {
+  var kw = state.filter.trim().toLowerCase()
+  return state.items
+    .filter(function (it) { return !kw || it.name.toLowerCase().indexOf(kw) >= 0 })
+    .map(function (it) { return it.name })
+}
+
 /** 下拉候选 */
 function renderDatalists () {
   var fill = function (id, list) {
@@ -686,7 +856,360 @@ function renderDatalists () {
   fill('dl-character', state.index.characters)
 }
 
-/* ============================================================ 加载 / 保存 */
+/* ============================================================ 全局搜索 */
+
+var G_TYPE_LABEL = { weapon: '武器', artifact: '圣遗物', character: '角色', talent: '天赋', constellation: '命座' }
+var gTimer = null
+var gLast = { names: [], text: [], q: '' }
+
+function globalSearchNow () {
+  var q = $('gsearch').value.trim()
+  if (!q) { showGResults(''); return }
+  showGResults('<div class="muted" style="padding:8px">搜索中…</div>')
+  api('GET', '/api/search?q=' + encodeURIComponent(q)).then(function (data) {
+    gLast = { names: asArray(data.names), text: asArray(data.text), q: q }
+    renderGResults(data)
+  }).catch(function (e) {
+    showGResults('<div class="status error" style="padding:8px">搜索失败：' + esc(e.message) + '</div>')
+  })
+}
+
+function showGResults (html) {
+  var box = $('gresults')
+  box.innerHTML = html
+  box.className = 'gresults' + (html ? '' : ' hidden')
+}
+
+function renderGResults (data) {
+  var names = asArray(data.names)
+  var text = asArray(data.text)
+  var html = '<div class="gr-head">' +
+    '「' + esc(data.q) + '」：引用命中 <b>' + data.totalHits + '</b> 处 · 正文命中 <b>' + data.totalText + '</b> 行' +
+    (data.fuzzy ? '（名称按包含匹配）' : '') +
+    '<span class="spacer"></span><button type="button" class="btn mini" data-g="close">关闭</button></div>'
+
+  if (!names.length && !text.length) {
+    html += '<div class="muted" style="padding:10px">没有找到与「' + esc(data.q) + '」相关的内容</div>'
+  }
+
+  names.forEach(function (g, gi) {
+    html += '<div class="gr-group">' +
+      '<div class="gr-title"><span class="badge ' + g.type + '">' + esc(G_TYPE_LABEL[g.type] || g.type) + '</span>' +
+      '<b>' + esc(g.name) + '</b><span class="muted">' + (g.total ? '被 ' + g.characters.length + ' 个角色用到 ' + g.total + ' 处' : '没有任何角色用到（未使用）') + '</span>' +
+      '<span class="spacer"></span>' +
+      '<button type="button" class="btn mini" data-g="batch" data-gi="' + gi + '">批量替换…</button>' +
+      '<button type="button" class="btn mini" data-g="usage" data-gi="' + gi + '">谁用了</button>' +
+      '</div>'
+    if (g.total) {
+      html += '<ul class="gr-list">' + g.hits.map(function (h) {
+        return '<li><a href="#" data-g="jump" data-name="' + esc(h.name) + '" data-row="' + esc(h.rowId) + '">' +
+          esc(h.name) + '</a> <span class="muted">' + esc(h.section) + ' · ' + esc(h.line === undefined ? '' : '第 ' + h.line + ' 行') + '</span>' +
+          '<span class="gr-text">' + esc(h.text) + '</span></li>'
+      }).join('') + '</ul>'
+    }
+    html += '</div>'
+  })
+
+  if (text.length) {
+    html += '<div class="gr-group"><div class="gr-title"><b>正文关键词</b><span class="muted">' + text.length + ' 行</span></div>' +
+      '<ul class="gr-list">' + text.slice(0, 60).map(function (t) {
+        return '<li><a href="#" data-g="jump" data-name="' + esc(t.name) + '" data-hit="' + esc(t.hitId) + '">' +
+          esc(t.name) + '</a> <span class="muted">' + esc(t.title) + ' · 第 ' + t.line + ' 行</span>' +
+          '<span class="gr-text">' + esc(t.text) + '</span></li>'
+      }).join('') + '</ul></div>'
+  }
+  showGResults(html)
+}
+
+/** 搜索面板里点一个名字 → 打开「谁用了」详情 */
+function showUsageDetail (type, name) {
+  loadUsage().then(function () {
+    var hits = []
+    // 直接用搜索接口拿精确命中（比在客户端重算更省事）
+    return api('GET', '/api/search?q=' + encodeURIComponent(name) + '&type=' + encodeURIComponent(type) + '&scope=name')
+  }).then(function (data) {
+    var groups = asArray(data.names)
+    var html = '<div class="gr-head">「' + esc(name) + '」用在哪<span class="spacer"></span>' +
+      '<button type="button" class="btn mini" data-g="close">关闭</button></div>'
+    if (!groups.length || !groups[0].total) {
+      html += '<div class="muted" style="padding:10px">没有被任何角色用到（未使用）</div>'
+    } else {
+      groups[0].hits.forEach(function (h) {
+        html += '<div class="gr-row"><a href="#" data-g="jump" data-name="' + esc(h.name) + '" data-row="' + esc(h.rowId) + '">' +
+          esc(h.name) + '</a> <span class="muted">' + esc(h.section) + ' · 第 ' + h.line + ' 行</span> <span class="gr-text">' + esc(h.text) + '</span></div>'
+      })
+    }
+    showGResults(html)
+  }).catch(function (e) { showGResults('<div class="status error" style="padding:8px">查询失败：' + esc(e.message) + '</div>') })
+}
+
+/** 跳转到某个角色的某一行并高亮 */
+function jumpTo (name, rowId) {
+  state.pendingFocus = rowId || null
+  showGResults('')
+  return selectCharacter(name).then(function () {
+    if (state.pendingFocus === rowId && rowId) {
+      // selectCharacter 没换角色时不会重绘，这里补一次
+      state.pendingFocus = null
+      renderForm()
+    }
+    if (rowId && !state.pendingFocus) focusRow(rowId)
+  }).catch(function (e) { showStatus('跳转失败：' + e.message, 'error', true) })
+}
+
+/* ============================================================ 工具箱面板 */
+
+var TOOL_TABS = [['search', '全局搜索'], ['batch', '批量替换'], ['library', '名称库浏览']]
+
+/** 顶栏下方的工具面板：批量替换 + 名称库浏览（#tools 在 index.html 里没有，用 status 之下动态插入） */
+function renderToolPanel () {
+  var panel = $('tools')
+  if (!panel) return
+  if (!state.toolsOpen) { panel.className = 'tools hidden'; return }
+  panel.className = 'tools'
+  var tab = state.view
+  var head = '<div class="tools-head">' +
+    TOOL_TABS.map(function (t) {
+      return '<button type="button" class="btn ' + (t[0] === tab ? 'primary' : '') + ' tab" data-tab="' + t[0] + '">' + t[1] + '</button>'
+    }).join('') +
+    '<span class="spacer"></span><button type="button" class="btn mini" data-tab="close">✕ 关闭</button></div>'
+  var body = tab === 'batch' ? batchPanelHtml() : (tab === 'library' ? libraryPanelHtml() : searchPanelHtml())
+  panel.innerHTML = head + '<div class="tools-body">' + body + '</div>'
+  if (tab === 'library') renderLibraryList()
+}
+
+/** 工具箱 - 全局搜索 tab */
+function searchPanelHtml () {
+  return '<div class="tool-row">' +
+    '<input id="tools-q" class="grow" type="search" placeholder="搜名称（武器/圣遗物/角色/套装）或正文关键词（回车）" value="' + esc(state.gq || '') + '" autocomplete="off">' +
+    '<button type="button" class="btn primary" id="tools-search">搜索</button>' +
+    '</div>' +
+    '<div class="muted" style="font-size:12px">结果会显示在顶栏搜索框下拉里（点击条目可跳转到该角色并高亮所在行）。</div>'
+}
+
+/** 工具箱 - 批量替换 tab */
+function batchPanelHtml () {
+  var b = state.batch || (state.batch = { type: 'weapon', from: '', to: '', preview: null })
+  var types = [['weapon', '武器'], ['artifact', '圣遗物套装'], ['character', '角色（配队成员）'], ['talent', '天赋 A/E/Q'], ['constellation', '命座名']]
+  var dv = b.type === 'character' ? 'dl-character' : (b.type === 'artifact' ? 'dl-artifact' : (b.type === 'weapon' ? 'dl-weapon' : ''))
+  var html = '<div class="tool-row">' +
+    '<label class="field"><span>替换哪一类</span><select id="batch-type">' +
+    types.map(function (t) { return '<option value="' + t[0] + '"' + (t[0] === b.type ? ' selected' : '') + '>' + t[1] + '</option>' }).join('') +
+    '</select></label>' +
+    '<label class="field"><span>原名称 from</span><input id="batch-from" type="text" list="' + dv + '" value="' + esc(b.from) + '" placeholder="如 薙草之稻光"></label>' +
+    '<label class="field"><span>新名称 to</span><input id="batch-to" type="text" list="' + dv + '" value="' + esc(b.to) + '" placeholder="如 香韵奏者"></label>' +
+    '<div class="tool-btns">' +
+    '<button type="button" class="btn" id="batch-preview">预览命中</button>' +
+    '<button type="button" class="btn primary" id="batch-run">执行替换</button>' +
+    '</div></div>' +
+    '<div class="muted" style="font-size:12px">只改 v2 引用（name / ref），不动 note；执行前会把要改的文件复制到 <code>data/_backup/&lt;时间戳&gt;/</code>，可回滚。</div>'
+
+  if (b.preview) {
+    var p = b.preview
+    html += '<div class="batch-preview">' +
+      '<div class="gr-title">预览：命中 <b>' + p.total + '</b> 处，涉及 <b>' + p.files + '</b> 个角色</div>' +
+      (asArray(p.warnings).length ? '<div class="alert">' + p.warnings.map(esc).join('<br>') + '</div>' : '') +
+      (p.total
+        ? '<div class="muted" style="font-size:12px">按角色：' + p.perCharacter.map(function (c) { return esc(c.name) + '（' + c.count + '）' }).join('、') + '</div>' +
+          '<ul class="gr-list">' + p.hits.slice(0, 200).map(function (h) {
+            return '<li><a href="#" data-batch-jump="1" data-name="' + esc(h.name) + '" data-row="' + esc(h.rowId) + '">' + esc(h.name) + '</a>' +
+              ' <span class="muted">' + esc(h.section) + ' · 第 ' + h.line + ' 行</span>' +
+              '<span class="gr-text">' + esc(h.text) + '</span></li>'
+          }).join('') + '</ul>' + (p.hits.length > 200 ? '<div class="muted">（只显示前 200 条，共 ' + p.hits.length + ' 条）</div>' : '')
+        : '<div class="muted">没有任何引用命中这个名字</div>') +
+      '</div>'
+  }
+
+  if (state.backupHistory.length) {
+    html += '<div class="batch-preview"><div class="gr-title">可回滚的备份（本次会话）</div>' +
+      state.backupHistory.map(function (h) {
+        return '<div class="gr-row">' + esc(h.stamp) + ' · ' + esc(h.type) + '：' + esc(h.from) + ' → ' + esc(h.to) +
+          '（' + h.changed + ' 处 / ' + h.files + ' 个文件）' +
+          ' <button type="button" class="btn mini danger" data-undo="' + esc(h.stamp) + '">回滚</button></div>'
+      }).join('') + '</div>'
+  }
+  return html
+}
+
+/** 工具箱 - 名称库浏览 tab */
+function libraryPanelHtml () {
+  var lib = state.library || (state.library = { type: 'weapon', filter: '', selected: null })
+  var types = [['weapon', '武器'], ['artifact', '圣遗物套装'], ['character', '角色']]
+  return '<div class="tool-row">' +
+    types.map(function (t) {
+      return '<button type="button" class="btn ' + (t[0] === lib.type ? 'primary' : '') + ' tab" data-lib="' + t[0] + '">' + t[1] + '</button>'
+    }).join('') +
+    '<input id="lib-filter" class="grow" type="search" placeholder="过滤名称（支持拼音首字母）" value="' + esc(lib.filter) + '" autocomplete="off">' +
+    '<button type="button" class="btn" id="lib-refresh">刷新用量</button>' +
+    '</div>' +
+    '<div class="lib-wrap"><div id="lib-list" class="lib-list muted">正在统计使用情况…</div>' +
+    '<div id="lib-detail" class="lib-detail muted">点左边的名字看它用在哪里</div></div>'
+}
+
+/** 名称库列表：名称 + 用量徽标（未使用 / 被 N 个角色用到） */
+function renderLibraryList () {
+  var box = $('lib-list')
+  if (!box) return
+  var lib = state.library
+  loadUsage().then(function (usage) {
+    var list = usage[lib.type] || []
+    var indexNames = lib.type === 'weapon' ? state.index.weapons : (lib.type === 'artifact' ? state.index.artifacts : state.index.characters)
+    var q = lib.filter.trim()
+    var pinyin = window.Pinyin
+    var names = asArray(indexNames).slice()
+    // 名称库里没有、但数据里在用的名字也列出来（方便批量改名）
+    asArray(list).forEach(function (u) { if (names.indexOf(u.name) < 0) names.push(u.name) })
+    var filtered = names.filter(function (n) {
+      if (!q) return true
+      if (n.toLowerCase().indexOf(q.toLowerCase()) >= 0) return true
+      if (n.indexOf(q) >= 0) return true
+      if (pinyin && typeof pinyin.match === 'function') { try { return pinyin.match(n, q) } catch (e) { return false } }
+      return false
+    }).sort(function (a, b) { return a.localeCompare(b, 'zh-Hans-CN') })
+
+    var usedMap = {}
+    asArray(list).forEach(function (u) { usedMap[u.name] = u })
+    var usedCount = filtered.filter(function (n) { return usedMap[n] && usedMap[n].total }).length
+    box.className = 'lib-list'
+    box.innerHTML = '<div class="muted" style="font-size:12px;padding:2px 4px">共 ' + filtered.length + ' 个名称，其中 ' + usedCount + ' 个被用到</div>' +
+      filtered.map(function (n) {
+        var u = usedMap[n]
+        var badge = (u && u.total) ? '<span class="lib-used">' + u.total + ' 处 / ' + u.characters.length + ' 角色</span>' : '<span class="lib-unused">未使用</span>'
+        return '<div class="lib-item' + (lib.selected === n ? ' active' : '') + '" data-libname="' + esc(n) + '">' +
+          '<span class="nm">' + esc(n) + '</span>' + badge + '</div>'
+      }).join('')
+  }).catch(function (e) {
+    box.innerHTML = '<div class="muted" style="padding:8px">统计失败：' + esc(e.message) + '</div>'
+  })
+}
+
+/** 名称库右侧详情：谁用了它 + 发起批量替换 */
+function renderLibraryDetail (name) {
+  var box = $('lib-detail')
+  if (!box) return
+  var type = state.library.type
+  box.className = 'lib-detail'
+  box.innerHTML = '<div class="muted" style="padding:8px">查询中…</div>'
+  api('GET', '/api/search?q=' + encodeURIComponent(name) + '&type=' + encodeURIComponent(type) + '&scope=name').then(function (data) {
+    var g = asArray(data.names)[0]
+    var html = '<div class="gr-title"><b>' + esc(name) + '</b><span class="spacer"></span>' +
+      '<button type="button" class="btn mini primary" data-libbatch="' + esc(name) + '">批量替换这个名字…</button></div>'
+    if (!g || !g.total) html += '<div class="muted" style="padding:8px">没有被任何角色用到（未使用）</div>'
+    else {
+      html += '<div class="muted" style="font-size:12px">' + g.total + ' 处 / ' + g.characters.length + ' 个角色：' +
+        g.characters.map(function (c) { return esc(c.name) + '（' + c.count + '）' }).join('、') + '</div>' +
+        '<ul class="gr-list">' + g.hits.map(function (h) {
+          return '<li><a href="#" data-g="jump" data-name="' + esc(h.name) + '" data-row="' + esc(h.rowId) + '">' + esc(h.name) + '</a>' +
+            ' <span class="muted">' + esc(h.section) + ' · 第 ' + h.line + ' 行</span><span class="gr-text">' + esc(h.text) + '</span></li>'
+        }).join('') + '</ul>'
+    }
+    box.innerHTML = html
+  }).catch(function (e) { box.innerHTML = '<div class="muted" style="padding:8px">查询失败：' + esc(e.message) + '</div>' })
+}
+
+/** 打开工具箱并定位到某个 tab */
+function openTools (tab) {
+  state.toolsOpen = true
+  if (tab) state.view = tab
+  renderToolPanel()
+}
+
+/** 批量替换：先预览，再执行 */
+function batchPreview () {
+  syncBatchForm()
+  var b = state.batch
+  if (!b.from || !b.to) { showStatus('请填写 from 与 to', 'warn'); return Promise.resolve(null) }
+  showStatus('正在扫描全部角色…', '', true)
+  return api('POST', '/api/batch-replace', { type: b.type, from: b.from, to: b.to, dry: true }).then(function (res) {
+    state.batch.preview = res
+    renderToolPanel()
+    showStatus('预览：命中 ' + res.total + ' 处，涉及 ' + res.files + ' 个角色' +
+      (asArray(res.warnings).length ? '；' + res.warnings.join('；') : ''), asArray(res.warnings).length ? 'warn' : 'ok', true)
+    return res
+  }).catch(function (e) {
+    showStatus('预览失败：' + e.message, 'error', true)
+    return null
+  })
+}
+
+function batchRun () {
+  syncBatchForm()
+  var b = state.batch
+  if (!b.from || !b.to) { showStatus('请填写 from 与 to', 'warn'); return Promise.resolve(null) }
+  if (b.from === b.to) { showStatus('from 与 to 相同，不需要替换', 'warn'); return Promise.resolve(null) }
+  return api('POST', '/api/batch-replace', { type: b.type, from: b.from, to: b.to, dry: true }).then(function (res) {
+    if (!res.total) {
+      showStatus('没有命中，未做任何改动', 'warn', true)
+      return null
+    }
+    return modal({
+      title: '确认批量替换',
+      message: '把 ' + res.total + ' 处「' + b.from + '」替换成「' + b.to + '」，涉及 ' + res.files + ' 个角色文件（会先备份到 data/_backup/）。' +
+        (asArray(res.warnings).length ? ' 注意：' + res.warnings.join('；') : ''),
+      okText: '执行替换',
+      danger: true
+    }).then(function (yes) {
+      if (!yes) return null
+      return api('POST', '/api/batch-replace', { type: b.type, from: b.from, to: b.to }).then(function (done) {
+        state.lastBackup = done.stamp
+        state.backupHistory.unshift({ stamp: done.stamp, type: b.type, from: b.from, to: b.to, changed: done.changed, files: done.files })
+        state.batch.preview = null
+        state.batch.from = b.to
+        state.batch.to = ''
+        return refreshIndex().then(refreshList).then(function () {
+          if (state.current) return openCharacter(state.current).catch(function () {})
+        }).then(function () {
+          renderToolPanel()
+          toast('批量替换完成', [
+            '「' + b.from + '」→「' + b.to + '」',
+            '改动 ' + done.changed + ' 处，涉及 ' + done.files + ' 个文件',
+            '备份时间戳：' + done.stamp + '（可在面板里回滚）'
+          ])
+          showStatus('已替换 ' + done.changed + ' 处（备份 ' + done.stamp + '）', 'ok', true)
+          return done
+        })
+      })
+    })
+  }).catch(function (e) {
+    showStatus('替换失败：' + e.message, 'error', true)
+    return null
+  })
+}
+
+function batchUndo (stamp) {
+  return modal({
+    title: '回滚批量替换',
+    message: '用备份 ' + stamp + ' 还原当时的文件。注意：替换之后对该文件的其它手工改动也会被一起还原。',
+    okText: '回滚',
+    danger: true
+  }).then(function (yes) {
+    if (!yes) return null
+    return api('POST', '/api/batch-replace/undo', { stamp: stamp }).then(function (res) {
+      state.backupHistory = state.backupHistory.filter(function (h) { return h.stamp !== stamp })
+      if (state.lastBackup === stamp) state.lastBackup = null
+      return refreshIndex().then(refreshList).then(function () {
+        if (state.current) return openCharacter(state.current).catch(function () {})
+      }).then(function () {
+        renderToolPanel()
+        toast('已回滚', ['备份 ' + res.stamp + ' 已还原 ' + res.files + ' 个文件：' + asArray(res.characters).join('、')])
+        showStatus('已回滚 ' + res.files + ' 个文件', 'ok', true)
+        return res
+      })
+    }).catch(function (e) {
+      showStatus('回滚失败：' + e.message, 'error', true)
+      return null
+    })
+  })
+}
+
+/** 把批量替换面板里的输入同步回 state */
+function syncBatchForm () {
+  var b = state.batch
+  if (!b || !$('batch-type')) return
+  b.type = $('batch-type').value
+  b.from = $('batch-from').value.trim()
+  b.to = $('batch-to').value.trim()
+}
 
 function refreshList () {
   return api('GET', '/api/characters').then(function (data) {
@@ -703,9 +1226,25 @@ function refreshIndex () {
     state.index = {
       weapons: asArray(data.weapons),
       artifacts: asArray(data.artifacts),
-      characters: asArray(data.characters)
+      characters: asArray(data.characters),
+      talents: TALENTS.slice(),
+      constellations: ['1', '2', '3', '4', '5', '6']
     }
+    state.usage = null
+    state.usageAt = 0
     renderDatalists()
+    renderToolPanel()
+  })
+}
+
+/** 名称库使用统计（谁用了这个名字），带 5 秒缓存 */
+function loadUsage (force) {
+  var fresh = state.usage && (Date.now() - state.usageAt < 5000)
+  if (fresh && !force) return Promise.resolve(state.usage)
+  return api('GET', '/api/name-usage').then(function (data) {
+    state.usage = { weapons: asArray(data.weapons), artifacts: asArray(data.artifacts), characters: asArray(data.characters), indexTotal: data.indexTotal || {} }
+    state.usageAt = Date.now()
+    return state.usage
   })
 }
 
@@ -721,6 +1260,7 @@ function openCharacter (name) {
   return api('GET', '/api/character?name=' + encodeURIComponent(name)).then(function (data) {
     state.current = name
     state.model = normalizeData(data)
+    state.before = snapshotShape(state.model)
     state.issues = asArray(data.issues)
     state.issueMap = buildIssueMap(state.issues)
     markDirty(false)
@@ -787,12 +1327,19 @@ function buildBody () {
   }).filter(function (row) { return row.items.length > 0 })
 
   var artifacts = mv2.artifacts.map(function (row) {
+    if (row.kind === 'note') return { kind: 'note', text: str(row.text).trim() }
     if (row.kind === 'main') {
       var stats = {}
       MAIN_SLOTS.forEach(function (slot) {
         stats[slot] = asArray(row.stats && row.stats[slot]).map(function (x) { return x.trim() }).filter(Boolean)
       })
-      return { kind: 'main', stats: stats }
+      var main = { kind: 'main' }
+      if (hasText(row.note)) {
+        main.note = row.note.trim()
+        if (hasText(row.noteSlot)) main.noteSlot = row.noteSlot
+      }
+      main.stats = stats
+      return main
     }
     if (row.kind === 'sub') {
       var o2 = { kind: 'sub', stats: asArray(row.stats).map(function (x) { return x.trim() }).filter(Boolean) }
@@ -811,6 +1358,7 @@ function buildBody () {
   }).filter(function (row) {
     // 主词条行永远保留（旧数据里有整行留空的占位行，丢掉就是数据损失）
     if (row.kind === 'main') return true
+    if (row.kind === 'note') return hasText(row.text)
     if (row.kind === 'sub') return row.stats.length > 0
     if (row.kind === 'text') return hasText(row.text)
     return row.sets.length || hasText(row.label)
@@ -874,17 +1422,26 @@ function buildBody () {
 function save () {
   if (!state.current || !state.model) return Promise.resolve(false)
   syncRefInputs()
+  var before = state.before
+  var after = snapshotShape(state.model)
+  var diff = diffSummary(before, after)
   var body = buildBody()
   showStatus('正在保存…', '', true)
   return api('PUT', '/api/character?name=' + encodeURIComponent(state.current), body).then(function (res) {
     state.issues = asArray(res && res.issues)
     state.issueMap = buildIssueMap(state.issues)
     markDirty(false)
+    state.before = snapshotShape(state.model)
     renderForm()
     // 保存后服务器会自动重建 data/_index.json（索引已刷新 / 重建失败只算警告，不影响保存）
     var idxNote = (res && res.indexRefreshed) ? '，索引已刷新' : ''
     var idxWarn = (res && res.indexWarning) ? res.indexWarning : ''
     return refreshIndex().then(refreshList).then(function () {
+      var lines = diff.length ? diff : ['内容与上次打开时一致（只有格式/顺序层面的改动）']
+      lines.push('武器行 ' + after.weapons + ' / 圣遗物行 ' + after.artifacts + ' / 配队行 ' + after.teams + ' / 命座行 ' + after.constellations)
+      if (state.issues.length) lines.push('⚠ ' + state.issues.length + ' 处名称不在图鉴（输入框旁的 ⚠ 可看详情）')
+      if (idxWarn) lines.push(idxWarn)
+      toast('已保存 ' + state.current + '.json' + idxNote, lines, (state.issues.length || idxWarn) ? 'warn' : 'ok')
       if (state.issues.length) {
         showStatus('已保存' + idxNote + '；但有 ' + state.issues.length + ' 处名称不在图鉴里（输入框旁的 ⚠ 可看详情）' + (idxWarn ? '；' + idxWarn : ''), 'warn', true)
       } else {
@@ -894,8 +1451,118 @@ function save () {
     })
   }).catch(function (e) {
     showStatus('保存失败：' + e.message, 'error', true)
+    toast('保存失败', [e.message], 'error')
     return false
   })
+}
+
+/**
+ * 发布：把改动铺到全链路（Ctrl+Shift+S）。
+ * 服务端的 /api/publish 会依次：写角色 JSON（给了 name 才写）→ 重建 _index.json →
+ * 写回主文档 .docx（自动备份）→ 生成 guide.html → 产出提交摘要（**不自动 commit**）。
+ * 响应形状以 steps[] + summary 为准；同时兼容旧形状的 files[]。
+ */
+function publish () {
+  showStatus('正在发布（索引 / 主文档 / guide.html）…', '', true)
+  return api('POST', '/api/publish', {}).then(function (res) {
+    var lines = []
+    asArray(res.steps).forEach(function (s) { lines.push((s.ok ? '✓ ' : '✗ ') + s.step + (s.detail ? '：' + s.detail : '')) })
+    asArray(res.files).forEach(function (f) { lines.push(f.file + '（' + String(f.mtime).replace('T', ' ').slice(0, 19) + '）') })
+    if (res.docx && res.docx.path) lines.push('主文档：' + res.docx.path.split(/[\\/]/).pop() + '（备份 ' + (res.docx.backup ? res.docx.backup.split(/[\\/]/).pop() : '无') + '）')
+    var changed = asArray(res.summary && res.summary.changedFiles)
+    if (changed.length) lines.push('变更文件：' + changed.map(function (c) { return c.path + '（' + c.status + '）' }).join('、'))
+    lines.push('未执行 git 提交' + (res.summary && res.summary.suggestedMessage ? '；建议提交信息：' + res.summary.suggestedMessage : ''))
+    asArray(res.errors).forEach(function (e) { lines.push('⚠ ' + e) })
+    toast(res.ok === false ? '发布有错误' : '已发布', lines, res.ok === false ? 'error' : 'ok')
+    var failed = asArray(res.steps).filter(function (s) { return s.ok === false })
+    showStatus(res.ok === false || failed.length
+      ? ('发布失败：' + (res.error || failed.map(function (s) { return s.step + ' — ' + s.detail }).join('；')))
+      : ('已发布：' + asArray(res.steps).map(function (s) { return s.step }).join(' → ') + '（未提交，摘要见 ' + (res.summaryFile || 'out/_commit-summary.md') + '）'),
+    (res.ok === false || failed.length) ? 'error' : 'ok', true)
+    if (state.current) { refreshIndex().then(refreshList).catch(function () {}) }
+    return res
+  }).catch(function (e) {
+    showStatus('发布失败：' + e.message, 'error', true)
+    toast('发布失败', [e.message], 'error')
+    return null
+  })
+}
+
+/* ==================================================== 保存并发布（全链路） */
+
+/** 「保存并发布」的四个阶段（用于进度提示） */
+var PUBLISH_STEPS = ['写角色 JSON', '重建 data/_index.json', '写回主文档（含备份）', '生成 guide.html', '三方一致性校验', '自动提交（不推送）']
+
+/**
+ * 保存并发布（Ctrl+Shift+S，按钮「保存并发布」）：
+ *   写 JSON → 重建索引 → build-docx 写回 Word 主文档（含备份）→ build-html 生成 guide.html
+ *   → **三方一致性校验**（数据/文档/网页/分隔符，全过才继续）→ `git add` + `git commit`
+ *   （**绝不 push**，推送由人工执行）。
+ * 校验不过或提交失败都不回滚：文档与网页保持可用，返回里说明原因与手动提交命令。
+ * 摘要落盘 out/_commit-summary.md（+ 最近 5 份时间戳副本）。
+ */
+function saveAndPublish () {
+  if (!state.current || !state.model) return Promise.resolve(false)
+  syncRefInputs()
+  var body = buildBody()
+  showStatus('保存并发布：' + PUBLISH_STEPS.join(' → ') + ' …', '', true)
+  toast('保存并发布中…', PUBLISH_STEPS.map(function (s, i) { return (i + 1) + '. ' + s }), 'ok')
+  return api('POST', '/api/publish', { name: state.current, character: body, targets: ['html'] }).then(function (res) {
+    markDirty(false)
+    state.issues = asArray(res.issues)
+    state.before = snapshotShape(state.model)
+    return refreshIndex().then(refreshList).then(function () {
+      renderForm()
+      var s = (res && res.summary) || {}
+      var lines = []
+      asArray(s.characterChanges).forEach(function (c) { lines.push(c.name + '：' + fieldChangeText(c.fields)) })
+      asArray(res.steps).forEach(function (st) { lines.push((st.ok ? '✓ ' : '✗ ') + st.step + (st.detail ? '：' + st.detail : '')) })
+      if (s.suggestedMessage) lines.push('提交信息：' + s.suggestedMessage)
+      lines.push('主文档备份：' + ((res.docx && res.docx.backup) || '（无）'))
+      asArray(res.verify && res.verify.checks).forEach(function (c) {
+        if (c.advisory) return
+        lines.push((c.ok ? '✓ ' : '✗ ') + c.name + '：' + c.detail)
+      })
+      if (res.commitExecuted) lines.push('✓ 已自动提交 ' + (res.commit || '') + '（**未推送**，push 请人工执行）')
+      else if (res.step === 'verify') lines.push('⚠ 三方校验未通过，已跳过提交：' + (res.detail || ''))
+      else if (res.commitError) lines.push('⚠ 自动提交失败（保存与生成已完成）：' + res.commitError + '　→ 请手动 git add && git commit')
+      else lines.push('无改动可提交（' + (res.commitSkipped || '工作区已干净') + '）')
+      lines.push('摘要文件：' + (res.summaryFile || 'out/_commit-summary.md'))
+      var failed = asArray(res.steps).filter(function (st) { return st.ok === false })
+      var blocked = res.ok === false && res.step === 'verify'
+      toast(failed.length ? '保存并发布有失败步骤' : (blocked ? '已保存并发布；三方校验未通过，未提交' : (res.commitExecuted ? '已保存并发布并提交（未推送）' : '已保存并发布（未提交）')), lines, (failed.length || blocked) ? 'warn' : 'ok', {
+        text: s.markdown,
+        label: '复制提交信息',
+        title: s.suggestedMessage || s.title
+      })
+      showStatus(failed.length
+        ? ('保存并发布失败：' + failed.map(function (st) { return st.step + ' — ' + st.detail }).join('；'))
+        : blocked
+          ? ('保存并发布：三方一致性校验未通过，未提交 — ' + (res.detail || ''))
+          : ('已保存并发布 ' + state.current + '；主文档已写回（备份 ' + ((res.docx && res.docx.backup) || '无') + '）'
+            + (res.commitExecuted ? '；已提交 ' + res.commit + '（未推送）' : (res.commitError ? '；自动提交失败，请手动提交' : '；无改动可提交'))
+            + '；摘要 ' + (res.summaryFile || 'out/_commit-summary.md')),
+      (failed.length || blocked) ? 'error' : 'ok', true)
+      return res
+    })
+  }).catch(function (e) {
+    showStatus('保存并发布失败：' + e.message, 'error', true)
+    toast('保存并发布失败', [e.message], 'error')
+    return null
+  })
+}
+
+/** 角色字段变化 → 一行中文摘要（服务端 summary.characterChanges[].fields） */
+function fieldChangeText (fields) {
+  var parts = []
+  asArray(fields).forEach(function (f) {
+    var bits = []
+    if (f.changed) bits.push(f.changed + ' 改')
+    if (f.added) bits.push(f.added + ' 增')
+    if (f.removed) bits.push(f.removed + ' 删')
+    if (bits.length) parts.push(f.label + ' ' + bits.join(' '))
+  })
+  return parts.length ? parts.join(' / ') : '无字段变化'
 }
 
 /* ============================================================ 结构操作 */
@@ -959,6 +1626,27 @@ function handleAction (act, path, i, el) {
     model.v2.talents.push({ kind: 'crown', items: [{ name: 'A', level: '' }] })
   } else if (act === 'add-member') {
     target.push({ name: nextTeamMember(getPath(model, path.replace(/\.members$/, '')), target), note: '' })
+  } else if (act === 'open-members') {
+    // 配队成员：可搜索多选选择器（path 是这一行的路径，如 v2.teams.0）
+    openMemberPicker(path)
+    changed = false
+  } else if (act === 'copy-prev') {
+    // 「复制上一条」：把同一个列表里上一条的名字填进来（含 ref）
+    var cur = String(getPath(model, path) || '').trim()
+    var parts2 = path.split('.')
+    var field = parts2.pop()
+    var idx = Number(parts2.pop())
+    var list = getPath(model, parts2.join('.'))
+    var prevItem = asArray(list)[idx - 1]
+    if (prevItem && idx > 0) {
+      var val = str(prevItem.name || prevItem)
+      setPath(model, path, val)
+      var holder = asArray(list)[idx]
+      if (holder && typeof holder === 'object') holder.ref = (path.indexOf('v2.teams') === 0 ? 'character:' : (path.indexOf('v2.artifacts') === 0 ? 'artifact:' : 'weapon:')) + val
+      if (cur === val) changed = false
+    } else {
+      changed = false
+    }
   } else if (act === 'panel-to-text') {
     var row = getPath(model, path)
     if (hasText(row.k)) {
@@ -989,6 +1677,51 @@ function nextTeamMember (team, members) {
     if (state.index.characters.indexOf(parts[i]) >= 0 && used.indexOf(parts[i]) < 0) return parts[i]
   }
   return ''
+}
+
+/* ============================================================ 配队成员选择器 */
+
+/** 配队成员候选池：名称库里的角色 + 当前行已有成员（保证已选的一定在列表里） */
+function memberPool (extra) {
+  var out = asArray(state.index.characters).slice()
+  asArray(extra).forEach(function (m) {
+    var n = str(m && m.name).trim()
+    if (n && out.indexOf(n) < 0) out.push(n)
+  })
+  return out
+}
+
+/**
+ * 打开配队成员多选选择器（可搜索 / 拼音首字母、回车添加、拖动排序）
+ * @param {string} path 形如 v2.teams.0
+ */
+function openMemberPicker (path) {
+  var team = getPath(state.model, path)
+  if (!team) { showStatus('找不到这一行配队', 'error'); return }
+  if (typeof window.Picker === 'undefined') { showStatus('选择器组件没加载（/picker.js 404？）', 'error', true); return }
+  window.Picker.openMembers({
+    title: '选择配队成员（' + (hasText(team.label) ? team.label : path) + '）',
+    pool: memberPool(team.members),
+    members: team.members,
+    onConfirm: function (members) {
+      var before = clone(team.members)
+      if (window.Picker.sameMembers(before, members)) return
+      team.members = members
+      markDirty(true)
+      renderForm()
+      showStatus('已更新成员：' + (members.length ? members.map(function (m) { return m.name }).join(' + ') : '（空）'), 'ok')
+    }
+  })
+}
+
+/** 配队行里拖动成员排序（HTML5 drag & drop） */
+function moveMemberAt (team, from, to) {
+  if (!team || from < 0 || from >= team.members.length) return false
+  var members = team.members.slice()
+  var item = members.splice(from, 1)[0]
+  members.splice(Math.max(0, Math.min(members.length, to)), 0, item)
+  team.members = members
+  return true
 }
 
 /* ============================================================ 事件绑定 */
@@ -1039,12 +1772,105 @@ function formEvents () {
   form.addEventListener('click', function (e) {
     var el = e.target
     if (!el || !el.getAttribute) return
+    // 「从名称库选」：引用字段旁边的小按钮
+    var pickBtn = el.closest ? el.closest('[data-pick]') : null
+    if (pickBtn) {
+      e.preventDefault()
+      openRefPickerFor(pickBtn.getAttribute('data-pick'), pickBtn.getAttribute('data-path'))
+      return
+    }
     var act = el.getAttribute('data-act')
     if (!act) return
     e.preventDefault()
     var path = el.getAttribute('data-path')
     var i = el.hasAttribute('data-i') ? Number(el.getAttribute('data-i')) : -1
     handleAction(act, path, i, el)
+  })
+
+  // 成员备注：只更新模型，不重绘（避免输入时丢焦点）
+  form.addEventListener('input', function (e) {
+    var el = e.target
+    if (!el || !el.classList || !el.classList.contains('member-note')) return
+    var path = el.getAttribute('data-path')
+    if (path) { setPath(state.model, path, el.value); markDirty(true) }
+  })
+
+  // 配队成员拖动排序（HTML5 drag & drop）
+  var dragM = { from: -1, path: null }
+  form.addEventListener('dragstart', function (e) {
+    var chip = e.target && e.target.closest ? e.target.closest('.members .member') : null
+    if (!chip) return
+    var box = chip.closest('.members')
+    dragM = { from: Number(chip.getAttribute('data-m')), path: box ? box.getAttribute('data-members') : null }
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move'
+      try { e.dataTransfer.setData('text/plain', String(dragM.from)) } catch (err) {}
+    }
+  })
+  form.addEventListener('dragover', function (e) {
+    var box = e.target && e.target.closest ? e.target.closest('.members') : null
+    if (!box || dragM.from < 0 || dragM.path !== box.getAttribute('data-members')) return
+    e.preventDefault()
+    var team = getPath(state.model, dragM.path)
+    if (!team) return
+    var chips = [].slice.call(box.querySelectorAll('.member'))
+    var rects = chips.map(function (c) { return c.getBoundingClientRect() })
+    var x = e.clientX
+    var to = rects.length
+    for (var k = 0; k < rects.length; k++) {
+      if (x < rects[k].left + rects[k].width / 2) { to = k; break }
+    }
+    if (to === dragM.from || to === dragM.from + 1) return
+    if (moveMemberAt(team, dragM.from, to > dragM.from ? to - 1 : to)) {
+      dragM.from = to > dragM.from ? to - 1 : to
+      markDirty(true)
+      renderForm()
+    }
+  })
+  form.addEventListener('drop', function (e) {
+    if (dragM.from < 0) return
+    e.preventDefault()
+    dragM = { from: -1, path: null }
+    showStatus('已调整成员顺序', 'ok')
+  })
+  form.addEventListener('dragend', function () { dragM = { from: -1, path: null } })
+}
+
+/** 引用字段 → 名称库候选（角色字段直接用角色清单，可以搜拼音首字母） */
+function candidatesFor (kind) {
+  if (kind === 'weapon') return state.index.weapons
+  if (kind === 'artifact') return state.index.artifacts
+  if (kind === 'character') return state.index.characters
+  if (kind === 'talent') return TALENTS.slice()
+  if (kind === 'constellation') return ['一命', '二命', '三命', '四命', '五命', '六命']
+  return []
+}
+
+/** 路径 → 可放进 CSS 属性选择器的字面量（优先用 CSS.escape） */
+function attrSelectorValue (value) {
+  var s = String(value == null ? '' : value)
+  if (typeof CSS !== 'undefined' && CSS && typeof CSS.escape === 'function') return CSS.escape(s)
+  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+}
+
+/** 打开「从名称库选」并写回模型 */
+function openRefPickerFor (kind, path) {
+  if (typeof window.Picker === 'undefined') { showStatus('选择器组件没加载（/picker.js 404？）', 'error', true); return }
+  var el = document.querySelector('#form [data-ref-kind="' + kind + '"][data-path="' + attrSelectorValue(path) + '"]')
+  var current = el ? el.value : str(getPath(state.model, path))
+  var label = REF_KINDS[kind] ? REF_KINDS[kind].text : kind
+  window.Picker.openRef({
+    title: '从名称库选' + label + '（共 ' + candidatesFor(kind).length + ' 个候选）',
+    candidates: candidatesFor(kind),
+    value: current,
+    onPick: function (name) {
+      if (el) el.value = name
+      if (applyRef({ path: path, kind: kind, value: name })) {
+        markDirty(true)
+        renderForm()
+        showStatus('已选择：' + label + '「' + name + '」', 'ok')
+      }
+    }
   })
 }
 
@@ -1073,6 +1899,204 @@ function applyRef (el) {
     else parent.ref = kind + ':' + val
   }
   return true
+}
+
+/* ============================================================ 回收站 */
+
+/**
+ * 打开回收站面板：列出 data/_trash/ 里被软删除的角色，
+ * 支持「恢复」（移回 data/gi/ 并把名字补回 _order.json 末尾）/「彻底删除」/「清空」。
+ * 三个写操作都要二次确认；恢复撞名时服务端返回 409，这里给出中文提示。
+ */
+function openTrash () {
+  var el = $('trash-view')
+  if (!el) return
+  el.className = 'trash-view'
+  renderTrash()
+}
+
+function closeTrash () {
+  var el = $('trash-view')
+  if (el) el.className = 'trash-view hidden'
+}
+
+function renderTrash () {
+  var box = $('trash-list')
+  var countEl = $('trash-count')
+  if (!box) return
+  box.innerHTML = '<div class="muted" style="padding:8px">读取中…</div>'
+  api('GET', '/api/trash').then(function (data) {
+    var items = asArray(data.items)
+    if (countEl) countEl.textContent = '共 ' + items.length + ' 个（data/_trash/）'
+    if (!items.length) {
+      box.innerHTML = '<div class="empty-trash muted">回收站是空的。删除角色时会先移到这里，可以随时恢复。</div>'
+      return
+    }
+    box.innerHTML = items.map(function (it) {
+      var s = it.summary || {}
+      var meta = []
+      if (s.weapons) meta.push('武 ' + s.weapons)
+      if (s.artifacts) meta.push('圣 ' + s.artifacts)
+      if (s.teams) meta.push('配队 ' + s.teams)
+      if (s.constellations) meta.push('命座 ' + s.constellations)
+      return '<div class="trash-item' + (it.broken ? ' broken' : '') + '">' +
+        '<div class="ti-main">' +
+        '<div class="ti-name">' + esc(it.name) + (it.broken ? ' <span class="warn-chip" title="这个文件不是合法 JSON，恢复后需要手工修复">⚠</span>' : '') + '</div>' +
+        '<div class="ti-meta muted">删除时间 ' + esc(String(it.deletedAt).replace('T', ' ').slice(0, 19)) +
+        ' · ' + Math.max(1, Math.round((it.bytes || 0) / 1024)) + ' KB' +
+        (meta.length ? ' · ' + meta.join(' / ') : '') +
+        (it.conflicts ? ' · <span class="warn-chip" title="data/gi/ 里已有同名文件，恢复会失败">⚠ 同名已存在</span>' : '') +
+        '</div></div>' +
+        '<div class="ti-btns">' +
+        '<button type="button" class="btn mini primary" data-trt="restore" data-name="' + esc(it.name) + '">恢复</button>' +
+        '<button type="button" class="btn mini danger" data-trt="delete" data-name="' + esc(it.name) + '">彻底删除</button>' +
+        '</div></div>'
+    }).join('')
+  }).catch(function (e) {
+    box.innerHTML = '<div class="muted" style="padding:8px">读取回收站失败：' + esc(e.message) + '</div>'
+  })
+}
+
+/** 恢复一个：二次确认 → POST /api/trash/restore → 刷新列表与角色清单 */
+function trashRestore (name) {
+  return modal({
+    title: '恢复角色',
+    message: '把「' + name + '.json」从回收站移回 data/gi/，并把名字补回 _order.json 末尾。继续吗？',
+    okText: '恢复'
+  }).then(function (yes) {
+    if (!yes) return null
+    return api('POST', '/api/trash/restore', { name: name }).then(function (res) {
+      return refreshIndex().then(refreshList).then(function () {
+        renderTrash()
+        var idxNote = res.indexRefreshed ? '，索引已刷新' : ''
+        showStatus('已恢复 ' + name + '（移回 data/gi/，并补回 _order.json）' + idxNote, 'ok', true)
+        toast('已恢复角色', [name + '.json 已回到 data/gi/', '名字已补回 _order.json 末尾'])
+        return res
+      })
+    }).catch(function (e) {
+      showStatus('恢复失败：' + e.message, 'error', true)
+      return null
+    })
+  })
+}
+
+/** 彻底删除一个：二次确认 */
+function trashDeleteForever (name) {
+  return modal({
+    title: '彻底删除（不可撤销）',
+    message: '会把 data/_trash/' + name + '.json 直接删掉，之后无法恢复。确定吗？',
+    okText: '彻底删除',
+    danger: true
+  }).then(function (yes) {
+    if (!yes) return null
+    return api('DELETE', '/api/trash?name=' + encodeURIComponent(name)).then(function (res) {
+      renderTrash()
+      showStatus('已彻底删除 ' + name, 'ok', true)
+      return res
+    }).catch(function (e) {
+      showStatus('删除失败：' + e.message, 'error', true)
+      return null
+    })
+  })
+}
+
+/** 清空回收站：二次确认 → DELETE /api/trash */
+function trashEmpty () {
+  return api('GET', '/api/trash').then(function (data) {
+    var items = asArray(data.items)
+    if (!items.length) {
+      showStatus('回收站已经是空的', 'warn')
+      return null
+    }
+    return modal({
+      title: '清空回收站（不可撤销）',
+      message: '会彻底删除回收站里的 ' + items.length + ' 个角色：' + items.map(function (i) { return i.name }).slice(0, 8).join('、') +
+        (items.length > 8 ? ' 等' : '') + '。这一步无法撤销，确定吗？',
+      okText: '清空（' + items.length + ' 个）',
+      danger: true
+    }).then(function (yes) {
+      if (!yes) return null
+      return api('DELETE', '/api/trash').then(function (res) {
+        renderTrash()
+        showStatus('已清空回收站（删除 ' + res.removed + ' 个）', 'ok', true)
+        toast('已清空回收站', ['彻底删除 ' + res.removed + ' 个角色：' + asArray(res.names).slice(0, 8).join('、')])
+        return res
+      }).catch(function (e) {
+        showStatus('清空失败：' + e.message, 'error', true)
+        return null
+      })
+    })
+  })
+}
+
+/* ============================================== 心跳 / 关闭服务（空闲自动退出） */
+
+var HEARTBEAT_MS = 5000
+var heartbeatTimer = null
+var serverClosed = false
+
+/**
+ * 每 5 秒给服务端一次心跳，让它知道「页面还开着」。
+ * 服务端只有带 --exit-on-idle 时才真的用这个信号（否则只是 200 no-op，命令行用户行为不变）。
+ * 标签页切到后台（visibilityState=hidden）时暂停心跳 —— 关窗口靠 pagehide 的 /api/close，
+ * 这样「人离开了」也能在阈值内把后台服务收掉。
+ */
+function startHeartbeat () {
+  if (heartbeatTimer) return
+  var beat = function () {
+    if (serverClosed) return
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+    api('POST', '/api/heartbeat', {}).catch(function () { /* 服务已经关了，静默 */ })
+  }
+  beat()
+  heartbeatTimer = setInterval(beat, HEARTBEAT_MS)
+}
+
+/** 问一次服务端：有没有开空闲自动退出？有就提示用户 */
+function checkIdleExit () {
+  return api('POST', '/api/heartbeat', {}).then(function (res) {
+    if (res && res.exitOnIdle) {
+      state.idleExit = res.idleSeconds || 20
+      showStatus('服务已开启空闲自动退出：关掉网页约 ' + state.idleExit + ' 秒后自动结束（多标签页只要有一个还在就不会退）', 'ok', true)
+    }
+    return res
+  }).catch(function () { return null })
+}
+
+/**
+ * 通知服务端「页面要关了」：用 sendBeacon 保证卸载时也能发出去。
+ * 服务端收到后等 5 秒再退，5 秒内又来心跳（刷新/马上重开）就取消 —— 所以刷新不会误杀服务。
+ */
+function signalClose (manual) {
+  serverClosed = true
+  if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null }
+  var url = '/api/close'
+  try {
+    if (!manual && typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+      return navigator.sendBeacon(url)   // 卸载路径：beacon 不阻塞页面关闭
+    }
+  } catch (e) { /* 退回到 fetch */ }
+  return api('POST', url, {}).catch(function () { return null })
+}
+
+/** 界面上手动「关闭服务」：二次确认后调 /api/close */
+function closeServerManually () {
+  return modal({
+    title: '关闭编辑器服务',
+    message: '会停掉后台的 node 服务（页面随后就打不开了）。已保存的数据不受影响，下次双击快捷方式即可重新启动。确定吗？',
+    okText: '关闭服务',
+    danger: true
+  }).then(function (yes) {
+    if (!yes) return null
+    showStatus('已发送关闭信号，服务即将退出…', 'warn', true)
+    return api('POST', '/api/close', {}).then(function () {
+      toast('编辑器服务正在关闭', ['后台 node 进程会在几秒内结束', '要再次打开：双击桌面「打开攻略编辑器」'])
+      return true
+    }).catch(function () {
+      toast('编辑器服务已关闭', ['连接已断开（服务应该已经退出）'])
+      return false
+    })
+  })
 }
 
 function globalEvents () {
@@ -1161,19 +2185,185 @@ function globalEvents () {
   $('btn-up').addEventListener('click', function () { reorderBy(-1) })
   $('btn-down').addEventListener('click', function () { reorderBy(1) })
 
+  /* ------------------------------------------------ 全局搜索框（顶栏） */
+  $('gsearch').addEventListener('input', function () {
+    if (gTimer) clearTimeout(gTimer)
+    gTimer = setTimeout(globalSearchNow, 220)
+  })
+  $('gsearch').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); if (gTimer) clearTimeout(gTimer); globalSearchNow() }
+    else if (e.key === 'Escape') showGResults('')
+  })
+  $('gresults').addEventListener('click', function (e) {
+    var t = e.target
+    var btn = t && t.closest ? t.closest('[data-g]') : null
+    if (!btn) return
+    e.preventDefault()
+    var act = btn.getAttribute('data-g')
+    if (act === 'close') { showGResults(''); return }
+    if (act === 'jump') { jumpTo(btn.getAttribute('data-name'), btn.getAttribute('data-row')); return }
+    if (act === 'usage') {
+      var g = gLast.names[Number(btn.getAttribute('data-gi'))]
+      if (g) showUsageDetail(g.type, g.name)
+      return
+    }
+    if (act === 'batch') {
+      var g2 = gLast.names[Number(btn.getAttribute('data-gi'))]
+      if (!g2) return
+      state.batch = { type: g2.type, from: g2.name, to: '', preview: null }
+      openTools('batch')
+      showGResults('')
+    }
+  })
+
+  /* ------------------------------------------------ 工具箱面板 */
+  $('btn-tools').addEventListener('click', function () { openTools('batch') })
+  $('tools').addEventListener('click', function (e) {
+    var t = e.target
+    if (!t || !t.getAttribute) return
+    var tab = t.getAttribute('data-tab')
+    if (tab === 'close') { state.toolsOpen = false; renderToolPanel(); return }
+    if (tab) { state.view = tab; renderToolPanel(); return }
+    var libTab = t.getAttribute('data-lib')
+    if (libTab) { state.library.type = libTab; state.library.selected = null; renderToolPanel(); return }
+    var undo = t.getAttribute('data-undo')
+    if (undo) { batchUndo(undo); return }
+    var libName = t.getAttribute('data-libname')
+    if (libName) {
+      state.library.selected = libName
+      renderLibraryList()
+      renderLibraryDetail(libName)
+      return
+    }
+    var libBatch = t.getAttribute('data-libbatch')
+    if (libBatch) {
+      state.batch = { type: state.library.type, from: libBatch, to: '', preview: null }
+      openTools('batch')
+      return
+    }
+    var jump = t.closest ? t.closest('[data-g="jump"]') : null
+    if (jump) { e.preventDefault(); jumpTo(jump.getAttribute('data-name'), jump.getAttribute('data-row')); return }
+    var bjump = t.closest ? t.closest('[data-batch-jump]') : null
+    if (bjump) { e.preventDefault(); jumpTo(bjump.getAttribute('data-name'), bjump.getAttribute('data-row')) }
+  })
+  $('tools').addEventListener('input', function (e) {
+    var t = e.target
+    if (!t || !t.id) return
+    if (t.id === 'lib-filter') {
+      state.library.filter = t.value
+      renderLibraryList()
+      return
+    }
+    if (t.id === 'batch-from' || t.id === 'batch-to') syncBatchForm()
+  })
+  $('tools').addEventListener('change', function (e) {
+    if (e.target && e.target.id === 'batch-type') {
+      syncBatchForm()
+      state.batch.preview = null
+      renderToolPanel()
+    }
+  })
+  $('tools').addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return
+    var t = e.target
+    if (!t || !t.id) return
+    if (t.id === 'tools-q') { e.preventDefault(); runToolsSearch() }
+    else if (t.id === 'batch-from' || t.id === 'batch-to') { e.preventDefault(); batchPreview() }
+    else if (t.id === 'lib-filter') { e.preventDefault(); renderLibraryList() }
+  })
+  $('tools').addEventListener('click', function (e) {
+    var id = e.target && e.target.id
+    if (id === 'tools-search') runToolsSearch()
+    else if (id === 'batch-preview') batchPreview()
+    else if (id === 'batch-run') batchRun()
+    else if (id === 'lib-refresh') { loadUsage(true).then(function () { renderLibraryList() }) }
+  })
+
+  $('btn-publish').addEventListener('click', function () { publish() })
+  if ($('btn-publish-all')) $('btn-publish-all').addEventListener('click', function () { saveAndPublish() })
+
+  /* ------------------------------------------------ 回收站 */
+  $('btn-trash').addEventListener('click', function () { openTrash() })
+  $('trash-view').addEventListener('click', function (e) {
+    var t = e.target
+    if (!t || !t.getAttribute) return
+    var act = t.getAttribute('data-trash')
+    if (act === 'close') { closeTrash(); return }
+    if (t === $('trash-view') || (t.classList && t.classList.contains('picker-mask'))) { closeTrash(); return }
+    var trt = t.getAttribute('data-trt')
+    if (trt === 'restore') { trashRestore(t.getAttribute('data-name')); return }
+    if (trt === 'delete') { trashDeleteForever(t.getAttribute('data-name')); return }
+  })
+  $('btn-trash-empty').addEventListener('click', function () { trashEmpty() })
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return
+    var el = $('trash-view')
+    if (el && !el.classList.contains('hidden')) { e.preventDefault(); closeTrash() }
+  })
+
+  /* ------------------------------------------------ 快捷键 */
   document.addEventListener('keydown', function (e) {
     var key = String(e.key || '').toLowerCase()
-    if ((e.ctrlKey || e.metaKey) && key === 's') {
+    var mod = e.ctrlKey || e.metaKey
+    if (mod && key === 's') {
       e.preventDefault()
-      save()
+      if (e.shiftKey) saveAndPublish()
+      else save()
+      return
+    }
+    if (mod && key === 'f') {
+      e.preventDefault()
+      $('gsearch').focus()
+      $('gsearch').select()
+      return
+    }
+    // 角色列表：↑↓ 切换（输入框里不抢键）
+    if (key === 'arrowdown' || key === 'arrowup') {
+      var t = e.target
+      var tag = t && t.tagName ? String(t.tagName).toLowerCase() : ''
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return
+      var names = visibleListNames()
+      if (!names.length) return
+      e.preventDefault()
+      var i = state.current ? names.indexOf(state.current) : -1
+      var j = i < 0 ? (key === 'arrowdown' ? 0 : names.length - 1) : i + (key === 'arrowdown' ? 1 : -1)
+      if (j < 0 || j >= names.length) return
+      selectCharacter(names[j]).catch(function (err) { showStatus('打开失败：' + err.message, 'error', true) })
+      var active = document.querySelector('#list .list-item.active')
+      if (active && active.scrollIntoView) active.scrollIntoView({ block: 'nearest' })
+      return
+    }
+    if (key === 'enter') {
+      // 侧栏搜索框里回车 = 打开第一个匹配
+      if (e.target && e.target.id === 'search') {
+        var list = visibleListNames()
+        if (list.length) { e.preventDefault(); selectCharacter(list[0]) }
+      }
     }
   })
 
   window.addEventListener('beforeunload', function (e) {
+    // 关页面 / 刷新都先给服务端一个关闭信号：它等 5 秒再退，刷新时新页面的心跳会把它取消
+    signalClose(false)
     if (!state.dirty) return
     e.preventDefault()
     e.returnValue = ''
   })
+  // pagehide 才是 iOS/Safari 与 bfcache 场景下真正会触发的事件
+  window.addEventListener('pagehide', function () { signalClose(false) })
+
+  if ($('btn-close-server')) $('btn-close-server').addEventListener('click', function () { closeServerManually() })
+}
+
+/** 工具箱 - 全局搜索 tab 的搜索按钮 */
+function runToolsSearch () {
+  var el = $('tools-q')
+  if (!el) return
+  state.gq = el.value.trim()
+  var g = $('gsearch')
+  if (g) g.value = state.gq
+  if (!state.gq) { showStatus('请输入关键词', 'warn'); return }
+  globalSearchNow()
 }
 
 /** 在当前 _order.json 顺序里上下移动选中角色 */
@@ -1199,6 +2389,8 @@ function reorderBy (delta) {
 function boot () {
   formEvents()
   globalEvents()
+  checkIdleExit()   // 先在状态条里说清楚「关掉网页会不会自动退」
+  startHeartbeat()  // 之后每 5 秒一次心跳（服务端没开 --exit-on-idle 时是 no-op）
   Promise.all([refreshIndex(), refreshList()])
     .then(function () {
       var withData = state.items.filter(function (it) { return it.weapons || it.artifacts })[0]
@@ -1217,17 +2409,47 @@ else boot()
 window.__editor = {
   state: state,
   save: save,
+  publish: publish,
   refreshList: refreshList,
   refreshIndex: refreshIndex,
+  loadUsage: loadUsage,
   openCharacter: openCharacter,
   selectCharacter: selectCharacter,
   reorderBy: reorderBy,
+  globalSearchNow: globalSearchNow,
+  openTools: openTools,
+  batchPreview: batchPreview,
+  batchRun: batchRun,
+  batchUndo: batchUndo,
+  openMemberPicker: openMemberPicker,
+  openRefPickerFor: openRefPickerFor,
+  jumpTo: jumpTo,
+  focusRow: focusRow,
+  toast: toast,
+  openTrash: openTrash,
+  closeTrash: closeTrash,
+  renderTrash: renderTrash,
+  trashRestore: trashRestore,
+  trashDeleteForever: trashDeleteForever,
+  trashEmpty: trashEmpty,
+  startHeartbeat: startHeartbeat,
+  checkIdleExit: checkIdleExit,
+  signalClose: signalClose,
+  closeServerManually: closeServerManually,
   internals: {
     normalizeData: normalizeData,
     buildBody: buildBody,
     renderForm: renderForm,
+    renderList: renderList,
+    renderTeamsHtml: renderTeamsHtml,
     handleAction: handleAction,
     applyRef: applyRef,
-    constellationIndex: constellationIndex
+    constellationIndex: constellationIndex,
+    snapshotShape: snapshotShape,
+    diffSummary: diffSummary,
+    memberPool: memberPool,
+    moveMemberAt: moveMemberAt,
+    visibleListNames: visibleListNames,
+    candidatesFor: candidatesFor
   }
 }

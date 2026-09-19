@@ -12,9 +12,10 @@ data/<gameId>/images/…           段落配图（可选）
 templates/guide.html             网页版外壳（样式 + 页头）
 scripts/build-html.mjs           JSON → guide.html
 scripts/build-doc.mjs            JSON → guide.md（文档版文本，可再打包成 .docx）
+scripts/fetch-font.mjs           从上游图鉴仓库同步 guide.html 用的字体（不入库）
 guide.html                       生成的网页版，请勿手改
 guide.md                         生成的文档版文本，请勿手改
-汉仪文黑-85W.ttf                  guide.html 使用的字体
+汉仪文黑-85W.ttf                  guide.html 使用的字体（商业字体，**不入库**；用 fetch-font.mjs 取回，见「字体」一节）
 ```
 
 插件侧的读取规则：仓库存在 `data/` 时只扫 `data/`，按 `<gameId>` 目录判定游戏；
@@ -165,6 +166,8 @@ node scripts/build-doc.mjs       # 文档版 guide.md（Word 用可再打包 doc
 `schema: 2` 的文件在原有字段之外多了一层 `v2`，把「需要引用图鉴图标的实体」拆成独立字段；
 `tags` / `sections` 变成**由 `v2` 回推的产物**（`scripts/lib/schema.mjs` 的 `deriveTags` / `deriveSections`），
 旧渲染器（`build-html.mjs` / `build-doc.mjs`）与游戏内插件不需要改动即可继续读。
+`build-docx.mjs` 也直接复用 `deriveSections` —— 「JSON 里的 `sections`」与「写进 Word 的正文行」
+永远是同一份渲染结果，不会出现两套渲染器漂移。
 
 ```jsonc
 {
@@ -193,9 +196,10 @@ node scripts/build-doc.mjs       # 文档版 guide.md（Word 用可再打包 doc
       { "kind": "preferred",  "label": null,     "sep": " + ", "sets": [ { "name": "水仙之梦", "ref": "artifact:水仙之梦" }, { "name": "沉沦之心", "ref": "artifact:沉沦之心" } ] },  // 2+2 组合
       { "kind": "transition", "label": null,     "sep": " > ", "sets": [] },   // 过渡
       { "kind": "optional",   "label": null,     "sep": " > ", "sets": [] },   // 可选
-      { "kind": "main", "stats": { "时之沙": ["元素充能效率"], "空之杯": ["生命值"], "理之冠": ["暴击率"] } },
+      { "kind": "main", "note": "二命", "noteSlot": "空之杯", "stats": { "时之沙": ["元素充能效率"], "空之杯": ["生命值", "水元素伤害加成"], "理之冠": ["暴击率"] } },
       { "kind": "sub",  "stats": ["充能", "暴击"], "sep": " > " },
-      { "kind": "text", "label": null, "text": "自由文本" }
+      { "kind": "text", "label": null, "text": "自由文本" },
+      { "kind": "note", "text": "二命" }        // 段末备注行 → 文档里渲染成「注：建议二命及以上…」
     ],
     "talents": [                           // 天赋加点
       { "kind": "priority", "order": [ { "name": "Q", "ref": "talent:Q" } ], "raw": "Q > E > A" },
@@ -209,15 +213,61 @@ node scripts/build-doc.mjs       # 文档版 guide.md（Word 用可再打包 doc
       { "name": "二命", "index": 2, "text": "加快增伤叠层速度" }
     ],
     "teams": [                             // 配队推荐
-      { "label": "首选", "members": [ { "name": "芙宁娜", "ref": "character:芙宁娜" } ], "text": "" }
+      { "label": "首选", "members": [ { "name": "芙宁娜", "ref": "character:芙宁娜" } ], "text": "" },
+      { "kind": "note", "text": "二命" },
+      { "kind": "note", "text": "高金" }
     ]
   },
-  "unparsed": { "武器推荐": ["Word 里没认出来的整行"] },   // 可选：原样保留，进旧版输出
   "tags": [],        // ← deriveTags(data) 生成，不要手写
   "sections": [],    // ← deriveSections(data) 生成，不要手写
   "source": { "guide": "赋光之人 · 队伍攻略" }
 }
 ```
+
+> `unparsed` 字段已**取消**：解析器对六个小节的每一种行都有对应分支，认不出来的行会让
+> `parse-docx` 退出码 1 并列出明细（实测当前主文档 0 行）。旧数据里的 `unparsed` 会在下次
+> `parse-docx` 时自动消失。
+
+### 备注行（段末 `注：`）—— 括注不丢，正文保持干净
+
+正文行只放**标准名 / 标准词条**（这样 `ref` 能取到图鉴图标），括注（`（二命）` `（高金）`
+`（随命座）` …）统一转到**所属段落末尾的一行 `注：`**。数据结构就是上面 `{kind:'note', text}` 的形式，
+放进对应的 `v2.artifacts` / `v2.weapons` / `v2.teams` 等数组里，位置放在该段落数组的末尾。
+
+```text
+2. 圣遗物推荐
+首选：翠绿之影 / 血红之证
+主词条：时之沙：元素精通 / 空之杯：水元素伤害加成 / 理之冠：暴击率
+副词条：元素精通 / 元素充能效率
+注：建议二命及以上使用水伤杯
+```
+
+规则：
+
+| 场景 | JSON | 文档 |
+|------|------|------|
+| 配队成员的命座括注 | `teams` 里补 `{kind:'note', text:'二命'}` | 成员只留标准名，段末 `注：建议二命及以上` |
+| 成本括注 | `{kind:'note', text:'高金'}` | 段末 `注：高金配置` |
+| 同一段多条 | 多条 note（或一条里用 `；`） | 合并成**一行**、用 `；` 分隔 |
+| 主词条的括注 | `kind:'main'` 上加 `note`（+ `noteSlot` 指定部位） | 挂在**那个词条值后面**：`空之杯：水元素伤害加成（二命）` |
+| 手写的 `（…）` | 直接写 note 文本即可 | 按下面的润色表输出 |
+
+**语义化润色**（原始括注 → 文档文本；认不出语义的原样保留）：
+
+| 原始括注 | 文档文本 |
+|----------|----------|
+| `二命` / `2命`（有同段主词条时） | `建议二命及以上使用<该词条>` → 例 `建议二命及以上使用水元素伤害加成` |
+| `二命` / `2命`（无主词条） | `建议二命及以上` |
+| `高金` | `高金配置` |
+| `中金` / `低金` | `中金配置` / `低金配置` |
+| `随命座` | `随命座变化` |
+| 其它（`特殊` `华馆` `非讨龙` …） | 原样 |
+
+**不参与备注走廊**（保持现状不动）：`（精五）` `（叠满）` 这类精炼备注、皇冠的
+`（建议 / 必须 / 可选）`、`（满命）`、以及套装件数 `（2件套）` —— 它们留在正文里。
+
+**双向无损**：`parse-docx` 读懂 `注：` 行 → `{kind:'note'}`；`build-docx` 再把
+`{kind:'note'}` 写回段末 `注：` 行。实测 `JSON → docx → JSON` **129/129 深度相等**且连续两次运行逐字节幂等。
 
 ### ref 写法：`类型:名称`
 
@@ -244,13 +294,16 @@ node scripts/parse-docx.mjs <docx路径> [--dry]    # --dry 只报告不写文�
 ```
 
 - 输出 `data/gi/<角色名>.json`（v2 结构）、`data/_parse-report.json`，并按文档顺序重建 `data/gi/_order.json`
-- 认不出来的行原样存进 `unparsed`，**绝不丢内容**
+- **认不出来的行不再塞进 `unparsed`**：六个小节的每种行都有对应分支，
+  真遇到没认出来的写法会打印明细并**退出码 1**（当前主文档实测 0 行），不会再静默丢内容
+- `注：…` 备注行 → 该段的 `{kind:'note', text}`（见上面「备注行」一节）
 - 会读 `data/_index.json` 给引用打 ref，并统计「名称不在图鉴」的问题
 - 组合写法会拆成独立条目，回推文本时按 `sep` 逐个拼回：
   - 2+2 套装：`水仙之梦+沉沦之心` → 2 条 set，`sep: " + "`（成套组合，不是备选）
   - 备选套装：`黄金剧团 / 水仙之梦` → 2 条 set，`sep: " / "`（`/` 是优先级/备选）
   - 配队成员分隔符：`+`、`＋`、`/`、`／`、`、`
   - `2充能` 这类口语写法照拆，但会在 `_parse-report.json` 里被标出来，方便回头改成标准名
+- 天赋优先级行保留**分隔符原文**（`A＞E＞Q`、`E ≥ Q`、`E / Q`、`A=Q＞E` 各写各的），不归一成 `>`
 
 ### 2. 生成图鉴索引：`node scripts/build-index.mjs`
 
@@ -268,30 +321,161 @@ node scripts/build-index.mjs [图鉴后端目录]
   `{ "generatedAt": "ISO 时间", "weapons": [], "characters": [], "artifacts": [] }`
 - 找不到后端目录时报错并退出（退出码 1）；某一类为空时只警告、继续
 - 编辑器与 `parse-docx.mjs` 都读它；换了后端版本或新增角色后重跑即可
+- **`data/_index.json` 是生成物，但照样入库**：没有图鉴后端的机器跑不出索引，所以仓库里留一份最新的；
+  数据变动后（编辑、重命名、删除、批量替换）编辑器会自动重建它，手工重建就用 `node scripts/build-index.mjs`
+- `data/_parse-report.json`、`out/`、`data/_trash/`、`data/_backup/`、`.tmp/` 都是本地中间产物，已在 `.gitignore` 里**不入库**
 - 当前规模：武器 291 / 角色 138 / 圣遗物套装 69（写这段时实测值）
 
 ### 3. 图形化编辑器：`node scripts/editor.mjs`
 
 ```bash
-node scripts/editor.mjs [--port 8787] [--no-open]
+cd <仓库目录>
+node scripts/editor.mjs [--port 8787] [--no-open] [--exit-on-idle[=<秒>]]
 ```
 
-浏览器打开 `http://127.0.0.1:8787`（端口被占用会自动 +1 重试，最多 10 次）。
+浏览器打开终端提示的地址（默认 `http://127.0.0.1:8787`；端口被占用会自动 +1 重试，最多 10 次）。
 界面中文、零依赖、无 CDN：左边搜角色 / 新增 / 排序 / 重命名 / 删除（软删除到 `data/_trash/`），
-右边按区块折叠编辑；保存用「保存」按钮或 `Ctrl+S` / `⌘+S`。
+右边按区块折叠编辑；保存用「保存」按钮或 `Ctrl+S` / `⌘+S`；
+「保存并发布」或 `Ctrl+Shift+S` 走全链路（写 JSON → 重建索引 → 写回 Word 主文档 → 生成 `guide.html` → 三方一致性校验 → **自动提交，不推送**）；
+「发布」按钮只把**已保存的**数据重新生成 `guide.html` 与 Word 主文档，不写入正在编辑的表单。
+
+**关闭网页后自动结束服务**（`--exit-on-idle`，默认关闭，只在手动开时生效）
+
+后台隐藏启动时（见下）关掉浏览器窗口，服务会变成任务管理器里的幽灵进程，所以加了空闲自动退出：
+
+- `--exit-on-idle`（单写 = 20 秒）或 `--exit-on-idle=30`：**连续 N 秒没有页面心跳**就优雅退出
+  （先 `server.close()`，1 秒兜底后 `process.exit(0)`），退出前在日志里留一行 `[idle] 无心跳 Ns（阈值 Ns），自动退出`
+- 页面每 5 秒 `POST /api/heartbeat`；页面 `pagehide` / `beforeunload` 时用 `navigator.sendBeacon('/api/close')` 发关闭信号
+- 收到关闭信号后服务再等 **5 秒**才退：这 5 秒内只要又来一次心跳（F5 刷新、关掉马上重开）就**取消退出**，不会误杀
+- **多标签页天然正确**：服务端只记「最近一次心跳时间」，任一标签还在心跳就不会超时
+- 界面上也能手动停：右上角「关闭服务」（二次确认后调 `/api/close`），或直接 `POST /api/close`
+- 不传这个开关时，`/api/heartbeat` 与 `/api/close` 都只是 200 的空操作 —— 命令行用户行为完全不变
+
+**本机便利（可选，不随仓库分发）**：想要「双击就开、窗口不残留、关网页自动收掉」，可以在桌面建一个快捷方式指向
+PowerShell 的隐藏命令，而不是直接指向 `node.exe`：
+
+- 「目标」：`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`
+- 「参数」：`-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command "cd '<仓库目录>'; node scripts/editor.mjs --exit-on-idle 20 *>> '<仓库目录>\out\editor.log'"`
+- 「起始位置」：仓库目录；「运行方式」：最小化（窗口样式 7）
+- 效果：无窗口后台启动、输出追加到 `out/editor.log`（`out/` 已在 `.gitignore` 里）、关掉网页约 20 秒后服务自己结束
+
+仓库内**不提供** `.cmd` / `.lnk` 之类的启动脚本：启动脚本与快捷方式都属于个人环境配置，不入库，避免污染仓库。
+
+### 4. 保存即发布：`POST /api/publish`
+
+界面里点「保存并发布」（快捷键 `Ctrl+Shift+S`）或直接打 API，一次把改动铺到全链路：
+
+```
+写角色 JSON  →  重建 data/_index.json  →  build-docx.mjs 写回 Word 主文档（先备份）
+            →  build-html.mjs 生成 guide.html  →  生成提交摘要
+            →  三方一致性校验（全过才继续）  →  git add + git commit（**绝不 push**）
+```
+
+**保存并发布 = 保存 + 发布 + 三方校验 + 自动提交；推送（`git push`）由人工执行** ——
+全链路只做 `git add` / `git commit`，**不执行任何 `git push`，也不设置远端**。
+
+「三方一致」指：**数据库（`data/gi`）× 文档（Word 主文档）× 网页版（`guide.html`）** 内容一致。
+提交前逐项校验，**任一项不过就跳过提交**（已生成的文档 / 网页保持可用，不回滚）：
+
+| 校验 | 命令 / 依据 | 通过标准 |
+|------|-------------|----------|
+| a. 数据 ↔ 文档 | `node scripts/diagnose-docx-json.mjs` | 不一致角色 **0** |
+| b. 文档往返 | `build-docx --write-main` 的往返校验（`parse-docx` 读回 vs 生成时 JSON） | **129/129 深度相等** |
+| c. 网页版新鲜度 | `guide.html` 必须是本次 publish 的 `build-html` 刚生成的（比对 sha1/大小） | 本次生成 |
+| d. 悬挂分隔符 | `node scripts/scan-separators.mjs` | **0 处** |
+
+任一项不过时返回 `{ok:false, step:'verify', detail:'…', commitExecuted:false}`，
+`detail` 里写明**哪一项没过、哪几个角色不一致**，摘要也会标注「已跳过自动提交」。
+
+| 产出 | 说明 |
+|------|------|
+| `data/gi/<角色名>.json` | body 带 `name` 时由服务器按 v2 规范化后写盘（同「保存」） |
+| `data/_index.json` | 用 `build-index.mjs` 重建（新角色立刻能被名称校验认识） |
+| `D:\文件\游戏\原神\原神·角色攻略.docx` | 主文档。**写前自动备份**为同名 `.bak-YYYYMMDD-HHmmss`（保留最近 5 份），再原子替换 |
+| `guide.html` | 网页版 |
+| `out/_commit-summary.md` | 提交摘要（最新一份覆盖写），同时留 `out/_commit-summary-<时间戳>.md`（保留最近 5 份） |
+
+**提交摘要**（界面右下角 toast 里显示同样内容，带「复制提交信息」按钮）包含四段：
+
+1. **建议提交信息** —— 单行标题 + 正文要点（单角色 `docs: 更新 <角色名>（<字段>）`，批量 `docs: 批量更新 <n> 个角色`），
+   自动提交用的就是它（首行标题 + 正文要点）
+2. **变更文件** —— 新增 / 修改 / 删除 + 行数（新增文件给 `+行数`）
+3. **按角色变化** —— 武器 / 圣遗物 / 天赋 / 面板 / 命座 / 配队 各「增 / 删 / 改」几条
+4. **未跟踪文件** —— `git status` 里的 `??` 文件提醒
+
+**提交范围**：只提交本次发布真正动过的路径（`data/gi/*.json`、`data/_index.json`、`guide.html`、`out/_commit-summary*.md`）
+以及**未跟踪的新文件**，不会把仓库里别人的在途改动一起卷进去。
+主文档不在仓库内，不进 git。需要「整仓 `git add -A`」时可显式传 `{ "stageAll": true }`。
+
+**提交失败/无改动都不算发布失败**：`git` 不可用、无改动、提交失败 → 返回
+`{ok:true, commitExecuted:false, commitError|commitSkipped:'…'}`，保存与生成的结果**不回滚**，提示用户手动提交。
+
+响应形状：
+
+```json
+{
+  "ok": true,
+  "steps": [{ "step": "写角色 JSON", "ok": true, "detail": "data/gi/旅行者·火.json" }],
+  "verify": { "ok": true, "checks": [{ "key": "docx-json", "name": "数据 ↔ 文档（diagnose-docx-json）", "ok": true, "detail": "不一致角色 0 个" }] },
+  "summary": { "suggestedMessage": "docs: 更新 旅行者·火（武器）", "markdown": "…", "changedFiles": [], "characterChanges": [], "untracked": [] },
+  "summaryFile": "out/_commit-summary.md",
+  "summaryStampFile": "out/_commit-summary-20260919-213340.md",
+  "docx": { "path": "D:\\文件\\游戏\\原神\\原神·角色攻略.docx", "backup": "…bak-20260919-213340", "bytes": 29414 },
+  "html": { "path": "guide.html", "bytes": 220601 },
+  "commit": "1a2b3c4",
+  "commitExecuted": true,
+  "pushed": false
+}
+```
+
+任何一步失败：该步 `ok:false` 并带 `detail`，**后续步骤继续尝试**（例如 docx 失败也会照常产摘要），
+响应里如实列出每一步，不会静默跳过。
+
+> 幂等的手动重试入口：`POST /api/commit`（body `{message?, paths?, stageAll?}`，不传 message 则取摘要里的建议标题）——
+> 界面上没有入口；**无改动时返回 `{ok:true, commitExecuted:false, commitSkipped:'…'}` 且不报错**，同样不 push。
+
+#### `scripts/build-docx.mjs`：JSON → Word 主文档
+
+```bash
+node scripts/build-docx.mjs [--out 目标docx] [--template 模板docx] [--no-mark] [--dry] [--no-verify]
+```
+
+* 默认目标就是主文档；`--dry` 只打印将写入的段落数 / 角色数 / 标记数，不写文件。
+* 以现有主文档为模板，**只替换 `word/document.xml`**，其余部件（`[Content_Types].xml`、`_rels`、`styles`…）逐字节复制；
+  段落数与文本行数一致，`[Content_Types].xml` / `_rels/.rels` / `word/document.xml` 必须齐全。
+* **默认只写仓库内的试验产物** `out/build-docx-<时间戳>.docx`；**只有显式 `--write-main` 才写主文档**，
+  且写前自动备份为 `.bak-<时间戳>`（保留最近 5 份）、原子替换；**往返校验不过就拒绝写**（保留原文档）。
+* 默认写入引用标记 `[[w:]] [[a:]] [[c:]] [[t:]] [[k:]]`（与 `mark-docx.mjs` 同一套实现，逐行做回推校验，有损标记自动撤回）；
+  `--no-mark` 写纯文本。**两种模式下 `parse-docx` 读回来都与 `data/gi/*.json` 129/129 深度相等**。
+* 幂等：连续跑两次，`word/document.xml` 逐字节相同（zip 内各条目的时间戳按运行时刻写入，所以整包字节会变）。
 
 编辑器只用了 Node 内置模块（`node:http` / `node:fs` / `node:path` / `node:url` / `node:child_process`），
-静态资源在 `resources/editor/`（`index.html` + `app.js` + `style.css`）。
+静态资源在 `resources/editor/`（`index.html` + `app.js` + `picker.js` + `style.css`；
+拼音表 `scripts/lib/pinyin.mjs` 由服务端以 `/pinyin.js` 发给浏览器，不重复维护两份）。
 
 **关键约定**
 
 - 需要图标的实体（武器 / 圣遗物套装 / 配队角色 / 天赋 / 命座）都是**独立的带类型徽标输入控件**，
-  不会和正文文本混在同一个输入框；输入框挂 `<datalist>` 候选（来自 `/api/index`）
+  不会和正文文本混在同一个输入框；输入框挂 `<datalist>` 候选（来自 `/api/index`），旁边还有「▾」按钮
+  打开**可搜索选择器**（支持中文 / 拼音首字母过滤），列表里第一条之后的行还能「⧉ 上一条」复制上一行的名字
+- 配队成员用**可搜索多选选择器**：输入中文或拼音首字母（如 `ldjj` → 雷电将军）过滤全部角色候选，
+  回车添加、`↑↓` 选择、已选 chip 可拖动排序（也能用 `←/→` 键移动），确认后写入 `{name, ref:"character:…"[, note]}`
 - 名字不在图鉴时，输入框旁出现 ⚠ 与原因（来自 `validate(data, index)`）
+- **回收站**（左侧「🗑 回收站」）：列出 `data/_trash/` 里被软删除的角色（删除时间 / 大小 / 各段行数 / 是否撞名），
+  可「恢复」（移回 `data/gi/` 并把名字补回 `_order.json` 末尾）、「彻底删除」单个、「清空回收站」——三个写操作都有二次确认
+- **批量替换**（工具箱 → 批量替换，或从全局搜索结果直接发起）：按类别把某个名字换成另一个，
+  只改 v2 引用（`name` / `ref`），**不动 `note`**，并回推 `tags` / `sections`；
+  先「预览命中」（列出命中角色 / 段落 / 第几行），执行前把要改的文件复制到 `data/_backup/<时间戳>/`，
+  可一键回滚（`POST /api/batch-replace/undo`）；名字不在 `_index.json` 时只给 ⚠、仍允许强制替换
+- **全局检索**（顶栏搜索框，`Ctrl+F`）：搜名称 → 返回「哪些角色 / 哪个段落 / 第几行用到它」，
+  点结果跳转到该角色并高亮所在行；也支持搜正文关键词（匹配 `sections` 文本行）
+- **名称库浏览**（工具箱）：列出 `_index.json` 的武器 / 圣遗物套装 / 角色，标出「未使用 / 被 N 个角色用到 M 处」，
+  点名字看它用在哪里，并可从这里直接发起批量替换
 - 保存时由服务器重新生成 `tags` / `sections`（丢弃前端传来的这两个字段），并强制 `schema: 2`
 - **未被编辑器编辑的字段会从原文件按位置合并回来**（`raw`、`sep`、套装 `pieces`、空的主词条占位行等），
   所以「打开再保存」不会产生多余 diff；129 个 v2 文件实测逐字节不变
-- `highlight`、`unparsed` 编辑器只读、保存时原样保留
+- `highlight` 编辑器只读、保存时原样保留；备注行（`{kind:'note'}`）与主词条的 `note` / `noteSlot` 也会原样带回
+  （圣遗物段可以直接把某一行切成「备注（注：）」类型来编辑）
 
 **API**（全部返回 JSON，UTF-8 无 BOM）
 
@@ -305,6 +489,18 @@ node scripts/editor.mjs [--port 8787] [--no-open]
 | POST | `/api/rename` | body `{from,to}`，改文件名 + `_order.json` |
 | DELETE | `/api/character?name=X` | 软删除：移到 `data/_trash/X.json` 并从 `_order.json` 移除 |
 | POST | `/api/reorder` | body `{order:[...]}`，重写 `_order.json`（没提到的角色补在后面） |
+| GET | `/api/trash` | 回收站清单：`{ok,total,items:[{name,file,bytes,deletedAt,schema,broken,summary:{weapons,artifacts,teams,constellations},conflicts}]}`（按删除时间倒序；`conflicts` = `data/gi/` 已有同名文件，恢复会 409） |
+| POST | `/api/trash/restore` | body `{name}`：把 `data/_trash/<name>.json` 移回 `data/gi/` 并把名字**补回 `_order.json` 末尾**，重建索引；撞名返回 409 |
+| DELETE | `/api/trash?name=X` | **彻底删除**回收站里的一个角色（不可撤销） |
+| DELETE | `/api/trash` | **清空回收站**：返回 `{ok,removed,names}`（删不掉的个别文件会跳过） |
+| GET | `/api/search?q=&type=&scope=` | 全局检索。`type` = `weapon`/`artifact`/`character`/`talent`/`constellation`/`set`（`set` = 圣遗物套装）；`scope` = `name`（只查名称引用）/ `text`（只搜正文）/ `auto`（默认，两者都查）。返回 `{names:[{type,name,total,characters,hits:[{file,name,section,line,rowId,path,ref,text,hitId}]}], text:[...]}` |
+| GET | `/api/name-usage` | 名称库使用统计：`{weapons,artifacts,characters}`，每项 `{name,total,characters:[{name,count}]}`（未出现的名字即「未使用」） |
+| POST | `/api/batch-replace` | body `{type,from,to,dry?}`。`dry:true` 只预览（返回 `total` / `files` / `perCharacter` / `hits` / `warnings`）；否则执行替换，返回 `{stamp,files,perCharacter,changed,remaining,warnings}`，并在 `data/_backup/<stamp>/` 留副本 |
+| POST | `/api/batch-replace/undo` | body `{stamp}`，用备份逐字节还原并删除该备份目录 |
+| POST | `/api/publish` | 保存并发布全链路：写角色 JSON（body 带 `name` 才写）→ 重建 `data/_index.json` → `build-docx.mjs --write-main` 写回 Word 主文档（自动备份）→ `build-html.mjs` 生成 `guide.html` → 提交摘要 `out/_commit-summary.md`（+ 最近 5 份时间戳副本）→ **三方一致性校验**（diagnose 不一致 0 / 往返 129-129 / guide.html 本次生成 / 悬挂分隔符 0）→ `git add` + `git commit`。返回 `{ok, steps, verify, summary, docx, html, summaryFile, summaryStampFile, commit:'<短hash>', commitExecuted, pushed:false}`；校验不过时 `{ok:false, step:'verify', detail, commitExecuted:false}` 且**不提交**；提交失败/无改动时 `{ok:true, commitExecuted:false, commitError|commitSkipped}` 且**不回滚**。**永不 push**（详见「保存即发布」一节） |
+| POST | `/api/commit` | 幂等的手动提交入口（界面无入口）：body `{message?, paths?, stageAll?}`，不传 message 则取摘要里的建议标题；`git add` + `git commit`，返回 `{ok, commit:'<短hash>', commitExecuted, commitError?, commitSkipped?, pushed:false}`；**无改动不报错**，同样不 push |
+| GET/POST | `/api/heartbeat` | 页面心跳（前端每 5 秒一次）：返回 `{ok, exitOnIdle, idleSeconds, at}`；`--exit-on-idle` 未开启时 `exitOnIdle:false`（空操作，不影响命令行用法） |
+| POST | `/api/close` | 页面关闭信号：返回 `{ok, exitOnIdle, graceMs}`。开启空闲退出时，**5 秒宽限期**后退出；期间再来一次心跳就取消退出（刷新页面不会误杀服务）。未开启时是空操作。前端用 `navigator.sendBeacon('/api/close')` 在 `pagehide` / `beforeunload` 时发出 |
 
 `name` 必须是单层文件名（拒绝 `/ \ .. :` 等字符与 `_` 开头），文件操作限制在 `data/gi/` 下；
 所有错误返回 `{error:"..."}` 与对应状态码（400 / 403 / 404 / 405 / 409 / 413 / 500）。
@@ -329,19 +525,92 @@ node scripts/build-doc.mjs       # guide.md
 | 范围 | 内容 | 许可 |
 |------|------|------|
 | `scripts/`、`resources/` | Node 脚本（Word→JSON 转换、索引 / 网页 / 文档生成、图形化编辑器）与编辑器静态资源 | **MIT**，见 [`LICENSE`](LICENSE) |
-| `data/`、`templates/`、`guide.html`、`guide.md` | 角色攻略数据、页面模板，以及由数据生成的网页版 / 文档版 | **CC BY-NC-SA 4.0**，见 [`LICENSE-DATA`](LICENSE-DATA) |
-| `汉仪文黑-85W.ttf` | `guide.html` 使用的字体 | 版权归汉仪字库所有，**不在本仓库授权范围内**，仅随页面本地引用 |
+| `data/`、`templates/`、`guide.html`、`guide.md` | 角色攻略数据、页面模板，以及由数据生成的网页版 / 文档版 | **CC BY 4.0**，见 [`LICENSE-DATA`](LICENSE-DATA) |
+| `汉仪文黑-85W.ttf` | `guide.html` 使用的字体（**不入库**，用 `node scripts/fetch-font.mjs` 从上游同步） | 商业字体，版权归汉仪字库所有，**不随仓库分发**；使用者需自行获取，或直接用免费回退字体 |
 
 1. **脚本（MIT）**：可自由使用、修改、分发与再许可，需保留版权声明与许可文本。
-2. **攻略数据与文档（CC BY-NC-SA 4.0，署名—非商业性使用—相同方式共享 4.0 国际）**：
-   - 允许在**非商业**前提下复制、转载、改编本数据与文档；
+2. **攻略数据与文档（CC BY 4.0，署名 4.0 国际）**：
+   - 允许复制、转载、改编，**包括商业用途**（无需另行取得授权）；
    - 必须**署名**：注明来源为本仓库（`Character-Codex-Data`，并附仓库链接）及所用许可；
-   - 改编作品（含基于本数据的二次整理）必须以**相同许可**（CC BY-NC-SA 4.0 或兼容许可）发布；
-   - 商业用途（以商业优势或金钱报酬为主要目的的使用）**不在授权范围内**，请另行取得授权。
+   - 改编作品**不必**以相同许可发布（CC BY 4.0 无 SA 条款），但仍须署名并标明是否做过修改；
    - 官方法律文本全文见 [`LICENSE-DATA`](LICENSE-DATA)（英文逐字转载），亦见
-     <https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode>；简体中文参考译本：
-     <https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode.zh-Hans>。**如有出入，一律以官方文本为准。**
+     <https://creativecommons.org/licenses/by/4.0/legalcode>；简体中文参考译本：
+     <https://creativecommons.org/licenses/by/4.0/legalcode.zh-Hans>。**如有出入，一律以官方文本为准。**
 3. 上述许可只覆盖整理者可以主张权利的「整理、编排、结构化与表述」部分，**第三方内容不在授权范围内**。
+
+### 字体（不入库，用 `scripts/fetch-font.mjs` 从上游同步）
+
+`汉仪文黑-85W.ttf` 是**商业字体**，版权归汉仪字库（北京汉仪创新科技股份有限公司）所有，
+**不在本仓库的授权范围内，也不随仓库分发**（已 `git rm --cached` 从版本控制移除，并写进 `.gitignore` 的 `*.ttf` / `*.otf`）。
+
+#### 上游到底有没有这个字体
+
+**有等价文件，没有同名文件**：上游图鉴仓库 [Atlas-Plugin](https://github.com/AxiuCN/Atlas-Plugin)
+的 `resources/common/font/hk4e_zh-cn.ttf` 与本仓库原先那份 `汉仪文黑-85W.ttf`
+**字节完全相同**（都是 7,232,220 字节，SHA256 `fcc8454a5ea27e2cd5a0e435ca83e0b5a87af31c95a2e57e74975c3e9df96d23`），
+在 `origin/master` / `upstream/master` 里都是普通 blob（非 LFS）。它是从原神客户端提取的 hk4e 内置字体，
+Atlas-Plugin 自己注释为「hk4e（原神官方字体）」。
+
+> ⚠️ 因此「从上游取回」只解决**本机排版一致**的问题，不改变授权性质：
+> 上游那份同样是汉仪商业字体 + 米哈游游戏资源。想规避风险，见下面的「免费替代」。
+
+#### 取回字体
+
+```bash
+node scripts/fetch-font.mjs          # 已有同名文件时跳过
+node scripts/fetch-font.mjs --force  # 强制重新同步
+node scripts/fetch-font.mjs --from <路径或URL> --force
+```
+
+按顺序尝试：
+
+1. **本地上游图鉴仓库**（优先，不必联网）：`<Atlas-Plugin>\resources\common\font\hk4e_zh-cn.ttf`
+2. **上游 raw 地址**：`https://raw.githubusercontent.com/AxiuCN/Atlas-Plugin/master/resources/common/font/hk4e_zh-cn.ttf`
+   （以及 `Hyposelenia-Moon/Atlas-Plugin` 的同路径）
+
+成功后在**仓库根目录**写出 `汉仪文黑-85W.ttf`，并打印字节数与 SHA256（方便核对是不是同一份）。
+实测（本机）：
+
+```
+$ node scripts/fetch-font.mjs --force
+复制：D:\文件\游戏\原神\Atlas-Plugin\resources\common\font\hk4e_zh-cn.ttf … OK（7232220 字节（6.90 MB））
+SHA256：fcc8454a5ea27e2cd5a0e435ca83e0b5a87af31c95a2e57e74975c3e9df96d23
+来源：本地上游图鉴仓库
+```
+
+拿不到时脚本退出码 1，并提示三条手动路径（放文件 / `--from` / 直接用免费字体）。
+
+#### 没有字体时会怎样（回退栈）
+
+`guide.html` 的 `@font-face` 仍按相对路径引用 `./汉仪文黑-85W.ttf`；文件不存在时浏览器会回退到
+`font-family` 栈里的免费字体：
+
+```css
+font-family: 'HYWenHei-85W', 'MiSans', 'Source Han Sans SC', 'Noto Sans CJK SC',
+             'Noto Sans SC', '思源黑体', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+```
+
+- **本机有 `汉仪文黑-85W.ttf` 时仍优先用它**（栈里排第一），排版与原来完全一致；
+- 没有时按 `MiSans → 思源黑体 / Noto Sans SC → 微软雅黑 / 苹方` 依次回退，观感与汉仪文黑接近；
+  `MiSans` 官方声明**全球免费商用、允许嵌入式**（<https://hyperos.mi.com/font/faq>），
+  `Noto Sans SC / Source Han Sans SC` 为 SIL OFL，都可自由分发；
+- 也就是说**别人 clone 下来不做任何事也能正常看网页版**，只是字形略有差别。
+
+想彻底规避商业字体，把 `templates/guide.html` 里 `@font-face` 指向 MiSans / Noto 即可
+（`fetch-font.mjs` 与 `.gitignore` 都不用动）。
+
+#### 手动获取与授权
+
+需要商业字体本身的，走官方渠道（个人非商用可免费下载，商用需购买授权）：
+
+- 汉仪文黑 85W 产品页：<https://www.hanyi.com.cn/productdetail.php?id=992&type=0>
+  （页面原文：「当前字体仅供个人使用，若需商用，请您『购买授权』」）
+- 《汉仪字库个人非商用须知》：<https://www.hanyi.com.cn/coupon/faq-doc-1>
+  （关键限制：「**不得对外销售或提供许可字库或其中的任何字体，无论通过何种技术方式**」
+  「**不得将许可字库或其中的字体加载到您或第三方经营的产品中**」）
+- 商用 / Webfont 授权：<https://www.hanyi.com.cn/license>、<https://www.hanyi.com.cn/webfont>
+
+结论：**商业字体，个人非商用免费、商用需付费；不构成可合法随仓库分发的来源**（上游那份也一样）。
 
 ### 游戏内容版权声明
 

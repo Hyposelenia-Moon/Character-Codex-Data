@@ -4,7 +4,12 @@
 <meta charset="UTF-8">
 <title>赋光之人 队伍攻略</title>
 <style>
-    /* 引入汉仪文黑-85W 字体 */
+    /*
+     * 字体：汉仪文黑-85W（原神内置的 hk4e 字体）**不随仓库分发**，用
+     *   node scripts/fetch-font.mjs
+     * 从上游图鉴仓库取回同名字体文件放到仓库根目录。取不到时下面的回退栈兜底，
+     * 观感与有字体时接近（MiSans / Noto Sans SC / 思源黑体都是免费可商用字体）。
+     */
     @font-face {
         font-family: 'HYWenHei-85W';
         src: url('./汉仪文黑-85W.ttf') format('truetype');
@@ -14,7 +19,8 @@
     }
 
     body {
-        font-family: 'HYWenHei-85W', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+        /* 有 汉仪文黑-85W 时优先用它；否则退到免费字体（MiSans / Noto Sans SC / 思源黑体） */
+        font-family: 'HYWenHei-85W', 'MiSans', 'Source Han Sans SC', 'Noto Sans CJK SC', 'Noto Sans SC', '思源黑体', 'Microsoft YaHei', 'PingFang SC', sans-serif;
         /* 保留后备字体，防止字体加载失败时页面无法正常显示 */
         background-color: #f4f6f9;
         color: #333;
@@ -193,7 +199,7 @@
         <div class="section">
             <div class="section-title">2. 圣遗物推荐</div>
             <div class="text-block">
-                首选：黄金剧团 / + 水仙之梦 / + 沉沦之心<br>
+                首选：黄金剧团 / 水仙之梦 + 沉沦之心<br>
                 主词条：时之沙：攻击力 / 元素充能效率 / 空之杯：水元素伤害加成 / 攻击力 / 理之冠：暴击率 / 暴击伤害<br>
                 副词条：暴击率 / 暴击伤害 / 元素充能效率 / 攻击力
             </div>
@@ -277,7 +283,7 @@
         <div class="section">
             <div class="section-title">3. 天赋加点</div>
             <div class="text-block">
-                优先级：Q &gt; E &gt; A<br>
+                优先级：Q＞E＞A<br>
                 皇冠：Q
             </div>
         </div>
@@ -489,7 +495,7 @@
         <div class="section">
             <div class="section-title">2. 圣遗物推荐</div>
             <div class="text-block">
-                首选：如雷的盛怒 / + 如雷的盛怒 / + 昔日宗室之仪<br>
+                首选：如雷的盛怒 / 如雷的盛怒 + 昔日宗室之仪<br>
                 过渡：教官<br>
                 主词条：时之沙：元素充能效率 / 空之杯：雷元素伤害加成 / 理之冠：暴击率 / 暴击伤害<br>
                 副词条：暴击率 / 暴击伤害 / 元素充能效率 / 元素精通
@@ -532,7 +538,7 @@
         <div class="section">
             <div class="section-title">3. 天赋加点</div>
             <div class="text-block">
-                优先级：Q &gt; E
+                优先级：Q＞E
             </div>
         </div>
         <div class="section">
@@ -619,7 +625,7 @@
         <div class="section">
             <div class="section-title">3. 天赋加点</div>
             <div class="text-block">
-                优先级：A &gt; E<br>
+                优先级：A=Q＞E<br>
                 皇冠：A（必须）E（必须）
             </div>
         </div>
@@ -761,7 +767,7 @@
         <div class="section">
             <div class="section-title">3. 天赋加点</div>
             <div class="text-block">
-                优先级：Q &gt; A &gt; E<br>
+                优先级：Q＞A＞E<br>
                 皇冠：Q（必须）A（必须）
             </div>
         </div>
@@ -979,7 +985,7 @@
         <div class="section">
             <div class="section-title">3. 天赋加点</div>
             <div class="text-block">
-                优先级：Q &gt; A
+                优先级：Q＞A
             </div>
         </div>
         <div class="section">
@@ -1025,7 +1031,7 @@
         <div class="section">
             <div class="section-title">3. 天赋加点</div>
             <div class="text-block">
-                优先级：A &gt; E &gt; Q<br>
+                优先级：A＞E＞Q<br>
                 皇冠：A
             </div>
         </div>
@@ -1080,7 +1086,7 @@
         <div class="section">
             <div class="section-title">3. 天赋加点</div>
             <div class="text-block">
-                优先级：E &gt; Q
+                优先级：E＞Q
             </div>
         </div>
         <div class="section">
@@ -1193,7 +1199,7 @@
         <div class="section">
             <div class="section-title">3. 天赋加点</div>
             <div class="text-block">
-                优先级：Q &gt; E
+                优先级：Q＞E
             </div>
         </div>
         <div class="section">
@@ -1238,7 +1244,7 @@
         <div class="section">
             <div class="section-title">3. 天赋加点</div>
             <div class="text-block">
-                优先级：E &gt; Q
+                优先级：E ≥ Q
             </div>
         </div>
         <div class="section">
@@ -1820,7 +1826,7 @@
         <div class="section">
             <div class="section-title">2. 圣遗物推荐</div>
             <div class="text-block">
-                首选：炽烈的炎之魔女 / / 追忆之注连 / / 沙上楼阁史话<br>
+                首选：炽烈的炎之魔女 / 追忆之注连 / 沙上楼阁史话<br>
                 过渡：战狂<br>
                 主词条：时之沙：生命值 / 元素精通
             </div>
@@ -1904,7 +1910,7 @@
         <div class="section">
             <div class="section-title">2. 圣遗物推荐</div>
             <div class="text-block">
-                首选：炽烈的炎之魔女 / / 流浪大地的乐团 / / 角斗士的终幕礼＆炽烈的炎之魔女<br>
+                首选：炽烈的炎之魔女 / 流浪大地的乐团 + 角斗士的终幕礼 + 炽烈的炎之魔女<br>
                 过渡：武人<br>
                 主词条：时之沙：攻击力 / 元素精通 / 空之杯：火元素伤害加成 / 理之冠：暴击率 / 暴击伤害
             </div>
@@ -1934,7 +1940,7 @@
         <div class="section">
             <div class="section-title">2. 圣遗物推荐</div>
             <div class="text-block">
-                首选：苍白之火 / + / / + 染血的骑士道 / + / / + 苍白之火 / + / / + 角斗士的终幕礼 / + / / + 武人 / + / / + 战狂
+                首选：苍白之火 / 染血的骑士道 + 苍白之火 + 角斗士的终幕礼 + 武人 + 战狂
             </div>
         </div>
         <div class="section">
@@ -2026,7 +2032,7 @@
         <div class="section">
             <div class="section-title">3. 天赋加点</div>
             <div class="text-block">
-                优先级：Q &gt; A &gt; E
+                优先级：Q &gt; A ≥ E
             </div>
         </div>
         <div class="section">
@@ -2069,7 +2075,7 @@
         <div class="section">
             <div class="section-title">3. 天赋加点</div>
             <div class="text-block">
-                优先级：A &gt; E
+                优先级：A ≥ E
             </div>
         </div>
         <div class="section">
@@ -2106,7 +2112,7 @@
         <div class="section">
             <div class="section-title">2. 圣遗物推荐</div>
             <div class="text-block">
-                首选：翠绿之影 / / / + 被怜爱的少女 / / / + 昔日宗室之仪 / / / + 少女角斗士追忆乐团（2件套） / / / + 2<br>
+                首选：翠绿之影 / 被怜爱的少女 + 昔日宗室之仪<br>
                 过渡：教官<br>
                 主词条：时之沙：元素充能效率 / 元素精通 / 攻击力 / 空之杯：元素精通 / 攻击力 / 风元素伤害加成 / 理之冠：治疗加成 / 元素精通 / 攻击力<br>
                 副词条：元素充能效率 / 元素精通 / 百分比攻击力
@@ -2144,7 +2150,7 @@
         <div class="section">
             <div class="section-title">3. 天赋加点</div>
             <div class="text-block">
-                优先级：E &gt; Q<br>
+                优先级：E / Q<br>
                 皇冠：Q
             </div>
         </div>
@@ -2382,7 +2388,7 @@
         <div class="section">
             <div class="section-title">2. 圣遗物推荐</div>
             <div class="text-block">
-                首选：华馆梦醒形骸记 / / 回声之林夜话 / / 逆飞的流星<br>
+                首选：华馆梦醒形骸记 / 回声之林夜话 / 逆飞的流星<br>
                 过渡：武人
             </div>
         </div>
@@ -2637,7 +2643,7 @@
         <div class="section">
             <div class="section-title">2. 圣遗物推荐</div>
             <div class="text-block">
-                首选：饰金之梦 / / 千岩牢固 / / 乐园遗落之花<br>
+                首选：饰金之梦 / 千岩牢固 / 乐园遗落之花<br>
                 主词条：时之沙：元素精通 / 空之杯：元素精通 / 理之冠：元素精通
             </div>
         </div>
@@ -2681,7 +2687,7 @@
         <div class="section">
             <div class="section-title">2. 圣遗物推荐</div>
             <div class="text-block">
-                首选：翠绿之影 / / 翠绿之影 / / 角斗士的终幕礼两件套<br>
+                首选：翠绿之影 / 翠绿之影 / 角斗士的终幕礼（2件套）<br>
                 过渡：战狂<br>
                 主词条：时之沙：攻击力 / 空之杯：风元素伤害加成 / 攻击力 / 理之冠：暴击伤害 / 暴击率<br>
                 副词条：暴击率 / 暴击伤害 / 攻击力 / 元素充能效率
@@ -2800,7 +2806,7 @@
         <div class="section">
             <div class="section-title">2. 圣遗物推荐</div>
             <div class="text-block">
-                首选：海染砗磲 / / / 昔日宗室之仪 / / / 被怜爱的少女 / / / 如雷的盛怒<br>
+                首选：海染砗磲 / 昔日宗室之仪 / 被怜爱的少女 / 如雷的盛怒<br>
                 过渡：流放者<br>
                 主词条：时之沙：元素充能效率 / 生命值 / 空之杯：生命值 / 雷元素伤害加成 / 理之冠：治疗加成 / 生命值<br>
                 副词条：生命值 / 元素充能效率 / 精通
@@ -2876,7 +2882,7 @@
         <div class="section">
             <div class="section-title">2. 圣遗物推荐</div>
             <div class="text-block">
-                首选：昔日宗室之仪 / + / 千岩牢固（2件套） / + / 绝缘之旗印（2件套） / + / 角斗士的终幕礼<br>
+                首选：昔日宗室之仪 / 千岩牢固（2件套） + 绝缘之旗印（2件套） + 角斗士的终幕礼<br>
                 过渡：流放者<br>
                 主词条：时之沙：元素充能效率 / 生命值 / 空之杯：生命值 / 理之冠：生命值 / 暴击率<br>
                 副词条：暴击率 / 暴击伤害 / 生命值 / 元素充能
@@ -2907,7 +2913,7 @@
         <div class="section">
             <div class="section-title">2. 圣遗物推荐</div>
             <div class="text-block">
-                首选：千岩牢固 + / + / / + 花海甘露之光 + / + / / + 沉沦之心 + / + / / + 水仙之梦 + / + / / + 深林的记忆 + / + / / + 战狂 + / + / / + 赌徒<br>
+                首选：千岩牢固 / 花海甘露之光 + 沉沦之心 + 水仙之梦 + 深林的记忆 + 战狂 + 赌徒<br>
                 过渡：教官<br>
                 主词条：时之沙：生命值 / 空之杯：生命值 / 理之冠：生命值
             </div>
@@ -3082,7 +3088,7 @@
         <div class="section">
             <div class="section-title">2. 圣遗物推荐</div>
             <div class="text-block">
-                首选：翠绿之影 / / 流放者 / / 昔日宗室之仪
+                首选：翠绿之影 / 流放者 / 昔日宗室之仪
             </div>
         </div>
         <div class="section">
@@ -3207,7 +3213,7 @@
         <div class="section">
             <div class="section-title">2. 圣遗物推荐</div>
             <div class="text-block">
-                首选：千岩牢固 / / 绝缘之旗印 / / 花海甘露之光<br>
+                首选：千岩牢固 / 绝缘之旗印 / 花海甘露之光<br>
                 主词条：时之沙：元素充能效率 / 空之杯：火元素伤害加成 / 理之冠：暴击率 / 暴击伤害
             </div>
         </div>
@@ -3294,7 +3300,7 @@
         <div class="section">
             <div class="section-title">2. 圣遗物推荐</div>
             <div class="text-block">
-                首选：深林的记忆 / / + 乐园遗落之花 / / + 饰金之梦 / / + 流浪大地的乐团<br>
+                首选：深林的记忆 / 乐园遗落之花 + 饰金之梦 + 流浪大地的乐团<br>
                 过渡：教官<br>
                 主词条：时之沙：元素充能效率 / 元素精通 / 空之杯：元素精通 / 理之冠：元素精通<br>
                 副词条：元素充能效率 / 元素精通 / 攻击力 / 暴击
@@ -3371,7 +3377,7 @@
         <div class="section">
             <div class="section-title">2. 圣遗物推荐</div>
             <div class="text-block">
-                首选：花海甘露之光 + / / 千岩牢固 + / / 深林的记忆 + / / 昔日宗室之仪<br>
+                首选：花海甘露之光 / 千岩牢固 + 深林的记忆 + 昔日宗室之仪<br>
                 过渡：教官<br>
                 主词条：时之沙：生命值 / 空之杯：生命值 / 理之冠：生命值<br>
                 副词条：生命值 / 元素充能效率 / 暴击率 / 元素精通
@@ -3404,7 +3410,7 @@
         <div class="section">
             <div class="section-title">2. 圣遗物推荐</div>
             <div class="text-block">
-                首选：翠绿之影 / / 昔日宗室之仪 / / 逐影猎人<br>
+                首选：翠绿之影 / 昔日宗室之仪 / 逐影猎人<br>
                 过渡：教官<br>
                 主词条：时之沙：攻击力 / 元素充能效率 / 空之杯：风元素伤害加成 / 攻击力 / 理之冠：暴击率 / 暴击伤害<br>
                 副词条：暴击率 / 元素充能效率 / 暴击伤害 / 攻击力
@@ -3481,7 +3487,7 @@
         <div class="section">
             <div class="section-title">2. 圣遗物推荐</div>
             <div class="text-block">
-                首选：苍白之火 / + / 染血的骑士道 / + / 苍白之火 / + / 冰风迷途的勇士<br>
+                首选：苍白之火 / 染血的骑士道 + 苍白之火 + 冰风迷途的勇士<br>
                 过渡：武人<br>
                 主词条：时之沙：攻击力 / 空之杯：物理伤害加成 / 理之冠：暴击率 / 暴击伤害<br>
                 副词条：暴击率 / 暴击伤害 / 攻击力 / 元素充能效率
@@ -3563,7 +3569,7 @@
         <div class="section">
             <div class="section-title">3. 天赋加点</div>
             <div class="text-block">
-                优先级：E &gt; A &gt; Q<br>
+                优先级：E ≥ A &gt; Q<br>
                 皇冠：EA
             </div>
         </div>
@@ -3643,10 +3649,10 @@
             <div class="section-title">2. 圣遗物推荐</div>
             <div class="text-block">
                 辅助向：千岩牢固<br>
-                主词条：时之沙：元素充能效率 / 空之杯：生命值 / 理之冠：暴击率<br>
+                主词条：时之沙：元素充能效率 / 空之杯：生命值 / 水元素伤害加成（二命） / 理之冠：暴击率<br>
                 副词条：充能 &gt; 暴击 &gt; 生命值<br>
                 输出向：黄金剧团 / 逐影猎人<br>
-                主词条：时之沙：生命值 / 空之杯：水元素伤害加成（二命） / 生命值 / 理之冠：暴击伤害 / 暴击率<br>
+                主词条：时之沙：生命值 / 空之杯：生命值 / 理之冠：暴击伤害 / 暴击率<br>
                 副词条：双爆 &gt; 大生命 &gt; 充能
             </div>
         </div>
@@ -3823,7 +3829,7 @@
         <div class="section">
             <div class="section-title">2. 圣遗物推荐</div>
             <div class="text-block">
-                首选：翠绿之影 / / 昔日宗室之仪 / / 逐影猎人<br>
+                首选：翠绿之影 / 昔日宗室之仪 / 逐影猎人<br>
                 过渡：昔时之歌<br>
                 主词条：时之沙：攻击力 / 空之杯：风元素伤害加成 / 理之冠：暴击率 / 暴击伤害
             </div>
@@ -3956,7 +3962,7 @@
         <div class="section">
             <div class="section-title">2. 圣遗物推荐</div>
             <div class="text-block">
-                首选：流浪大地的乐团 / / + + / 饰金之梦 / / + + / 流浪大地的乐团 / / + + / 饰金之梦 / / + + / 乐园遗落之花 / / + + / 逆飞的流星<br>
+                首选：流浪大地的乐团 / 饰金之梦 + 流浪大地的乐团 + 饰金之梦 + 乐园遗落之花 + 逆飞的流星<br>
                 过渡：教官<br>
                 主词条：时之沙：元素精通 / 空之杯：雷元素伤害加成 / 元素精通 / 理之冠：暴击率 / 暴击伤害<br>
                 副词条：暴击率 / 暴击伤害 / 元素精通 / 元素充能效率
@@ -4546,7 +4552,7 @@
         <div class="section">
             <div class="section-title">2. 圣遗物推荐</div>
             <div class="text-block">
-                首选：翠绿之影 / / / + 血红之证 / / / + 饰金之梦 / / / + 饰金之梦 / / / + 流浪大地的乐团<br>
+                首选：翠绿之影 / 血红之证 + 饰金之梦 + 饰金之梦 + 流浪大地的乐团<br>
                 主词条：时之沙：元素精通 / 元素充能效率 / 空之杯：元素精通 / 理之冠：元素精通<br>
                 副词条：元素精通 / 元素充能效率 / 暴击率
             </div>
@@ -4969,8 +4975,9 @@
         <div class="section">
             <div class="section-title">6. 配队推荐</div>
             <div class="text-block">
-                月绽放队：奈芙尔 + 菈乌玛 + 哥伦比娅 + 砂糖 + 纳西妲（二命） + 妮露（高金）<br>
-                传统绽放队：菈乌玛 + 行秋 + 夜兰 + 妮露 + 久岐忍 + 纳西妲
+                月绽放队：奈芙尔 + 菈乌玛 + 哥伦比娅 + 砂糖 + 纳西妲 + 妮露<br>
+                传统绽放队：菈乌玛 + 行秋 + 夜兰 + 妮露 + 久岐忍 + 纳西妲<br>
+                注：建议二命及以上；高金配置
             </div>
         </div>
     </div>
@@ -5200,8 +5207,9 @@
         <div class="section">
             <div class="section-title">6. 配队推荐</div>
             <div class="text-block">
-                首选：奈芙尔 + 菈乌玛 + 哥伦比娅 + 砂糖 + 纳西妲（2命） + 妮露（高金）<br>
-                其他：奈芙尔 + 菈乌玛 + 爱诺 + 砂糖
+                首选：奈芙尔 + 菈乌玛 + 哥伦比娅 + 砂糖 + 纳西妲 + 妮露<br>
+                其他：奈芙尔 + 菈乌玛 + 爱诺 + 砂糖<br>
+                注：2命；高金配置
             </div>
         </div>
     </div>
@@ -5331,8 +5339,9 @@
             <div class="section-title">6. 配队推荐</div>
             <div class="text-block">
                 月感电：哥伦比娅 + 菲林斯 + 伊涅芙 + 希诺宁 + 砂糖<br>
-                月绽放：哥伦比娅 + 奈芙尔 + 菈乌玛 + 砂糖 + 纳西妲（二命） + 妮露（高金）<br>
-                月结晶：哥伦比娅 + 兹白 + 莉奈娅 + 叶洛亚 + 希诺宁（二命）
+                月绽放：哥伦比娅 + 奈芙尔 + 菈乌玛 + 砂糖 + 纳西妲 + 妮露<br>
+                月结晶：哥伦比娅 + 兹白 + 莉奈娅 + 叶洛亚 + 希诺宁<br>
+                注：建议二命及以上；高金配置
             </div>
         </div>
     </div>
@@ -5394,7 +5403,8 @@
             <div class="section-title">6. 配队推荐</div>
             <div class="text-block">
                 首选：兹白 + 叶洛亚 + 哥伦比娅 + 莉奈娅<br>
-                其他：兹白 + 叶洛亚 + 哥伦比娅 + 五郎 + 希诺宁（二命）
+                其他：兹白 + 叶洛亚 + 哥伦比娅 + 五郎 + 希诺宁<br>
+                注：建议二命及以上
             </div>
         </div>
     </div>
@@ -5487,7 +5497,7 @@
         <div class="section">
             <div class="section-title">3. 天赋加点</div>
             <div class="text-block">
-                优先级：E &gt; Q
+                优先级：E＞Q
             </div>
         </div>
         <div class="section">
@@ -5678,7 +5688,7 @@
         <div class="section">
             <div class="section-title">3. 天赋加点</div>
             <div class="text-block">
-                优先级：E &gt; Q<br>
+                优先级：E＞Q<br>
                 皇冠：E
             </div>
         </div>
@@ -5727,7 +5737,7 @@
         <div class="section">
             <div class="section-title">3. 天赋加点</div>
             <div class="text-block">
-                优先级：A &gt; Q &gt; E<br>
+                优先级：A＞Q＞E<br>
                 皇冠：A（必须）Q（可选）
             </div>
         </div>
@@ -5827,7 +5837,7 @@
         <div class="section">
             <div class="section-title">3. 天赋加点</div>
             <div class="text-block">
-                优先级：E &gt; Q &gt; A<br>
+                优先级：E＞Q＞A<br>
                 皇冠：E
             </div>
         </div>
@@ -5920,7 +5930,7 @@
         <div class="section">
             <div class="section-title">3. 天赋加点</div>
             <div class="text-block">
-                优先级：E &gt; Q<br>
+                优先级：E＞Q<br>
                 皇冠：E
             </div>
         </div>

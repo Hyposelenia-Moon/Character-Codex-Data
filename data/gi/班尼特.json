@@ -54,7 +54,7 @@
     "artifacts": [
       {
         "kind": "preferred",
-        "label": null,
+        "label": "首选",
         "sep": " > ",
         "sets": [
           {

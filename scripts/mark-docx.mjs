@@ -33,11 +33,11 @@ const DEFAULT_OUT = path.join(root, 'out', '原神·角色攻略(标记版).docx
 
 const CN_NUM = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6 }
 /** 与 parse-docx 的 splitItems 保持一致的分隔符 */
-const ANY_SEP_RE = /\s*(?:[>＞]|≥|[/／])\s*/
-/** 与 parse-docx 的 parseSetGroup 保持一致的分隔符 */
-const SET_PLUS_RE = /\s*[+＋]\s*/
+const ANY_SEP_RE = /\s*(?:[>＞]|≥|[/／]|[=＝]|[，,、])\s*/
+/** 与 parse-docx 的 parseSetPlus 保持一致的分隔符（`+` / `＋` / `＆` / `&` 都算套装组合符） */
+const SET_PLUS_RE = /\s*[+＋＆&]\s*/
 /** 配队成员分隔符（与 parse-docx 的 parseMembers 一致） */
-const MEMBER_SEP_RE = /\s*[+＋/／、]\s*/
+const MEMBER_SEP_RE = /\s*[+＋＆&/／、]\s*/
 
 const readJson = f => JSON.parse(fs.readFileSync(f, 'utf8').replace(/^\uFEFF/, ''))
 const eqJson = (a, b) => JSON.stringify(a) === JSON.stringify(b)
@@ -535,13 +535,23 @@ export function applyPlan (xml, plan) {
  * 4. 外部验收：用真正的 parse-docx.mjs 分别解析两份文档并深比较
  * ------------------------------------------------------------------ */
 
-/** 跑一个 node 子进程（沙箱下子进程不能用管道 stdio，所以把输出重定向到文件再读） */
-export function childRun (scriptPath, argv, cwd, outFile) {
+/** 跑一个 node 子进程（沙箱下子进程不能用管道 stdio，所以把输出重定向到文件再读）
+ * @param {string} scriptPath
+ * @param {string[]} argv
+ * @param {string} cwd
+ * @param {string} outFile
+ * @param {NodeJS.ProcessEnv} [extraEnv] 追加/覆盖的环境变量（如冻结的 DSH_GI_DIR）
+ */
+export function childRun (scriptPath, argv, cwd, outFile, extraEnv) {
   const ofd = fs.openSync(outFile, 'w')
   const efd = fs.openSync(outFile + '.err', 'w')
   let r
   try {
-    r = spawnSync(process.execPath, [scriptPath, ...argv], { cwd, stdio: ['ignore', ofd, efd] })
+    r = spawnSync(process.execPath, [scriptPath, ...argv], {
+      cwd,
+      stdio: ['ignore', ofd, efd],
+      env: extraEnv ? { ...process.env, ...extraEnv } : process.env
+    })
   } finally {
     fs.closeSync(ofd)
     fs.closeSync(efd)
@@ -552,10 +562,14 @@ export function childRun (scriptPath, argv, cwd, outFile) {
   return { status: r.status, stdout, stderr }
 }
 
-/** --dry 先确认能解析（不写任何文件） */
-export function parseDry (docx, tmpDir) {
+/** --dry 先确认能解析（不写任何文件）
+ * @param {string} docx
+ * @param {string} tmpDir
+ * @param {{giDir?: string}} [opts] giDir：指向冻结的 data/gi 快照（并发写 data/gi 时保证结果稳定）
+ */
+export function parseDry (docx, tmpDir, opts = {}) {
   const out = path.join(tmpDir, 'dry-' + crypto.createHash('sha1').update(docx).digest('hex').slice(0, 8) + '.txt')
-  const r = childRun(path.join(root, 'scripts', 'parse-docx.mjs'), [docx, '--dry'], root, out)
+  const r = childRun(path.join(root, 'scripts', 'parse-docx.mjs'), [docx, '--dry'], root, out, opts.giDir ? { DSH_GI_DIR: opts.giDir } : undefined)
   if (r.status !== 0) throw new Error(`parse-docx --dry 失败（${r.status}）：${r.stderr.slice(0, 500)}`)
   const text = r.stdout
   // 输出形如「角色块：129」「武器行 222 / 圣遗物行 403 / …」「未识别行：0」
@@ -577,18 +591,29 @@ export function parseDry (docx, tmpDir) {
   return { text, stats }
 }
 
-/** 真正解析并落盘到 dumpDir（parse-docx 自己没有 dump 选项，这里在临时目录里跑一个克隆） */
-export function parseToJson (docx, dumpDir) {
+/** 真正解析并落盘（parse-docx 自己没有 dump 选项，这里在临时目录里跑一个克隆）
+ *
+ * 输出目录与输入分开：克隆放在 `<dumpDir>/clone/`，子进程 cwd 也在那里，
+ * 所以它写出的 data/gi 落在 `<dumpDir>/clone/data/gi`；
+ * `opts.giDir` 只作为**输入**（冻结的 data/gi 快照，避免并发写干扰）。
+ *
+ * @param {string} docx
+ * @param {string} dumpDir
+ * @param {{giDir?: string}} [opts]
+ */
+export function parseToJson (docx, dumpDir, opts = {}) {
+  const clone = path.join(dumpDir, 'clone')
   fs.rmSync(dumpDir, { recursive: true, force: true })
-  fs.mkdirSync(path.join(dumpDir, 'scripts', 'lib'), { recursive: true })
-  fs.mkdirSync(path.join(dumpDir, 'data'), { recursive: true })
-  fs.copyFileSync(path.join(here, 'parse-docx.mjs'), path.join(dumpDir, 'scripts', 'parse-docx.mjs'))
-  for (const f of ['docx.mjs', 'schema.mjs']) fs.copyFileSync(path.join(here, 'lib', f), path.join(dumpDir, 'scripts', 'lib', f))
-  fs.copyFileSync(path.join(dataDir, '_index.json'), path.join(dumpDir, 'data', '_index.json'))
+  fs.mkdirSync(path.join(clone, 'scripts', 'lib'), { recursive: true })
+  fs.mkdirSync(path.join(clone, 'data'), { recursive: true })
+  fs.copyFileSync(path.join(here, 'parse-docx.mjs'), path.join(clone, 'scripts', 'parse-docx.mjs'))
+  for (const f of ['docx.mjs', 'schema.mjs']) fs.copyFileSync(path.join(here, 'lib', f), path.join(clone, 'scripts', 'lib', f))
+  fs.copyFileSync(path.join(dataDir, '_index.json'), path.join(clone, 'data', '_index.json'))
   const abs = path.isAbsolute(docx) ? docx : path.resolve(root, docx)
-  const r = childRun(path.join(dumpDir, 'scripts', 'parse-docx.mjs'), [abs], dumpDir, path.join(dumpDir, 'stdout.txt'))
+  const r = childRun(path.join(clone, 'scripts', 'parse-docx.mjs'), [abs], clone, path.join(clone, 'stdout.txt'), opts.giDir ? { DSH_GI_DIR: opts.giDir } : undefined)
   if (r.status !== 0) throw new Error(`parse-docx 失败（${r.status}）：${r.stderr.slice(0, 500)}`)
-  const outGi = path.join(dumpDir, 'data', 'gi')
+  // 子进程写哪儿：给了 DSH_GI_DIR 就写那里（= opts.giDir），否则写克隆自己的 data/gi
+  const outGi = opts.giDir ? path.resolve(opts.giDir) : path.join(clone, 'data', 'gi')
   const names = readJson(path.join(outGi, '_order.json'))
   const objs = names.map(n => readJson(path.join(outGi, `${n}.json`)))
   return { names, objs, stdout: r.stdout }

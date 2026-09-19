@@ -4,7 +4,12 @@
 <meta charset="UTF-8">
 <title>赋光之人 队伍攻略</title>
 <style>
-    /* 引入汉仪文黑-85W 字体 */
+    /*
+     * 字体：汉仪文黑-85W（原神内置的 hk4e 字体）**不随仓库分发**，用
+     *   node scripts/fetch-font.mjs
+     * 从上游图鉴仓库取回同名字体文件放到仓库根目录。取不到时下面的回退栈兜底，
+     * 观感与有字体时接近（MiSans / Noto Sans SC / 思源黑体都是免费可商用字体）。
+     */
     @font-face {
         font-family: 'HYWenHei-85W';
         src: url('./汉仪文黑-85W.ttf') format('truetype');
@@ -14,7 +19,8 @@
     }
 
     body {
-        font-family: 'HYWenHei-85W', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+        /* 有 汉仪文黑-85W 时优先用它；否则退到免费字体（MiSans / Noto Sans SC / 思源黑体） */
+        font-family: 'HYWenHei-85W', 'MiSans', 'Source Han Sans SC', 'Noto Sans CJK SC', 'Noto Sans SC', '思源黑体', 'Microsoft YaHei', 'PingFang SC', sans-serif;
         /* 保留后备字体，防止字体加载失败时页面无法正常显示 */
         background-color: #f4f6f9;
         color: #333;

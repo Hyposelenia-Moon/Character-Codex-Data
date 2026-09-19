@@ -42,7 +42,7 @@
     "artifacts": [
       {
         "kind": "preferred",
-        "label": null,
+        "label": "首选",
         "sep": " > ",
         "sets": [
           {
@@ -155,7 +155,7 @@
     {
       "title": "3. 天赋加点",
       "lines": [
-        "优先级：Q > E"
+        "优先级：Q＞E"
       ]
     },
     {

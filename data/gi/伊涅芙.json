@@ -63,7 +63,7 @@
     "artifacts": [
       {
         "kind": "preferred",
-        "label": null,
+        "label": "首选",
         "sep": " > ",
         "sets": [
           {
@@ -74,7 +74,7 @@
       },
       {
         "kind": "optional",
-        "label": null,
+        "label": "可选",
         "sep": " > ",
         "sets": [
           {

@@ -24,3 +24,17 @@ AGENTS.md
 .plugin-conflict/
 .tmp/
 out/
+
+# 编辑器批量替换的安全副本（本地快照，不进版本库）
+data/_backup/
+
+# 软删除回收站（本地暂存，不进版本库）
+data/_trash/
+
+# 解析中间产物（本地生成，不进版本库；data/_index.json 例外：它要继续入库）
+data/_parse-report.json
+
+# 商业字体（本地保留即可，不随仓库分发；guide.html 按相对路径引用它）
+汉仪文黑-85W.ttf
+*.ttf
+*.otf

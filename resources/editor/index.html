@@ -12,20 +12,30 @@
     <span class="logo">攻略</span>
     <span class="brand-text">角色攻略编辑器</span>
   </div>
+  <div class="global-search">
+    <input id="gsearch" class="gsearch" type="search" placeholder="全局搜索：武器 / 圣遗物 / 角色 / 套装 / 正文关键词（Ctrl+F）" autocomplete="off">
+    <div id="gresults" class="gresults hidden"></div>
+  </div>
   <div class="top-actions">
     <span id="dirty" class="dirty hidden">● 未保存</span>
     <span id="current-name" class="current-name">未选择角色</span>
+    <button id="btn-tools" class="btn" type="button" title="批量替换 / 名称库浏览">工具箱</button>
+    <button id="btn-publish" class="btn" type="button" title="把当前已保存的数据重新生成 guide.html 与 Word 主文档（不写入正在编辑的表单）">发布</button>
+    <button id="btn-publish-all" class="btn" type="button" title="Ctrl+Shift+S：写 JSON → 重建索引 → 写回 Word 主文档（含备份）→ 生成 guide.html → 三方一致性校验 → 自动提交（**不推送**）">保存并发布</button>
     <button id="btn-save" class="btn primary" type="button" title="Ctrl+S / ⌘+S">保存</button>
+    <button id="btn-close-server" class="btn danger" type="button" title="停止后台的编辑器服务（只关服务，不动已保存的数据）">关闭服务</button>
   </div>
 </header>
 
 <div id="status" class="status hidden"></div>
+<div id="tools" class="tools hidden"></div>
+<div id="toast" class="toast hidden"></div>
 
 <div class="layout">
   <aside class="sidebar">
     <div class="side-block">
-      <input id="search" class="search" type="search" placeholder="搜索角色…" autocomplete="off">
-      <div id="list" class="list"></div>
+      <input id="search" class="search" type="search" placeholder="搜索角色…（↑↓ 切换）" autocomplete="off">
+      <div id="list" class="list" tabindex="0"></div>
     </div>
     <div class="side-foot">
       <button id="btn-new" class="btn wide" type="button">＋ 新增角色</button>
@@ -37,6 +47,7 @@
         <button id="btn-rename" class="btn" type="button">重命名</button>
         <button id="btn-delete" class="btn danger" type="button">删除</button>
       </div>
+      <button id="btn-trash" class="btn wide" type="button" title="查看 data/_trash/ 里被软删除的角色：可恢复 / 彻底删除 / 清空回收站">🗑 回收站</button>
       <div class="side-hint">排序写入 <code>data/gi/_order.json</code></div>
     </div>
   </aside>
@@ -45,15 +56,33 @@
     <div id="empty" class="empty">
       <p>左侧选一个角色开始编辑，或点「＋ 新增角色」。</p>
       <p class="muted">改动在浏览器内暂存，点「保存」（Ctrl+S）才会写入 <code>data/gi/&lt;角色名&gt;.json</code>。</p>
+      <p class="muted">保存并发布 = 保存 + 发布 + 三方校验 + 自动提交（<strong>不推送</strong>，push 由你手动执行）。</p>
+      <p class="muted">快捷键：↑↓ 切换角色 · Ctrl+S 保存 · Ctrl+Shift+S 保存并发布 · Ctrl+F 全局搜索。</p>
     </div>
     <form id="form" class="form hidden" autocomplete="off"></form>
   </main>
+</div>
+
+<div id="trash-view" class="trash-view hidden">
+  <div class="picker-mask" data-trash="mask"></div>
+  <div class="picker-pop trash-pop" role="dialog" aria-label="回收站">
+    <div class="picker-head">
+      <span class="picker-title">🗑 回收站</span>
+      <span id="trash-count" class="muted"></span>
+      <span class="spacer"></span>
+      <button type="button" class="btn mini danger" id="btn-trash-empty" title="把回收站里的角色全部彻底删除（不可撤销）">清空回收站</button>
+      <button type="button" class="btn mini" data-trash="close">✕</button>
+    </div>
+    <div id="trash-list" class="trash-list"></div>
+  </div>
 </div>
 
 <datalist id="dl-weapon"></datalist>
 <datalist id="dl-artifact"></datalist>
 <datalist id="dl-character"></datalist>
 
+<script src="/pinyin.js"></script>
+<script src="/picker.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

@@ -70,7 +70,7 @@
     "artifacts": [
       {
         "kind": "preferred",
-        "label": null,
+        "label": "首选",
         "sep": " / ",
         "sets": [
           {
@@ -262,7 +262,7 @@
     {
       "title": "3. 天赋加点",
       "lines": [
-        "优先级：A > Q > E",
+        "优先级：A＞Q＞E",
         "皇冠：A（必须）Q（可选）"
       ]
     },
