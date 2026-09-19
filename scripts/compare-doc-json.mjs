@@ -14,6 +14,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { childRun } from './mark-docx.mjs'
+import { ARTIFACT_KIND_LABEL } from './lib/guide-display.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '..')
@@ -103,7 +104,7 @@ function rowsOf (doc, key) {
       if (r.kind === 'main') out.push(`主词条：${Object.entries(r.stats ?? {}).map(([k, v]) => `${k}：${(v ?? []).join(' / ')}`).join(' / ')}`)
       else if (r.kind === 'sub') out.push(`副词条：${(r.stats ?? []).join(' / ')}`)
       else if (r.kind === 'text') out.push(`${r.label ? r.label + '：' : ''}${r.text ?? ''}`)
-      else out.push(`${r.label ? r.label + '：' : ({ preferred: '首选', transition: '过渡', optional: '可选' }[r.kind] ?? r.kind) + '：'}${(r.sets ?? []).map(s => s.name + (s.pieces ? `（${s.pieces}）` : '') + (s.note ? `〔注:${s.note}〕` : '')).join(' / ')}`)
+      else out.push(`${r.label ? r.label + '：' : (ARTIFACT_KIND_LABEL[r.kind] ?? r.kind) + '：'}${(r.sets ?? []).map(s => s.name + (s.pieces ? `（${s.pieces}）` : '') + (s.note ? `〔注:${s.note}〕` : '')).join(' / ')}`)
     }
     return out
   }

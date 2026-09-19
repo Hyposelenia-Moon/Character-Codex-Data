@@ -48,7 +48,7 @@ for (const name of names) {
   for (const s of card.sections) {
     if (s.empty) { console.log(`[${s.badge}] ${s.title}：暂无`); continue }
     if (s.type === 'teams') {
-      console.log(`[${s.badge}] ${s.title}：` + s.teams.map(t => `${t.tag ? t.tag + '：' : ''}${t.members.map(m => strip(m.name)).join(' + ')}${t.note ? ` ${strip(t.note)}` : ''}`).join(' ｜ '))
+      console.log(`[${s.badge}] ${s.title}：` + s.teams.map(t => `${t.tag ? t.tag + '：' : ''}${t.members.map(m => strip(m.name)).join(' + ')}${t.note ? ` ${t.notePrefix ? '注：' : ''}${strip(t.note)}` : ''}`).join(' ｜ '))
       continue
     }
     console.log(`[${s.badge}] ${s.title}：` + s.rows.map(row => {

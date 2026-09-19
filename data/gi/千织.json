@@ -51,30 +51,45 @@
         "kind": "priority",
         "order": [
           {
+            "name": "A",
+            "level": 10,
+            "crown": true,
+            "ref": "talent:A"
+          },
+          {
             "name": "E",
+            "level": 10,
+            "crown": true,
             "ref": "talent:E"
           },
           {
             "name": "Q",
+            "level": 10,
+            "crown": true,
             "ref": "talent:Q"
           }
         ],
-        "raw": "E > Q"
+        "raw": "A10 E10 Q10"
       },
       {
         "kind": "crown",
         "items": [
           {
             "name": "E",
+            "level": 10,
+            "crown": true,
             "ref": "talent:E"
           },
           {
             "name": "Q",
+            "level": 10,
+            "crown": true,
             "ref": "talent:Q"
           },
           {
             "name": "A",
-            "level": "满命",
+            "level": 10,
+            "crown": true,
             "ref": "talent:A"
           }
         ]
@@ -137,8 +152,8 @@
     {
       "title": "3. 天赋加点",
       "lines": [
-        "优先级：E > Q",
-        "皇冠：EQA（满命）"
+        "天赋：A10 E10 Q10",
+        "皇冠：E（10）Q（10）A（10）"
       ]
     },
     {

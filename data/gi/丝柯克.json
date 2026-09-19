@@ -110,7 +110,8 @@
       {
         "kind": "sub",
         "stats": [
-          "双爆",
+          "暴击率",
+          "暴击伤害",
           "大攻击"
         ],
         "sep": " > "
@@ -121,30 +122,38 @@
         "kind": "priority",
         "order": [
           {
+            "name": "A",
+            "level": 1,
+            "ref": "talent:A"
+          },
+          {
             "name": "E",
+            "level": 10,
+            "crown": true,
             "ref": "talent:E"
           },
           {
             "name": "Q",
+            "level": 10,
+            "crown": true,
             "ref": "talent:Q"
-          },
-          {
-            "name": "A",
-            "ref": "talent:A"
           }
         ],
-        "raw": "E > Q > A"
+        "raw": "A1 E10 Q10"
       },
       {
         "kind": "crown",
         "items": [
           {
             "name": "E",
+            "level": 10,
+            "crown": true,
             "ref": "talent:E"
           },
           {
             "name": "Q",
-            "level": "必须",
+            "level": 10,
+            "crown": true,
             "ref": "talent:Q"
           }
         ]
@@ -255,14 +264,14 @@
         "首选：深廊终曲",
         "过渡：逐影猎人",
         "主词条：时之沙：攻击力｜空之杯：冰元素伤害加成 / 攻击力｜理之冠：暴击伤害 / 暴击率",
-        "副词条：双爆 > 大攻击"
+        "副词条：暴击率 > 暴击伤害 > 大攻击"
       ]
     },
     {
       "title": "3. 天赋加点",
       "lines": [
-        "优先级：E > Q > A",
-        "皇冠：EQ（必须）"
+        "天赋：A1 E10 Q10",
+        "皇冠：E（10）Q（10）"
       ]
     },
     {

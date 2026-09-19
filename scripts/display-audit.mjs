@@ -4,7 +4,7 @@
  *      「展开幂等」（再展开一次结果不变）与「不产生重复字」（`效率效率` 之类）；
  *   2. 检查六个模块在归一后**永远都在**（空模块是「暂无」而不是消失）；
  *   3. 检查档位标签只出现 推荐 / 可选 / 过渡（自定义队名除外）；
- *   4. 检查面板里没有 `0%` 行、副词条里不再有半角斜杠、命座文案都是「命之座X」。
+ *   4. 检查面板里没有 `0%` 行、副词条分隔符只有 `=`（同级）/ `＞`（优先级）、命座文案都是「命之座X」。
  *
  * 用法：node scripts/display-audit.mjs
  */
@@ -13,7 +13,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   displayText, normalizeGuideSections, DISPLAY_SECTIONS,
-  constellationNumber, isZeroValue, displayLabel
+  constellationNumber, isZeroValue, displayLabel, ARTIFACT_KIND_LABEL
 } from './lib/guide-display.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -86,8 +86,13 @@ for (const n of names) {
       for (const row of sec.rows) {
         if (row.label) labelSeen.add(row.label)
         for (const it of row.items) {
-          if (sec.title === '圣遗物' && /副词条/.test(row.label ?? '') && /[/／]/.test(it.sepAfter ?? '')) {
-            problems.push(`${n}：副词条分隔符未转全角（${it.sepAfter}）`)
+          // 副词条的分隔符口径（用户定稿）：同级 = `=`、优先级 = `＞`、`≥` 原样（"高于等于"）。
+          // 源文档的 `/`（同级）必须已被折成 `=`，`>` 必须已被折成 `＞`；出现 `/` 或别的字形都是没归一。
+          if (sec.title === '圣遗物' && /副词条/.test(row.label ?? '')) {
+            const sep = String(it.sepAfter ?? '').trim()
+            if (sep && !['=', '＞', '≥'].includes(sep)) {
+              problems.push(`${n}：副词条分隔符应为「= 同级 / ＞ 优先级 / ≥ 高于等于」，实际「${sep}」`)
+            }
           }
           if (isZeroValue(it.text)) problems.push(`${n}：面板/条目里出现 0 值行「${it.text}」`)
         }
@@ -97,7 +102,13 @@ for (const n of names) {
       for (const row of sec.rows) for (const it of row.items) if (isZeroValue(it.text)) problems.push(`${n}：面板 0 值行「${it.text}」`)
     }
     if (sec.kind === 'teams') {
-      for (const t of sec.teams) { if (t.tag) labelSeen.add(t.tag); if (t.note && !t.note.startsWith('注：')) problems.push(`${n}：配队行内备注未用 注：（${t.note}）`) }
+      for (const t of sec.teams) {
+        if (t.tag) labelSeen.add(t.tag)
+        // 备注一律**不带** `注：` 前缀（见 guide-display 的 NOTE_PREFIX_RULE）；
+        // 前缀由 `notePrefix` 决定加不加：`true` = 成员之外的补充说明（渲染成 `… 注：xxx`），
+        // `false` = 整行就是这条备注（不加前缀）。所以带前缀的写法反而是错的。
+        if (t.note && t.notePrefix !== true && t.note.startsWith('注：')) problems.push(`${n}：配队行内备注不该带 注： 前缀（${t.note}）`)
+      }
     }
   }
 }
@@ -139,7 +150,9 @@ function localRows (v2) {
       arows.push({ label: '副词条', items: (r.stats ?? []).map((s, i, a) => ({ text: s, note: '', ref: '', sepAfter: i < a.length - 1 ? String(r.sep ?? ' / ').trim().split(/\s+/)[0] : '' })) })
       continue
     }
-    const head = { preferred: '首选', transition: '过渡', optional: '可选' }[r.kind] ?? ''
+    // 档位名走共享映射（**来源写法**，与文档/JSON 一致），再交给 displayLabel 归一 ——
+    // 这里刻意不用显示词，因为本脚本要模拟的是"数据/文档长什么样"。
+    const head = ARTIFACT_KIND_LABEL[r.kind] ?? ''
     arows.push({
       label: String(r.label ?? '').trim() || head,
       items: (r.sets ?? []).map((s, i, a) => ({ text: s.name + (s.pieces ? `（${s.pieces}）` : ''), note: s.note ?? '', ref: s.ref, sepAfter: i < a.length - 1 ? String(r.sep ?? ' / ').trim().split(/\s+/)[0] : '' }))

@@ -22,7 +22,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { readDocx, writeDocx, escapeXml, SEPARATOR } from './lib/docx.mjs'
-import { deriveSections, renderArtifactRow, joinWithSep, sepTokens, itemText, stripMarks, isNoteRow, noteText, resolveNoteText, artifactStatPool, NOTE_PREFIX, NOTE_SEP } from './lib/schema.mjs'
+import { deriveSections, renderArtifactRow, talentLevelLine, crownItemText, joinWithSep, sepTokens, itemText, stripMarks, isNoteRow, noteText, resolveNoteText, artifactStatPool, NOTE_PREFIX, NOTE_SEP } from './lib/schema.mjs'
 import { loadRefs, planMarks, applyPlan, splitBlocks, loadParseBlock, parseToJson, parseDry } from './mark-docx.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -97,8 +97,10 @@ export function renderRow (key, row) {
       // renderArtifactRow 返回数组（一行可能渲染成 0/1 行），这里只需要那唯一一行
       return renderArtifactRow(row)[0] ?? ''
     case 'talents':
-      if (row.kind === 'priority') return `优先级：${row.rawAll ?? row.raw ?? joinWithSep(row.order, ' > ', ' > ')}`
-      if (row.kind === 'crown') return `皇冠：${(row.items ?? []).map(itemText).join('')}`
+      // 天赋：固定顺序 A → E → Q + 等级（`天赋：A1 E10 Q10`），不再按优先级排序；
+      // 皇冠行单独一行（`皇冠：E（10）Q（10）`）
+      if (row.kind === 'priority') return talentLevelLine(row)
+      if (row.kind === 'crown') return `皇冠：${(row.items ?? []).map(crownItemText).join('')}`
       return ''
     case 'panels':
       if (row.k != null) return `${label}${stripMarks(row.k)}：${stripMarks(row.v ?? '')}`
@@ -477,7 +479,11 @@ export function verifyAgainstJson (docx, bundle, tmpDir, before, frozenGiDir) {
       }
       return `${p} 键不同`
     }
-    return `${p}: JSON=${JSON.stringify(a).slice(0, 40)} ≠ 文档=${JSON.stringify(b).slice(0, 40)}`
+    const show = (x) => {
+      const s = JSON.stringify(x)
+      return (s === undefined ? String(x) : s).slice(0, 40)
+    }
+    return `${p}: JSON=${show(a)} ≠ 文档=${show(b)}`
   }
   for (let i = 0; i < Math.min(parsed.names.length, bundle.names.length); i++) {
     const d = findDiff(bundle.docs[i].v2, parsed.objs[i].v2, 'v2') ?? findDiff(bundle.docs[i].meta, parsed.objs[i].meta, 'meta')

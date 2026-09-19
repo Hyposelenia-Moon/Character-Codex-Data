@@ -293,6 +293,11 @@ function buildSetRow (segments, baseSep, parse) {
 /**
  * 配队成员：认识的角色名 → ref，其余留文字。
  *
+ * 语义符号（与网页版 build-html.mjs 的 teamsFromLines、面板 parse.js 的 v2TeamRows 同一口径）：
+ *   · `+` 连接的是**并列成员**（3 个 = 3 人队、4 个 = 4 人队）
+ *   · `/` 连接的是**同一格的可替换项**（二选一）→ **并进同一个成员格**，格内原样保留 ` / `
+ *     （`A + B + C / D` → 3 个成员，第 3 个是 `C / D`）；`/` 不拆成额外成员格
+ *
  * 成员带**命座 / 成本类**括注（`纳西妲（二命）` `妮露（高金）`）时拆成
  * `{name:'纳西妲', ref:'character:纳西妲'}` + 一条段末备注 `{kind:'note', text:'二命'}`
  * —— 正文行保持干净标准名（ref 能取图标），括注进 `注：` 行。
@@ -301,18 +306,24 @@ function buildSetRow (segments, baseSep, parse) {
  */
 function parseMembers (text, index) {
   const chars = index.characters ?? []
-  const parts = String(text).split(/\s*[+＋＆&/／、]\s*/).map(x => x.trim()).filter(Boolean)
-  if (parts.length < 2) return null
+  // 没有 `+` 就不是队伍行（整段说明，如 `自由选择 / 减抗位`）
+  if (!/\s*[+＋＆&]\s*/.test(String(text))) return null
+  const slots = String(text).split(/\s*[+＋＆&]\s*/).map(x => x.trim()).filter(Boolean)
+  if (slots.length < 2) return null
   const notes = []
-  const members = parts.map(p => {
-    const sn = splitNameNote(p)
+  const members = slots.map(slot => {
+    // 同一格里的 `/` 候选择并成一格（`C / D`），空白归一成 ` / `；`、` 是旧写法同样并格
+    const merged = slot.split(/\s*[/／、]\s*/).map(x => x.trim()).filter(Boolean).join(' / ')
+    const sn = splitNameNote(merged)
+    // 取图标用第一个候选名（面板 / 网页版同款：格内首个候选代表这一格）
+    const first = sn.name.split(/\s*\/\s*/)[0].trim()
     let note = sn.note
     if (resolveNoteText(note, { readPool: [] })) { notes.push(note); note = '' }
-    return { name: sn.name, ...(note ? { note } : {}), ref: makeRef('character', sn.name) }
+    return { name: sn.name, ...(note ? { note } : {}), ref: makeRef('character', first) }
   })
-  // 至少一半能对上角色名才认为是队伍
-  const hit = members.filter(x => chars.includes(x.name)).length
-  return hit >= Math.max(1, Math.floor(members.length / 2)) ? { members, notes } : null
+  // 至少一个候选能对上角色名就认为是队伍（候选项并格后成员数变少，不能按「一半」判）
+  const hit = members.filter(x => x.name.split(/\s*\/\s*/).some(n => chars.includes(n.trim()))).length
+  return hit >= 1 ? { members, notes } : null
 }
 
 /**
@@ -364,14 +375,28 @@ function parseMainStats (text, into = { 时之沙: [], 空之杯: [], 理之冠:
 }
 
 /**
- * 天赋字母：`Q` / `[[t:Q]]` 都能取到 Q。
- * 先 stripMarks 再取首字母，这样带标记的写法与纯文本写法解析结果完全一致。
+ * 天赋字母 + 可选等级：`Q` / `[[t:Q]]` / `E10` / `A1` / `E 10` 都能读。
+ *
+ * 边界（重要）：字母后**紧跟的 1~2 位数字**才算等级，且必须是 1..10 ——
+ *   `A1` → A 等级 1；`A10` → A 等级 10（= 已投皇冠）；`A 10` → 同样按等级 10（中间允许一个空格）
+ *   其它情况（如 `A0`、`A11`）不当作等级，退回「只认字母」并保留原文本，绝不臆造数值。
+ * 等级 10 表示已投皇冠，会同时带上 `crown: true`（文档里只有 `E10` 一种写法，不需要额外标记）。
+ * @param {string} token
+ * @returns {{name: string, ref: string, level?: number, crown?: boolean}|null}
  */
 function talentItem (token) {
-  const m = stripMarks(String(token)).trim().match(/^([AEQaeq])/)
+  const text = stripMarks(String(token)).trim()
+  const m = text.match(/^([AEQaeq])\s*(\d{1,2})?/)
   if (!m) return null
   const name = m[1].toUpperCase()
-  return { name, ref: makeRef('talent', name) }
+  const item = { name }
+  const lv = Number(m[2])
+  if (m[2] !== undefined && Number.isInteger(lv) && lv >= 1 && lv <= 10) {
+    item.level = lv
+    if (lv === 10) item.crown = true
+  }
+  item.ref = makeRef('talent', name)
+  return item
 }
 
 /**
@@ -383,11 +408,35 @@ function parseCrown (text) {
   const out = []
   const re = /([AEQaeq])\s*(?:[（(]([^）)]*)[）)])?/g
   const seen = new Set()
-  const push = (name, level) => {
-    const key = `${name}|${level}`
+  /**
+   * 皇冠条目入列：括号里可能是**等级**（`E（10）`）、**建议**（`E（必须）`）或两者
+   * （`E（10·建议）`）。规则：`10` / `10·xxx` → `level: 10`（皇冠已投），
+   * 其它文本进 `note`（建议 / 可选…）；两者都有的写成 `10·建议`。
+   */
+  const push = (name, raw) => {
+    const s = String(raw ?? '').trim()
+    const num = s.match(/^(\d{1,2})\s*(?:[·・]\s*(.*))?$/)
+    let level = ''
+    let note = ''
+    if (num) {
+      // level 一律写**整数**（与编辑器 / 网页版模型同型；字符串会让往返深比较失败）
+      level = Number(num[1])
+      note = (num[2] ?? '').trim()
+    } else {
+      note = s
+    }
+    const key = `${name}|${level}|${note}`
     if (seen.has(key)) return
     seen.add(key)
-    out.push({ name, ...(level ? { level } : {}), ref: makeRef('talent', name) })
+    const item = { name }
+    if (level) {
+      item.level = level
+      // 皇冠行里的 10 就是「已投皇冠」——与天赋行的 `talentItem` 同口径，补上 crown:true
+      if (level === 10) item.crown = true
+    }
+    if (note) item.note = note
+    item.ref = makeRef('talent', name)
+    out.push(item)
   }
   let rest = String(text ?? '')
   for (const mk of extractMarks(rest)) {
@@ -446,8 +495,9 @@ function parseBlock (lines, index) {
 
     /**
      * 段末备注行 `注：<文本>` → 该段的 `{kind:'note', text}`（放在所属数组末尾）。
-     * 同一段多条备注用 `；` 合并成一行，写回时也合并成一行，所以这里按 `；` 拆开存。
-     * 认不出语义的文本原样存（不丢内容）。
+     * **整行原样存一条**（不按 `；` 拆开）：同一段的备注在导出时拼成一行 `注：…`，
+     * 渲染层（网页版 build-html / 面板 parse.js）都按「一行备注 = 一条」逐行画，
+     * 拆开会变成多行、与文档 / 另一端不一致。认不出语义的文本原样存（不丢内容）。
      * @returns {string} 所属 v2 字段名；不是备注行则 ''
      */
     const takeNote = () => {
@@ -456,10 +506,9 @@ function parseBlock (lines, index) {
       const key = NOTE_SECTION_KEY[section]
       if (!key) return '' // 不在六个小节里（如抬头说明）→ 当普通行处理
       const pool = section === '圣遗物推荐' ? artifactStatPool(data.v2.artifacts) : []
-      for (const part of text.split(/[；;]/).map(x => x.trim()).filter(Boolean)) {
-        const hit = resolveNoteText(part, { readPool: pool })
-        data.v2[key].push({ kind: 'note', text: hit ? hit.raw : part })
-      }
+      // 整行备注一般认不出「命座/成本」语义（那是一整句话），认不出就原样存
+      const hit = resolveNoteText(text, { readPool: pool })
+      data.v2[key].push({ kind: 'note', text: hit ? hit.raw : text })
       return key
     }
 
@@ -535,10 +584,36 @@ function parseBlock (lines, index) {
     }
 
     if (section === '天赋加点') {
-      const pri = line.match(/^优先级[:：]\s*(.*)$/)
+      /**
+       * 天赋等级行（新格式 `天赋：A1 E10 Q10`，固定顺序 A → E → Q）。
+       * 分隔符两种都认：空格（主格式）与全角竖线 `｜`（备选格式）。
+       */
+      const talentLine = line.match(/^天赋[:：]\s*(.*)$/)
+      if (talentLine && !/^优先级/.test(stripMarks(line))) {
+        const names = [...stripMarks(talentLine[1]).matchAll(/([AEQaeq])\s*(\d{1,2})?/g)]
+          .map(m => {
+            const name = m[1].toUpperCase()
+            const lv = Number(m[2])
+            const item = { name }
+            if (m[2] !== undefined && Number.isInteger(lv) && lv >= 1 && lv <= 10) {
+              item.level = lv
+              if (lv === 10) item.crown = true
+            } else {
+              item.level = 1   // 缺省按 1（用户确认的规则）
+            }
+            item.ref = makeRef('talent', name)
+            return item
+          })
+        if (names.length) {
+          // 固定顺序 A → E → Q；raw 记原写法，便于回溯（不再用于展示）
+          const ordered = ['A', 'E', 'Q'].map(k => names.find(n => n.name === k)).filter(Boolean)
+          data.v2.talents.push({ kind: 'priority', order: ordered, raw: stripMarks(talentLine[1]).trim() })
+          continue
+        }
+      }
+      const pri = line.match(/^(?:优先级|天赋)[:：]\s*(.*)$/)
       if (pri) {
-        // 分隔符原文逐字保留（A＞E＞Q / E ≥ Q / E / Q 各不相同），只去掉标记 ——
-        // 标记只影响 order 的解析；build-docx 写回时直接用 raw
+        // 旧格式兼容：`优先级：A1 ＞ E10 ＞ Q10`（逐档分隔符原文保留）
         const parts = splitStatsFull(pri[1])
         const order = parts.filter(p => p.text).map(p => talentItem(p.text)).filter(Boolean)
         if (order.length) {

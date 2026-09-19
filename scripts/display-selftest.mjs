@@ -14,7 +14,7 @@ import { pathToFileURL } from 'node:url'
 import { fileURLToPath } from 'node:url'
 import {
   displayLines, normalizeGuideSections, DISPLAY_SECTIONS, EMPTY_TEXT,
-  displayText, displayLabel, constellationNumber, crownItems, isZeroValue
+  displayText, displayLabel, constellationNumber, crownItems, isZeroValue, ARTIFACT_KIND_LABEL
 } from './lib/guide-display.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -133,7 +133,8 @@ function localModel (v2) {
       })
       continue
     }
-    const head = { preferred: '首选', transition: '过渡', optional: '可选' }[r.kind] ?? ''
+    // 档位名走共享映射（**来源写法**），与 data/gi 的 `v2.artifacts[].label` 词汇一致
+    const head = ARTIFACT_KIND_LABEL[r.kind] ?? ''
     arows.push({
       label: String(r.label ?? '').trim() || head,
       items: (r.sets ?? []).map((s, i, a) => ({ text: s.name + (s.pieces ? `（${s.pieces}）` : ''), note: s.note ?? '', ref: s.ref, sepAfter: i < a.length - 1 ? String(r.sep ?? ' / ').trim().split(/\s+/)[0] : '' }))

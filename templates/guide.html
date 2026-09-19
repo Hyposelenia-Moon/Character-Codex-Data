@@ -169,6 +169,32 @@
         color: #c8891a;
     }
     .sep { color: #a9b4c4; font-weight: bold; padding: 0 3px; font-size: 12px; }
+    /* 天赋：固定三格（A → E → Q），图标 + 正下方数字（与面板同款布局） */
+    .rank-list.talents { display: inline-flex; gap: 14px; align-items: flex-start; }
+    .rank-unit.talent { flex-direction: column; align-items: center; }
+    .rank-item.talent-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        padding: 2px 8px 3px;
+        min-width: 54px;
+    }
+    .rank-item.talent-item .rank-text { display: block; }
+    .level-num {
+        display: block;
+        margin-top: 1px;
+        font-size: 12.5px;
+        font-weight: 700;
+        line-height: 1.2;
+        color: #2f2f2f;
+        text-align: center;
+    }
+    /* 主词条：并列三槽靠排版分隔（不写字面 `｜`）——每条占一行，槽名加粗 */
+    .rank-list.main-slots { display: flex; flex-direction: column; gap: 2px; }
+    .rank-unit.main-slot { width: 100%; }
+    .rank-item.main-slot { width: 100%; }
+    .rank-item.main-slot .slot-name { font-weight: 700; color: #2f4a6d; }
     /* 行内备注（注：…）与段末备注行：小一号灰字 */
     .row-note { display: block; color: #8a8378; font-size: 12px; font-style: italic; }
     /* 配队成员 */

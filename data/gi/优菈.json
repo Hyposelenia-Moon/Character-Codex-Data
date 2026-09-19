@@ -44,10 +44,6 @@
             "ref": "artifact:染血的骑士道"
           },
           {
-            "name": "苍白之火",
-            "ref": "artifact:苍白之火"
-          },
-          {
             "name": "角斗士的终幕礼",
             "ref": "artifact:角斗士的终幕礼"
           },
@@ -75,19 +71,22 @@
         "kind": "priority",
         "order": [
           {
-            "name": "Q",
-            "ref": "talent:Q"
-          },
-          {
             "name": "A",
+            "level": 1,
             "ref": "talent:A"
           },
           {
             "name": "E",
+            "level": 1,
             "ref": "talent:E"
+          },
+          {
+            "name": "Q",
+            "level": 1,
+            "ref": "talent:Q"
           }
         ],
-        "raw": "Q > A > E"
+        "raw": "A1 E1 Q1"
       }
     ],
     "panels": [
@@ -141,13 +140,13 @@
     {
       "title": "2. 圣遗物推荐",
       "lines": [
-        "首选：苍白之火 / 染血的骑士道 + 苍白之火 + 角斗士的终幕礼 + 武人 + 战狂"
+        "首选：苍白之火 / 染血的骑士道 + 角斗士的终幕礼 + 武人 + 战狂"
       ]
     },
     {
       "title": "3. 天赋加点",
       "lines": [
-        "优先级：Q > A > E"
+        "天赋：A1 E1 Q1"
       ]
     },
     {

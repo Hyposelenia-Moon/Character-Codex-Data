@@ -3,6 +3,54 @@
 角色攻略数据仓库。数据为纯 JSON，供 **Atlas-Plugin**（TRSS-Yunzai 图鉴插件）的 `#角色攻略` / `#角色指南` 页面读取；
 仓库根目录的 `guide.html` 是由 JSON 生成的网页版，`guide.md` 是由同一份数据生成的文档版文本。
 
+---
+
+## 改动传播清单（每次改动必读）
+
+> **任何内容变更都必须同时更新全部消费者并跑固定验收集，不得只改一处。**
+> 用户说过"改了什么"，就要把所有对应栏目一起改到位 —— 不要等用户自己查、自己提醒。
+
+### A. 十类消费者（逐条勾选，缺一不可）
+
+| # | 消费者 | 怎么更新 | 证据 |
+|---|---|---|---|
+| 1 | `data/gi/*.json`（必要时含 `_order.json` / `_index.json`） | 数据改动走**文档层**：改主文档 → `node scripts/parse-docx.mjs`；索引 `node scripts/build-index.mjs` | 关键文件 sha256 前后 |
+| 2 | **主文档** `D:\文件\游戏\原神\原神·角色攻略.docx` | 脚本化改（跨 run 安全 + CAS + 备份 `.bak-<时间戳>`），或 `node scripts/build-docx.mjs --write-main` | 改前备份路径 + 主文档 sha1 |
+| 3 | **标记版 docx**（`out\…(标记版).docx` + `D:\…\…(标记版).docx`） | 由 `build-docx --write-main` 一并产出，无需手改 | 标记版 sha1 + "去标记后逐字一致：是" |
+| 4 | `guide.html` | `node scripts/build-html.mjs` | 卡片数 129 + `audit-guide-html` 通过 |
+| 5 | `guide.md` | `node scripts/build-doc.mjs`（**选 A 口径**：只过滤占位符，**文档词汇不变**） | `___`=0 + 文档词汇计数 + 新旧字节/行数 |
+| 6 | **编辑器**（表单文案 + `/api/preview` 预览） | `resources/editor/app.js`（文案/下拉）＋ 服务端走共享层；**改完必须重启编辑器进程**（长驻进程会缓存旧模块） | `/api/preview` html 与 `guide.html` **逐字节一致** |
+| 7 | **插件面板** | `model/codexIndex/display.js`（**与 `scripts/lib/guide-display.mjs` 逐字节一致**）、`parse.js`、`resources/atlas/codex.html`、`codex.css` | `node scripts/check-display-sync.mjs` + `audit-web-vs-panel` |
+| 8 | `README` 与 `templates/` | 改受影响的说明、词汇表、符号语义、期望值 | 本节表格与预期计数 |
+| 9 | **审计脚本的期望值** | `audit-*` / `display-*` / `check-display-sync` 的断言与合法集 | 每个审计 `exit=0` |
+| 10 | 离线脚手架 | `.dsh/` 下的脚手架**不得再读陈旧副本**，统一用 `CODEX_DIR` 环境变量、缺省读**主仓库** | 离线渲染输出能反映主仓库最新数据 |
+
+### B. 固定验收集（十条全绿才算完成）
+
+```bash
+node scripts/parse-docx.mjs --dry                 # 129 角色 / 未识别 0
+node scripts/build-docx.mjs --write-main          # 往返 129/129 深度相等 + 幂等
+node scripts/diagnose-docx-json.mjs               # 不一致 0
+node scripts/audit-web-vs-panel.mjs               # 0
+node scripts/audit-dup-items.mjs                  # 重复名 0/0、序列不一致 0
+node scripts/check-display-sync.mjs               # 两份显示级归一逐字节一致
+node scripts/scan-separators.mjs                  # 0
+node scripts/build-html.mjs && node scripts/build-doc.mjs   # 产物刷新
+# 编辑器 129 角色「打开→原样保存」逐字节不变 + /api/preview 与 guide.html 逐字节一致
+#   （需先 node scripts/editor.mjs --port <p> --no-open 起服务；改过共享层务必重启）
+node --check <每个改过的 .mjs>                     # 全过
+```
+
+### C. 传播矩阵（每次报告都要交）
+
+```
+变更: <一句话>
+产物 → 是否已更新 → 证据(sha/mtime/计数)
+data/gi | 主文档 | 标记版 | guide.html | guide.md | 编辑器 | 面板 | README | 审计期望
+```
+
+---
+
 ## 目录结构
 
 ```
@@ -156,6 +204,47 @@ node scripts/build-doc.mjs       # 文档版 guide.md（Word 用可再打包 doc
 - 数据仓库与插件解耦：插件只读 `data/`，页面样式在插件侧（`resources/atlas/codex.html`），改数据不会影响插件渲染逻辑
 - 插件按「文件清单 + 大小 + mtime」判断数据是否变化，`#图鉴更新` 后无需重启 bot
 - 同名角色在多个游戏下分别建目录（`data/gi/…`、`data/hsr/…`）即可，互不干扰
+
+## 文档词汇 vs 显示词汇（**重要，改数据前先看**）
+
+仓库里有**两套词汇表**。它们不是重复劳动，是分工；搞混会**直接破坏 129/129 文档往返**。
+
+| | 文档词汇（**源**，必须原样保留） | 显示词汇（**呈现**，只由显示层产出） |
+|---|---|---|
+| 档位 | `第一档` / `第二档` / `第三档`、`首选` / `次选` / `可选` / `过渡` / `套装` | `推荐` / `可选` / `过渡`（**三档**，第三档为空时整行不渲染） |
+| 命座 | `二命——说明` | `命之座2` |
+| 段落标题 | `1. 武器推荐` / `4. 毕业面板参考` / `5. 命座推荐` / `6. 配队推荐` | `武器` / `圣遗物` / `天赋` / `面板` / `命座` / `配队` |
+| **副词条百分比** | `生命值百分比` / `百分比生命值` / `攻击力百分比` / `百分比攻击力` / `防御力百分比` / `百分比防御力` | **`大生命` / `大攻击` / `大防御`**（**简写才是最终显示形态**，不再展开成 `生命值`/`攻击力`/`防御力` —— 那是"固定值"语义） |
+| 其它简写 | `充能` / `精通` / `暴伤` / `爆伤` / `大公鸡` … | `元素充能效率` / `元素精通` / `暴击伤害` / `攻击力` … |
+| 固定术语 | `双爆` | `暴击率=暴击伤害`（**同级**，恒等；只作词条时才展开，散文里原样） |
+| 出现位置 | 主文档 docx、`data/gi/*.json` 的 `v2.*.label` 与 `sections[].*`、`guide.md` | `guide.html`、插件面板、编辑器预览 |
+
+**符号语义（用户定稿，四处一致）**：`=`（显示 `＝`）**同级/等价**；`/` **或者/可替换**；
+`>`（显示 `＞`）**优先级/顺序**；`≥` 保留原样。**副词条是唯一例外**，
+源文档里 `/` 表示**同级**、`>` 表示**优先级**，所以显示层把副词条的 `/` 折成 `=`、`>` 折成 `＞`
+（`subSep()`）——**不允许**把 `/` 一律折成 `＞`，那会把"同级"说成"优先级"。
+`｜` 只用于主词条三个**槽位**之间的并列。
+
+**为什么 `v2.label` 里必须留着 `首选` / `过渡` / `第一档`：**
+
+- `parse-docx.mjs` 的行首档位正则只认 `首选|次选|可选|过渡|套装`，**不认 `推荐`**；
+  小节标题也只认 `武器推荐` / `毕业面板参考` 这些**长标题**，不认 `面板`。
+- 所以 `docx → JSON → docx` 往返（硬验收 **129/129 深度相等**）依赖这些来源写法**逐字存在**。
+- 显示词一律由 `scripts/lib/guide-display.mjs` 的 `displayTitle` / `displayLabel` /
+  `TIER_BY_INDEX` / `constellationNumber` / `STAT_ALIASES` 在**渲染期**换算，
+  **一个字都不写回 JSON / docx**。
+
+> ⚠ **误删会破坏往返**：把 `v2.artifacts[].label` 的 `首选` 改成 `推荐`（或把 `sections[].title`
+> 改成短标题）之后，`build-docx --write-main` 写出的文档将无法被 `parse-docx` 读回 ——
+> `推荐：…` 会掉进 `unparsed`，往返校验立刻**不再是 129/129**。真要去掉这些词，顺序必须是：
+> 先改 `parse-docx` 的识别规则 → 再改文档与数据 → 最后才改落盘词。
+
+**空值 / 占位符**：`data.tags` 与 `meta` 里**允许**留 `___级` / `___` / `___%` 这类"还没填"的占位
+（派生层刻意保留原文）。**是否显示由展示层判断**，三处共用同一个判空口径
+`guide-display.mjs` 的 `isBlankDisplay`（空串 / `___` / 只剩标点都算没填）：
+`guide.html` 与面板**不显示**这些标签行；`guide.md` 也**不输出**这些占位（`___` 出现次数为 0）。
+空模块的显示：`guide.html` / 面板显示「暂无」，`guide.md` 显示 `（暂无数据）` —— 同一条规则、不同文字，
+`guide.md` 沿用与它自己的空栏位骨架（`第一档：`）一致的风格。
 
 ---
 

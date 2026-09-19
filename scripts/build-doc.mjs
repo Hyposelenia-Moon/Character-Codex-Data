@@ -14,6 +14,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { isBlankDisplay } from './lib/guide-display.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '..')
@@ -61,35 +62,64 @@ function listCharacters () {
   return [...listed, ...rest].map(name => byName.get(name))
 }
 
-/** 空档角色：只有六个栏位标题，没有任何内容 */
+/**
+ * 去掉占位/空值的标签 —— 判空口径**与 build-html.mjs / 面板完全一致**（共用 `isBlankDisplay`）：
+ * 空串 / `___` 占位 / 只剩标点都算没填。
+ *
+ * 这是 `guide.md` 不再吐出 `建议等级：___级` / `定位：___` 的原因：
+ * `data.tags` 里确实存着占位文本（派生层刻意保留原文），但**展示层负责不显示它**。
+ */
+function visibleTags (data) {
+  return (data.tags || [])
+    .map(t => (typeof t === 'string' ? t : t?.text))
+    .map(t => String(t ?? '').trim())
+    .filter(t => !isBlankDisplay(t))
+}
+
+/** 空档角色：六个栏位标题之外没有任何**可见**内容（占位符不算内容） */
 function isEmptyCharacter (data) {
-  const hasTags = Array.isArray(data.tags) && data.tags.length > 0
-  const hasHighlight = Boolean(data.highlight)
-  const hasLines = (data.sections || []).some(s => Array.isArray(s.lines) && s.lines.length > 0)
+  const hasTags = visibleTags(data).length > 0
+  const hasHighlight = !isBlankDisplay(data.highlight ?? '')
+  const hasLines = (data.sections || []).some(s => Array.isArray(s.lines) && s.lines.some(line => !isBlankDisplay(line)))
   return !hasTags && !hasHighlight && !hasLines
 }
 
-/** 角色 → 文本行数组 */
+/**
+ * 角色 → 文本行数组
+ *
+ * 词汇口径（**用户裁定：选 A**）：本产物输出的是**文档词汇**
+ * （`第一档` / `首选` / `过渡` / `二命——` / `4. 毕业面板参考`），**不做显示级归一**，
+ * 因为 `guide.md` 仍要能打包回 `.docx` 再被 `parse-docx` 逐字读回 ——
+ * `parse-docx` 只认这些来源写法（小节标题也只认长标题、档位行不认 `推荐`）。
+ * 唯一例外是**空值/占位符不再输出**（与 `guide.html`、面板同一判空口径），
+ * 否则读者会看到 `___级` / `___%` 这类从未填过的占位。
+ */
 function renderCharacter (data) {
   const lines = []
-  const tags = (data.tags || []).map(t => (typeof t === 'string' ? t : t.text))
-  const level = tags.find(t => t.startsWith('建议等级')) || '建议等级：___级'
-  const role = tags.find(t => t.startsWith('定位')) || '定位：___'
+  const tags = visibleTags(data)
+  const level = tags.find(t => t.startsWith('建议等级'))
+  const role = tags.find(t => t.startsWith('定位'))
+  const power = isBlankDisplay(data.highlight ?? '') ? '' : plain(data.highlight)
   const empty = isEmptyCharacter(data)
 
-  lines.push(`${data.name} —— ${level}`)
-  lines.push(role)
-  lines.push(data.highlight ? plain(data.highlight) : '100级提升：___%')
+  // 抬头：有等级才写 ` —— 建议等级：…`（`——` 对 parse-docx 是可选的，缺等级不影响解析）
+  lines.push(level ? `${data.name} —— ${level}` : String(data.name))
+  if (role) lines.push(role)   // 没填就不写行（不是写 `定位：___`）
+  if (power) lines.push(power) // 没填就不写行（不是写 `100级提升：___%`）
   lines.push('')
 
   for (const title of SECTION_TITLES) {
     const section = (data.sections || []).find(s => String(s.title).replace(/^\d+\s*[.、]\s*/, '') === title.replace(/^\d+\s*[.、]\s*/, ''))
+    const body = (section?.lines ?? []).map(plain).filter(line => !isBlankDisplay(line))
     lines.push(title)
-    if (section && Array.isArray(section.lines) && section.lines.length) {
-      for (const line of section.lines) lines.push(plain(line))
+    if (body.length) {
+      for (const line of body) lines.push(line)
     } else if (empty) {
       for (const slot of SLOTS[title.replace(/^\d+\s*[.、]\s*/, '')] || []) lines.push(slot)
     } else {
+      // 空模块标记：与 guide.html 的「暂无」是**同一条规则**（模块为空 → 给可见占位），
+      // 只是文字不同 —— 这里用 `（暂无数据）` 与上面的空栏位骨架（`第一档：`）风格一致，
+      // 且不会像裸 `暂无` 那样被误当成正文值。差异已在 README「文档词汇 vs 显示词汇」里写明。
       lines.push('（暂无数据）')
     }
     lines.push('')

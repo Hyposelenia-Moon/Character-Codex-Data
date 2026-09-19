@@ -13,6 +13,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { childRun } from './mark-docx.mjs'
+import { ARTIFACT_KIND_LABEL } from './lib/guide-display.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '..')
@@ -71,7 +72,7 @@ function rows (doc, key) {
     if (x.kind === 'sub') return `副词条：${(x.stats ?? []).join(' / ')}${noteLv(x)}`
     if (x.kind === 'text') return `${x.label ? x.label + '：' : ''}${x.text ?? ''}`
     if (x.kind === 'note') return `（注行）${x.text ?? ''}`
-    const head = x.label ? `${x.label}：` : `${({ preferred: '首选', transition: '过渡', optional: '可选' }[x.kind]) ?? x.kind}：`
+    const head = x.label ? `${x.label}：` : `${ARTIFACT_KIND_LABEL[x.kind] ?? x.kind}：`
     return `${head}${(x.sets ?? []).map(s => s.name + (s.pieces ? `（${s.pieces}）` : '') + noteLv(s)).join(' / ')}`
   })
   if (key === 'talents') return R.map(x => x.kind === 'priority' ? `优先级：${(x.order ?? []).map(o => o.name).join(' > ')}` : x.kind === 'crown' ? `皇冠：${(x.items ?? []).map(i => i.name + (i.level ? `（${i.level}）` : '')).join('')}` : `（${x.kind}）${x.text ?? ''}`)

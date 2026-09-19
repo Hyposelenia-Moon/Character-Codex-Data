@@ -80,18 +80,21 @@
         "order": [
           {
             "name": "A",
+            "level": 1,
             "ref": "talent:A"
           },
           {
             "name": "E",
+            "level": 1,
             "ref": "talent:E"
           },
           {
             "name": "Q",
+            "level": 1,
             "ref": "talent:Q"
           }
         ],
-        "raw": "A > E > Q"
+        "raw": "A1 E1 Q1"
       }
     ],
     "panels": [
@@ -149,7 +152,7 @@
     {
       "title": "3. 天赋加点",
       "lines": [
-        "优先级：A > E > Q"
+        "天赋：A1 E1 Q1"
       ]
     },
     {

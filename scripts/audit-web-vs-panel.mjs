@@ -37,24 +37,50 @@ const canon = s => String(s ?? '')
  * 备注在网页版是嵌在文本里的全角括注、在面板是独立的 `note` 字段（渲染成小字），
  * 这里把两种形态都算进去，才真实反映「内容是否一致」。
  */
-const itemSig = i => canon(clean(i.text) + clean(i.note ? `（${String(i.note).replace(/^[（(]|[）)]$/g, '')}）` : '') + '|' + clean(i.sepAfter || ''))
-const rowSig = row => canon((row.items || []).map(itemSig).join(' '))
+/**
+ * 条目签名：文本 + 备注 + 等级 + 分隔符。
+ * 三处载体差异都要归一：
+ *   · 备注（网页版嵌在文本里的全角括注 / 面板独立的 `note` 字段）
+ *   · 天赋等级（网页版 `level`、面板 `talentLevel`；面板还会把等级同时塞进 `note`）
+ *   · 分隔符字形（`＞`↔`>`、`｜`↔`/`）
+ */
+const itemSig = (i, withLevel) => {
+  const noteLevel = Number(String(i.note ?? '').replace(/^[（(]\s*|\s*[）)]$/g, '').replace(/<[^>]*>/g, '').trim())
+  // 天赋等级只在**天赋行**里参与比对（面板把数字塞在 note、网页版在 level）
+  let level = null
+  if (withLevel) {
+    level = Number.isInteger(Number(i.level)) ? Number(i.level)
+      : (Number.isInteger(Number(i.talentLevel)) ? Number(i.talentLevel)
+        : (Number.isInteger(noteLevel) ? noteLevel : null))
+  }
+  const noteIsLevel = withLevel && Number.isInteger(noteLevel) && String(i.note ?? '').trim() !== ''
+  const noteText = i.note && !noteIsLevel ? `（${String(i.note).replace(/^[（(]|[）)]$/g, '')}）` : ''
+  return canon(clean(i.text) + clean(noteText) + (level === null ? '' : `（${level}）`) + '|' + clean(i.sepAfter || ''))
+}
+const rowSig = row => canon((row.items || []).map(it => itemSig(it, /天赋/.test(String(row.label || '')))).join(' '))
 /**
  * 配队行：两端都把「成员为空的说明」当行尾备注看（网页版放在 text、面板放在 note）。
  * 备注的 `注：` 前缀由显示层按 `notePrefix` 决定（整行就是备注时不加），
  * 所以比对前先剥掉前缀，只比内容（前缀的有无另有专门断言）。
  */
-const teamSig = t => canon([t.tag || '', (t.members || []).map(m => clean(m.name)).join('+'), clean(String(t.note || t.text || '').replace(/^注\s*[:：]/, ''))].join('|'))
 /**
- * 插件侧把**段末备注行**（`注：…`）也塞进 `section.teams` 里渲染（v2TeamRows 之后的
- * note-row 是插件既有的展示细节）；网页版把它们归到行尾备注。为聚焦「角色 / 套装 / 档位」
- * 的一致性，这里把插件侧这类纯备注行排除（它们的文案本身两端相同）。
- *
- * 判定：没有成员、也没有「除 `注：` 前缀外的标签」→ 就是一条整行备注。
- * （`notePrefix === true` 的行是「成员 + 补充说明」，属于正常队伍行，不能排除。）
+ * 配队行：并列成员（`+`）+ 可替换项（旧数据的 `options`，现已并进 `members`，这里只为兼容保留）。
+ * 备注的 `注：` 前缀由显示层按 `notePrefix` 决定（整行就是备注时不加），比对前先剥掉前缀。
  */
-const isPanelNoteRow = t => !(t.members || []).length &&
-  (!String(t.tag ?? '').trim() || /^注\s*[:：]?$/.test(String(t.tag ?? '').trim()))
+const teamSig = (t) => {
+  // 成员之间用 `§` 分隔（**不能用 `/` 或 `+`**：canon 会把 ` / ` 归一成 `/`，
+  // 而成员格内的 `迪奥娜 / 阿罗夏` 就长这样，会被误判成分隔符）
+  const members = (t.members || []).map(m => clean(m.name).replace(/\s*\/\s*/g, '/')).join('§')
+  const options = (t.options || []).map(m => clean(m.name)).join('§')
+  const note = clean(String(t.note || t.text || '').replace(/^注\s*[:：]/, ''))
+  return canon([t.tag || '', members, options, note].join('|'))
+}
+/**
+ * 插件侧把**段末备注行**（`注：…`）也塞进 `section.teams` 里渲染成「只有备注、没有成员」的一行；
+ * 网页版（build-html.mjs）现在也画同样的一行（曾经是漏的），所以这里**不再排除**它们 ——
+ * 两端必须逐字一致（备注的 `注：` 前缀由 `notePrefix` 决定，比对前统一剥掉）。
+ */
+const isPanelNoteRow = () => false
 
 let rows = 0
 let teams = 0

@@ -104,7 +104,7 @@
         "stats": [
           "暴击率",
           "暴击伤害",
-          "百分比攻击力"
+          "大攻击"
         ],
         "sep": " / "
       }
@@ -114,25 +114,31 @@
         "kind": "priority",
         "order": [
           {
+            "name": "A",
+            "level": 1,
+            "ref": "talent:A"
+          },
+          {
             "name": "E",
+            "level": 10,
+            "crown": true,
             "ref": "talent:E"
           },
           {
             "name": "Q",
+            "level": 1,
             "ref": "talent:Q"
-          },
-          {
-            "name": "A",
-            "ref": "talent:A"
           }
         ],
-        "raw": "E＞Q＞A"
+        "raw": "A1 E10 Q1"
       },
       {
         "kind": "crown",
         "items": [
           {
             "name": "E",
+            "level": 10,
+            "crown": true,
             "ref": "talent:E"
           }
         ]
@@ -246,14 +252,14 @@
       "lines": [
         "首选：炉火融炼之心 / 影中沉凝的幻灭",
         "主词条：时之沙：攻击力｜空之杯：攻击力｜理之冠：暴击率 / 暴击伤害 / 攻击力",
-        "副词条：暴击率 / 暴击伤害 / 百分比攻击力"
+        "副词条：暴击率 / 暴击伤害 / 大攻击"
       ]
     },
     {
       "title": "3. 天赋加点",
       "lines": [
-        "优先级：E＞Q＞A",
-        "皇冠：E"
+        "天赋：A1 E10 Q1",
+        "皇冠：E（10）"
       ]
     },
     {

@@ -418,7 +418,16 @@ function normalizeV2 (v2) {
             const text = typeof it === 'string' ? it : (it?.name ?? '')
             const name = String(text).trim().toUpperCase()
             if (!/^[AEQ]$/.test(name)) return null
-            return { name, ref: `talent:${name}` }
+            // 天赋等级（1..10）：缺省按 1、皇冠按 10（用户确认：宁可写 1，也不留「未知」）
+            // 形如 {name:'E', level:10, crown:true, ref:'talent:E'}
+            const rawLevel = typeof it === 'object' && it !== null ? it.level : undefined
+            const lv = Number(rawLevel)
+            const crown = (typeof it === 'object' && it !== null && it.crown === true) || lv === 10
+            const level = crown ? 10 : (Number.isInteger(lv) && lv >= 1 && lv <= 10 ? lv : 1)
+            const item = { name, level }
+            if (crown) item.crown = true
+            item.ref = `talent:${name}`
+            return item
           })
           .filter(Boolean)
         // raw：编辑器没改动顺序就原样保留原文件的写法（仓库里有 A＞E＞Q、E ≥ Q、E / Q、A=Q＞E 等）；
@@ -441,8 +450,12 @@ function normalizeV2 (v2) {
           .map(it => {
             const name = String(typeof it === 'string' ? it : (it?.name ?? '')).trim().toUpperCase()
             if (!/^[AEQ]$/.test(name)) return null
-            const item = { name }
-            if (hasText(it?.level)) item.level = String(it.level).trim()
+            // 皇冠行 = 已投皇冠：level 统一成**整数 10**（与 schema 的 crownItemText / parse-docx 的读法一致）
+            const rawLevel = String(it?.level ?? '').trim()
+            const num = rawLevel.match(/^(\d{1,2})\s*(?:[·・]\s*(.*))?$/)
+            const item = { name, level: 10, crown: true }
+            const note = (num ? (num[2] ?? '') : rawLevel).trim()
+            if (note && note !== '必须' && note !== '10') item.note = note
             item.ref = `talent:${name}`
             return item
           })

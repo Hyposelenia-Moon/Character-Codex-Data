@@ -7,10 +7,19 @@ var TALENTS = ['A', 'E', 'Q']
 var TIERS = [1, 2, 3, 4, 5, 6]
 var CN_NUM = { 1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: '六' }
 
+/**
+ * 圣遗物执行档位下拉的**界面用词**。
+ *
+ * ⚠ 这不是"另一份映射表"，只是浏览器脚本无法 import ESM 时的**显示镜像**；
+ * 唯一权威是数据仓库 `scripts/lib/guide-display.mjs` 的
+ * `ARTIFACT_KIND_LABEL`（kind → 来源写法）经 `displayLabel` 归一后的**三档显示词**：
+ * `preferred → 推荐`、`transition → 过渡`、`optional → 可选`。
+ * 改那边就必须同步这里（否则表单写 `过渡`、预览/面板显示 `可选`，两端漂移）。
+ */
 var ARTIFACT_KINDS = [
   { value: 'preferred', label: '推荐' },
-  { value: 'transition', label: '可选' },
-  { value: 'optional', label: '可选（备选）' },
+  { value: 'transition', label: '过渡' },
+  { value: 'optional', label: '可选' },
   { value: 'main', label: '主词条' },
   { value: 'sub', label: '副词条' },
   { value: 'text', label: '文本' },
@@ -32,12 +41,16 @@ function tierLabel (tier) {
   return String(tier == null ? '' : tier)
 }
 
-/** 行首标签的界面用词：数据里的「首选 / 其他」在界面上显示为 推荐 / 可选（只改显示，不改数据） */
+/**
+ * 行首标签的界面用词：数据里的来源写法在界面上显示为显示词汇（只改显示，不改数据）。
+ * 与 `guide-display.mjs` 的 `TIER_LABEL` 同一套（唯一权威在那边）：
+ * `首选`→推荐、`其他`/`次选`→可选、`套装`→推荐；`推荐`/`可选`/`过渡` 本身是显示词，原样。
+ */
 function labelText (label) {
   var s = str(label).trim()
   if (!s) return ''
-  if (s === '首选') return '推荐'
-  if (s === '其他') return '可选'
+  if (s === '首选' || s === '套装') return '推荐'
+  if (s === '其他' || s === '次选') return '可选'
   return s
 }
 
@@ -114,6 +127,104 @@ function asArray (v) { return Array.isArray(v) ? v : [] }
 
 function hasText (v) { return typeof v === 'string' && v.trim() !== '' }
 
+/* ------------------------------------------------ 天赋等级 / 配队可替换项 */
+
+/**
+ * 天赋等级 → 输入框文本：`1` 显示 `1`、皇冠（10）显示 `10`、没写等级的旧数据显示 `1`
+ * （用户口径：缺省就是 1，宁可写 1 也不留「未知」）
+ */
+function talentLevelText (v) {
+  var m = str(v).trim().match(/^(\d{1,2})/)
+  var n = m ? Number(m[1]) : 0
+  return (n >= 1 && n <= 10) ? String(n) : '1'
+}
+
+/**
+ * 一行天赋的**固定三格**：A / E / Q 各一格（顺序固定），等级来自优先级行
+ * @param {object[]} rows v2.talents 的界面模型
+ * @returns {Array<{name:string, level:string, crown:boolean, note?:string, extra?:boolean}>}
+ */
+function talentSlots (rows) {
+  var row = asArray(rows).filter(function (r) { return r && r.kind === 'priority' })[0]
+  var byName = {}
+  asArray(row && row.slots).forEach(function (s) { byName[str(s && s.name).toUpperCase()] = s })
+  var out = TALENTS.map(function (L) {
+    var s = byName[L]
+    var lv = s ? talentLevelText(s.level) : '1'
+    var crown = !!(s && s.crown) || lv === '10'
+    return { name: L, level: crown ? '10' : lv, crown: crown, note: str(s && s.note) }
+  })
+  // A/E/Q 之外的旧字母照原样带出来（保存时不丢）
+  asArray(row && row.slots).forEach(function (s) {
+    var L = str(s && s.name).toUpperCase()
+    if (!L || TALENTS.indexOf(L) >= 0) return
+    out.push({ name: str(s.name), level: talentLevelText(s.level), crown: !!s.crown, extra: true })
+  })
+  return out
+}
+
+/** 一格配队成员的名字 → 候选列表（`迪奥娜 / 阿罗夏` → ['迪奥娜','阿罗夏']） */
+function memberCandidates (name) {
+  return str(name).split(/\s*[/／]\s*/).map(function (s) { return s.trim() }).filter(Boolean)
+}
+
+/** 候选列表 → 一格的名字（多候选用 ` / ` 连接，与文档 / 面板 / 网页版同一写法） */
+function joinCandidates (list) {
+  var seen = {}
+  var out = []
+  asArray(list).forEach(function (x) {
+    var n = str(typeof x === 'string' ? x : (x && x.name)).trim()
+    if (!n || seen[n]) return
+    seen[n] = true
+    out.push(n)
+  })
+  return out.join(' / ')
+}
+
+/**
+ * 把天赋行统一成「固定三格」形状：
+ *   · 优先级行 → slots（A/E/Q 各一格）；缺字母补 1，多出的旧字母原样留着
+ *   · 皇冠行的字母把对应格抬到 10（皇冠 = 已投，等级 10）后**并掉皇冠行**（等级只有一处真相）
+ *   · 没有优先级行时补一行空的（界面上三格才有地方填）；**空的不会落盘**（见 buildBody）
+ * @param {object[]} rows
+ * @returns {object[]}
+ */
+function foldCrownRows (rows) {
+  var list = asArray(rows).filter(function (r) { return r && typeof r === 'object' }).map(function (r) { return Object.assign({}, r) })
+  var idx = -1
+  list.forEach(function (r, i) { if (idx < 0 && r.kind === 'priority') idx = i })
+  var slots = []
+  if (idx >= 0) {
+    var order = asArray(list[idx].order)
+    slots = TALENTS.map(function (L) {
+      var hit = order.filter(function (x) { return str(x && x.name).toUpperCase() === L })[0]
+      return { name: L, level: talentLevelText(hit && hit.level), crown: !!(hit && (hit.crown === true || talentLevelText(hit && hit.level) === '10')) }
+    })
+    order.forEach(function (x) {
+      var L = str(x && x.name).toUpperCase()
+      if (!L || TALENTS.indexOf(L) >= 0) return
+      slots.push({ name: str(x.name), level: talentLevelText(x.level), crown: x.crown === true, extra: true })
+    })
+  } else {
+    slots = TALENTS.map(function (L) { return { name: L, level: '1', crown: false } })
+  }
+  var byName = {}
+  slots.forEach(function (s, i) { byName[str(s.name).toUpperCase()] = i })
+  list.forEach(function (r) {
+    if (r.kind !== 'crown') return
+    asArray(r.items).forEach(function (it) {
+      var L = str(it && it.name).toUpperCase()
+      if (byName[L] === undefined) return
+      slots[byName[L]].level = '10'
+      slots[byName[L]].crown = true
+      if (hasText(it && it.note) && !slots[byName[L]].note) slots[byName[L]].note = str(it.note)
+    })
+  })
+  var others = list.filter(function (r) { return r.kind !== 'priority' && r.kind !== 'crown' })
+  var pri = { kind: 'priority', slots: slots, raw: idx >= 0 ? str(list[idx].raw) : '', order: idx >= 0 ? asArray(list[idx].order) : [] }
+  return [pri].concat(others)
+}
+
 /** v2 六个数组的空骨架 */
 function emptyV2 () {
   return { weapons: [], artifacts: [], talents: [], panels: [], constellations: [], teams: [] }
@@ -128,7 +239,7 @@ function normalizeData (data) {
   var d = data && typeof data === 'object' ? data : {}
   var v2 = d.v2 && typeof d.v2 === 'object' ? d.v2 : {}
   var meta = d.meta && typeof d.meta === 'object' ? d.meta : {}
-  return {
+  const model = {
     schema: 2,
     name: str(d.name),
     game: str(d.game) || 'gi',
@@ -153,6 +264,12 @@ function normalizeData (data) {
           var st = (r && r.stats) || {}
           row.stats = {}
           MAIN_SLOTS.forEach(function (slot) { row.stats[slot] = asArray(st[slot]).map(str) })
+          // 主词条上的「命座/成本」括注（`水元素伤害加成（二命）`）：界面不改它，
+          // 但**必须原样带回**（否则「打开→保存」会丢掉这条备注）
+          if (hasText(str(r && r.note))) {
+            row.note = str(r.note)
+            if (hasText(str(r && r.noteSlot))) row.noteSlot = str(r.noteSlot)
+          }
         } else if (kind === 'sub') {
           row.stats = asArray(r && r.stats).map(str)
         } else if (kind === 'text') {
@@ -162,22 +279,28 @@ function normalizeData (data) {
         }
         return row
       }),
-      talents: asArray(v2.talents).map(function (r) {
+      talents: foldCrownRows(asArray(v2.talents).map(function (r) {
         if (r && r.kind === 'priority') {
-          return { kind: 'priority', order: asArray(r.order).map(function (it) { return str(it && it.name).toUpperCase() }) }
+          // 天赋等级：固定三格 A → E → Q，每格一个等级（1..10，10 = 皇冠）。
+          // 界面只认这一份数据，皇冠由 level 决定（不再单独编辑皇冠行）。
+          var slots = TALENTS.map(function (L) {
+            var hit = asArray(r.order).filter(function (x) { return str(x && x.name).toUpperCase() === L })[0]
+            return { name: L, level: talentLevelText(hit && hit.level), crown: !!(hit && (hit.crown === true || talentLevelText(hit && hit.level) === '10')) }
+          })
+          // 旧数据/脏数据里可能多出 A/E/Q 之外的字母：原样留着，保存时不丢
+          var extra = asArray(r.order)
+            .filter(function (x) { return TALENTS.indexOf(str(x && x.name).toUpperCase()) < 0 && hasText(str(x && x.name)) })
+            .map(function (x) { return { name: str(x.name), level: talentLevelText(x.level), crown: x.crown === true, extra: true } })
+          return { kind: 'priority', slots: slots.concat(extra), raw: str(r && r.raw) }
         }
+        // 皇冠行：等级 10 归到对应字母那一格（数据里就是「这一格投了皇冠」）
         return {
           kind: 'crown',
           items: asArray(r && r.items).map(function (it) {
-            return {
-              name: str(it && it.name).toUpperCase(),
-              level: str(it && it.level),
-              // 界面上「皇冠」是勾选框：单看 level 里有没有「必须」，`10` 这种旧文本写法也算必需
-              note: str(it && it.note)
-            }
+            return { name: str(it && it.name).toUpperCase(), level: talentLevelText(it && it.level), note: str(it && it.note) }
           })
         }
-      }),
+      })),
       panels: asArray(v2.panels).map(function (r) {
         if (r && hasText(str(r.k))) return { label: str(r.label), k: str(r.k), v: str(r.v) }
         return { label: str(r && r.label), text: str(r && r.text) }
@@ -186,6 +309,8 @@ function normalizeData (data) {
         return { name: str(r && r.name), text: str(r && r.text) }
       }),
       teams: asArray(v2.teams).map(function (r) {
+        // 段末备注行：整行就是备注（`{kind:'note', text}`），渲染层按它画一行
+        if (r && r.kind === 'note') return { kind: 'note', text: str(r.text) }
         return {
           label: str(r && r.label),
           members: asArray(r && r.members).map(function (m) { return { name: str(m && m.name), note: str(m && m.note) } }),
@@ -197,6 +322,14 @@ function normalizeData (data) {
     legacy: d.v2 == null,
     _raw: { source: d.source, highlight: d.highlight, meta: d.meta, game: d.game, schema: d.schema, unparsed: d.unparsed }
   }
+  // 皇冠行条目的**原顺序**（A/E/Q 之外的写法，如 Q 在 A 前）：保存时照原样写回，
+  // 保证「打开→保存」逐字节不变（皇冠行在界面上被折进三格，顺序靠这里记着）
+  model.crownOrder = asArray(v2.talents)
+    .filter(function (r) { return r && r.kind === 'crown' })
+    .map(function (r) {
+      return asArray(r.items).map(function (it) { return str(it && it.name).toUpperCase() }).filter(Boolean)
+    })
+  return model
 }
 
 /** 按 'a.b.0.c' 取值 */
@@ -414,20 +547,10 @@ function refField (kind, value, path) {
     '</span>'
 }
 
-/** 天赋 A/E/Q 下拉（带徽标）。下拉本身就是候选清单，所以不再挂「从名称库选」按钮 */
-function talentField (value, path, extraClass) {
-  var name = str(value).toUpperCase()
-  if (TALENTS.indexOf(name) === -1) name = 'A'
-  var issue = state.issueMap['talent:' + name]
-  var opts = TALENTS.map(function (t) {
-    return '<option value="' + t + '"' + (t === name ? ' selected' : '') + '>' + t + '</option>'
-  }).join('')
-  return '<span class="ref-wrap">' +
-    '<span class="ref-field">' +
-    '<span class="badge talent" title="天赋"><span class="badge-icon">✦</span>天赋</span>' +
-    '<select class="' + (extraClass || '') + '" data-path="' + esc(path) + '" data-ref-kind="talent">' + opts + '</select>' +
-    '</span>' + (issue ? '<span class="warn-chip" title="' + esc(issue) + '">⚠</span>' : '') + '</span>'
-}
+/**
+ * 天赋三格用不到下拉了（A/E/Q 固定），保留这个注释位说明字段形态：
+ * 每格 = { name:'A'|'E'|'Q', level:'1'..'10', crown:boolean }
+ */
 
 /** 命座名输入（自动推导 index，显示为徽标 + 输入） */
 function constellationField (value, path) {
@@ -504,7 +627,7 @@ function rowVisible (row) {
     case 'text':
       return hasText(row.text) || hasText(row.label)
     case 'priority':
-      return asArray(row.order).length > 0
+      return asArray(row.slots).length > 0 || asArray(row.order).length > 0
     case 'crown':
       return asArray(row.items).length > 0
     default:
@@ -628,12 +751,13 @@ function renderArtifacts () {
     var body2 = ''
     if (row.kind === 'main') {
       // 三个槽位是**并列**关系（槽内候选用 `/`）；这里实时显示当前渲染形态：
-      // `时之沙：… ｜ 空之杯：… ｜ 理之冠：…`（副词条才是优先级 `＞`）
+      // `时之沙：… ｜ 空之杯：… ｜ 理之冠：…`（副词条另有一套：`/` = 同级 → 显示 `=`、`>` = 优先级 → 显示 `＞`）
       var nowLine = MAIN_SLOTS
         .filter(function (slot) { return asArray(row.stats && row.stats[slot]).length })
         .map(function (slot) { return slot + '：' + asArray(row.stats[slot]).map(function (x) { return str(x).trim() }).filter(Boolean).join(' / ') })
         .join(' ｜ ')
-      body2 = '<div class="muted main-hint">三个槽位是<strong>并列</strong>关系（槽内候选用 <code>/</code>，槽位之间渲染成 <code>｜</code>）；只有副词条用优先级 <code>＞</code>。' +
+      body2 = '<div class="muted main-hint">三个槽位是<strong>并列</strong>关系（槽内候选用 <code>/</code>，槽位之间渲染成 <code>｜</code>）。' +
+        '副词条另有口径：<code>/</code> 表示<strong>同级</strong>（渲染成 <code>=</code>），<code>&gt;</code> 表示<strong>优先级</strong>（渲染成 <code>＞</code>）；固定术语 <code>双爆</code> 恒等于 <code>暴击率=暴击伤害</code>。' +
         (nowLine ? '<br>当前渲染：<code>主词条：' + esc(nowLine) + '</code>' : '<br>当前渲染：<code>（空，' + EMPTY_TEXT + '）</code>') +
         '</div>' +
         '<div class="grid-3">' + MAIN_SLOTS.map(function (slot) {
@@ -646,7 +770,7 @@ function renderArtifacts () {
         '<span class="muted" style="font-size:12px">对某个部位的**补充说明**才写这里（整行就是说明时不必写「注：」）</span>' +
         '</div>'
     } else if (row.kind === 'sub') {
-      body2 = multiValue('副词条（按优先级从左到右）', p + '.stats', row.stats, '如 双爆')
+      body2 = multiValue('副词条（`/` = 同级 → 渲染 `=`；`>` = 优先级 → 渲染 `＞`；百分比统一写 `大生命`/`大攻击`/`大防御`）', p + '.stats', row.stats, '如 双爆 / 大攻击')
     } else if (row.kind === 'note') {
       body2 = '<div class="field"><span>备注（注：）</span>' +
         '<input type="text" data-path="' + p + '.text" value="' + esc(row.text) + '" placeholder="该段落末尾的一行「注：…」，多条用「；」分隔">' +
@@ -676,65 +800,35 @@ function renderArtifacts () {
 function renderTalents () {
   var s = state.model.v2
   var priorities = visibleRows(s.talents).filter(function (e) { return e.row.kind === 'priority' })
-  var crowns = visibleRows(s.talents).filter(function (e) { return e.row.kind === 'crown' })
-
-  var priBody
+  // 数据里没有天赋行时，界面仍然给一行空的三格（有地方填），保存时空行不落盘
   if (!priorities.length) {
-    priBody = emptyNote('还没有优先级行') + '<div style="margin-top:6px">' + actBtn('add-priority', 'v2.talents', '＋ 优先级', 'btn mini') + '</div>'
-  } else {
-    priBody = priorities.map(function (entry) {
-      var row = entry.row
-      var i = entry.i
-      var p = 'v2.talents.' + i
-      var steps = row.order.map(function (t, j) {
-        return '<span class="talent-row" style="gap:2px">' +
-          '<span class="idx">' + (j + 1) + '</span>' +
-          talentField(t, p + '.order.' + j + '.name', 'w-xs') +
-          actBtn('move-item-up', p + '.order', '↑', 'row-del', '前移', j) +
-          actBtn('move-item-down', p + '.order', '↓', 'row-del', '后移', j) +
-          actBtn('del-item', p + '.order', '×', 'row-del', '删除', j) +
-          '</span>'
-      }).join('<span class="muted"> &gt; </span>')
-      return '<div class="box"' + rowAttr(p) + '><div class="box-head">' +
-        '<span class="box-title">优先级（从左到右）</span><span class="spacer"></span>' +
-        actBtn('add-item', p + '.order', '＋ 天赋', 'btn mini') +
-        actBtn('del-row', 'v2.talents', '删除行', 'btn mini danger', '删除这一行', i) +
-        '</div><div class="talent-row" style="flex-wrap:wrap">' + steps + '</div></div>'
-    }).join('')
-    priBody += '<div style="margin-top:8px">' + actBtn('add-priority', 'v2.talents', '＋ 再加一条优先级', 'btn mini') + '</div>'
+    s.talents = foldCrownRows(s.talents)
+    priorities = visibleRows(s.talents).filter(function (e) { return e.row.kind === 'priority' })
   }
-
-  var crownBody
-  if (!crowns.length) {
-    crownBody = emptyNote('还没有皇冠行') + '<div style="margin-top:6px">' + actBtn('add-crown', 'v2.talents', '＋ 皇冠', 'btn mini') + '</div>'
-  } else {
-    crownBody = crowns.map(function (entry) {
-      var row = entry.row
-      var i = entry.i
-      var p = 'v2.talents.' + i
-      var items = row.items.map(function (it, j) {
-        var q = p + '.items.' + j
-        // 「皇冠」= 必需项：勾选（界面不再出现 `10` 这种文本，勾选状态落到 level='必须'）
-        var need = /必须/.test(str(it.level))
-        return '<div class="crown-row">' +
-          talentField(it.name, q + '.name') +
-          '<label class="crown-check" title="勾选 = 需要皇冠（渲染成技能图标角上的皇冠徽标；不勾选 = 可选，不标注）">' +
-          '<input type="checkbox" data-path="' + q + '.level" data-crown="1"' + (need ? ' checked' : '') + '>必需（皇冠）</label>' +
-          actBtn('del-item', p + '.items', '×', 'row-del', '删除', j) +
-          '</div>'
-      }).join('')
-      return '<div class="box"' + rowAttr(p) + '><div class="box-head">' +
-        '<span class="box-title">皇冠</span><span class="muted" style="font-size:12px">勾选「必需」的项会在预览 / 面板里带上皇冠徽标</span><span class="spacer"></span>' +
-        actBtn('add-item', p + '.items', '＋ 天赋', 'btn mini') +
-        actBtn('del-row', 'v2.talents', '删除行', 'btn mini danger', '删除这一行', i) +
-        '</div><div class="sub-list">' + items + '</div></div>'
-    }).join('')
-    crownBody += '<div style="margin-top:8px">' + actBtn('add-crown', 'v2.talents', '＋ 再加一条皇冠', 'btn mini') + '</div>'
-  }
-
-  var body = '<div style="font-size:12px;color:var(--text-soft);margin-bottom:6px">优先级' +
-    (s.talents.length ? '' : '（' + EMPTY_TEXT + '）') + '</div>' + priBody +
-    '<div style="font-size:12px;color:var(--text-soft);margin:12px 0 6px">皇冠（必需项勾选）</div>' + crownBody
+  var p0 = priorities.length ? 'v2.talents.' + priorities[0].i : ''
+  var slots = talentSlots(s.talents)
+  var slotHtml = slots.map(function (sl, j) {
+    var q = p0 + '.slots.' + j
+    return '<div class="talent-slot' + (sl.crown ? ' crowned' : '') + '"' + (sl.extra ? ' title="A/E/Q 之外的旧字母，保存时原样保留"' : '') + '>' +
+      '<span class="ts-name" data-ref-kind="talent" data-path="' + esc(q + '.name') + '">' + esc(sl.name) + '</span>' +
+      '<input class="ts-level" type="number" inputmode="numeric" min="1" max="10" step="1" value="' + esc(sl.level) + '"' +
+      ' data-path="' + esc(q + '.level') + '" data-level="1" title="等级 1–10（10 = 皇冠；留空按 1）">' +
+      '<button type="button" class="ts-crown" data-act="toggle-crown" data-path="' + esc(p0) + '" data-i="' + j + '"' +
+      ' title="皇冠：点上 = 已投皇冠（等级 10）">' +
+      '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.6 4.4l2.9 2.1L8 2.6l3.5 3.9 2.9-2.1-1.3 8.1H2.9z" fill="currentColor"/>' +
+      '<rect x="2.9" y="12.9" width="10.2" height="1.7" rx="0.85" fill="currentColor"/></svg></button>' +
+      '</div>'
+  }).join('')
+  var rawHint = hasText(s.talents.filter(function (r) { return r.kind === 'priority' })[0] &&
+    s.talents.filter(function (r) { return r.kind === 'priority' })[0].raw)
+    ? '<span class="muted" style="font-size:12px">文档里的写法：' +
+      esc(s.talents.filter(function (r) { return r.kind === 'priority' })[0].raw) + '</span>'
+    : ''
+  var body = '<div style="font-size:12px;color:var(--text-soft);margin-bottom:6px">天赋等级（固定 A → E → Q）</div>' +
+    '<div class="box"' + rowAttr(p0) + '><div class="box-head">' +
+    '<span class="box-title">A / E / Q</span>' + rawHint + '<span class="spacer"></span>' +
+    '<span class="muted" style="font-size:12px">数字 = 等级（1–10，留空按 1）· 点皇冠 = 10</span>' +
+    '</div><div class="talent-slots">' + slotHtml + '</div></div>'
   return card('天赋加点', s.talents.length + ' 行', body, true)
 }
 
@@ -784,13 +878,33 @@ function renderConstellations () {
 function renderTeams () {
   var s = state.model.v2
   var body = rowList('v2.teams', s.teams, function (row, i, p, rowId) {
-    var members = row.members.map(function (m, j) {
+    // 段末备注行（整行就是备注）：只显示文本输入，不做成员编辑
+    if (row.kind === 'note') {
+      return '<div class="box"' + rowAttr(rowId) + '><div class="box-head">' +
+        '<span class="box-title">行 ' + (i + 1) + ' · 备注</span>' +
+        '<span class="muted" style="font-size:12px">整行备注（写作 `注：…`，渲染时不加前缀）</span>' +
+        '<span class="spacer"></span>' +
+        actBtn('move-row-up', 'v2.teams', '↑', 'btn mini', '上移', i) +
+        actBtn('move-row-down', 'v2.teams', '↓', 'btn mini', '下移', i) +
+        actBtn('del-row', 'v2.teams', '删除行', 'btn mini danger', '删除这一行', i) +
+        '</div><div class="field"><span>备注文本</span>' +
+        '<input type="text" data-path="' + p + '.text" value="' + esc(str(row.text)) + '" placeholder="如 建议二命及以上"></div></div>'
+    }
+    var members = asArray(row.members).map(function (m, j) {
       var q = p + '.members.' + j
-      return '<span class="member" draggable="true" data-m="' + j + '" title="点名字打开选择器；左右拖动可排序">' +
-        '<span class="pk-av">' + esc(str(m.name).slice(0, 1)) + '</span>' +
-        '<button type="button" class="member-name" data-act="open-members" data-path="' + esc(p) + '">' + esc(m.name || '（未填）') + '</button>' +
+      var cands = memberCandidates(m.name)
+      var multi = cands.length > 1
+      // 一格里的可替换项显示成 `A / B`（斜杠不加中文标注）；名字那一行可点开候选选择器
+      var nameHtml = cands.map(function (n, k) {
+        return (k ? '<span class="cand-sep"> / </span>' : '') +
+          '<span class="cand' + (k ? ' cand-alt' : '') + '" title="' + (k ? '可替换项' : '主选') + '">' + esc(n) + '</span>'
+      }).join('')
+      return '<span class="member' + (multi ? ' multi' : '') + '" draggable="true" data-m="' + j + '" title="点名字选择候选（可加可替换项）；左右拖动可排序">' +
+        '<span class="pk-av">' + esc(cands[0] ? cands[0].slice(0, 1) : '') + '</span>' +
+        '<button type="button" class="member-name" data-act="open-candidates" data-path="' + esc(q) + '">' + (nameHtml || '（未填）') + '</button>' +
+        (multi ? '<span class="cand-tag" title="这一格有 ' + cands.length + ' 个候选（同一格二选一）">' + cands.length + ' 选</span>' : '') +
         '<input type="text" class="member-note" data-path="' + q + '.note" value="' + esc(m.note || '') + '" placeholder="备注" title="括注备注（如 二命 / 高金），输出为「名称（备注）」">' +
-        actBtn('del-item', p + '.members', '×', 'row-del', '移除成员', j) + '</span>'
+        actBtn('del-item', p + '.members', '×', 'row-del', '移除这一格', j) + '</span>'
     }).join('')
     return '<div class="box"' + rowAttr(rowId) + '><div class="box-head">' +
       '<span class="box-title">行 ' + (i + 1) + '</span>' +
@@ -800,10 +914,10 @@ function renderTeams () {
       actBtn('move-row-down', 'v2.teams', '↓', 'btn mini', '下移', i) +
       actBtn('del-row', 'v2.teams', '删除行', 'btn mini danger', '删除这一行', i) +
       '</div>' +
-      '<div class="field"><span>成员（点名字打开可搜索选择器：中文 / 拼音首字母过滤，可多选、拖动排序）</span>' +
+      '<div class="field"><span>成员（点一格的名字选候选：可加「可替换项」，同一格内用 <b> / </b> 连接；拖动可排序）</span>' +
       '<div class="members" data-members="' + esc(p) + '">' + members +
       '<button type="button" class="btn mini" data-act="open-members" data-path="' + esc(p) + '">＋ 成员</button></div></div>' +
-      '<div class="field" style="margin-top:8px"><span>文本' + (row.members.length ? '（成员之外的补充说明）' : '（没有拆成成员时，整行按文本输出）') + '</span>' +
+      '<div class="field" style="margin-top:8px"><span>文本' + (asArray(row.members).length ? '（成员之外的补充说明）' : '（没有拆成成员时，整行按文本输出）') + '</span>' +
       '<input type="text" data-path="' + p + '.text" value="' + esc(row.text) + '" placeholder="如 自由选择"></div>' +
       '</div>'
   }, '配队行')
@@ -1381,7 +1495,8 @@ function syncRefInputs () {
     var el = inputs[i]
     var path = el.getAttribute('data-path')
     var kind = el.getAttribute('data-ref-kind')
-    var val = el.value.trim()
+    // 天赋三格的字母是 <span>（没有 .value），引用字段（select/input）才有 —— 两种都取到文本
+    var val = String(el.value !== undefined ? el.value : (el.textContent || '')).trim()
     setPath(state.model, path, val)
     // 模型里同时存 ref 结构
     var parentPath = path.replace(/\.[^.]+$/, '')
@@ -1451,20 +1566,34 @@ function buildBody () {
     return row.sets.length || hasText(row.label)
   })
 
-  var talents = mv2.talents.map(function (row) {
-    if (row.kind === 'priority') {
-      var order = row.order.filter(function (t) { return TALENTS.indexOf(t) >= 0 })
-        .map(function (t) { return { name: t, ref: 'talent:' + t } })
-      // 不带 raw：服务器会在顺序没变时原样保留原文件的写法（A＞E＞Q / E ≥ Q / E / Q 等）
-      return { kind: 'priority', order: order }
-    }
-    var items = row.items.filter(function (it) { return TALENTS.indexOf(it.name) >= 0 }).map(function (it) {
-      var o = { name: it.name, ref: 'talent:' + it.name }
-      if (hasText(it.level)) o.level = it.level.trim()
+  var talents = []
+  mv2.talents.forEach(function (row) {
+    if (row.kind !== 'priority') return
+    // 数据里没有天赋行的角色：界面会补一行空三格（有地方填），但**没填就不落盘**，
+    // 否则「打开再保存」会凭空多出一行 A1 E1 Q1（还会多出一个「3. 天赋加点」段）。
+    // 判据：这一行**既没有 raw、也没有 A/E/Q 之外的旧字母**，且三格都还是默认的 1（没勾皇冠）
+    var slots = talentSlots(mv2.talents)
+    var blank = !hasText(row.raw) && slots.every(function (s) { return !s.extra && s.level === '1' && !s.crown })
+    if (blank) return
+    // 固定三格：A/E/Q 顺序写回；每格一个等级（1..10），10 = 皇冠（crown:true）
+    var order = slots.map(function (s) {
+      var o = { name: s.name, level: Number(s.level) === 10 ? 10 : (Number(s.level) || 1), ref: 'talent:' + s.name }
+      if (o.level === 10) o.crown = true
       return o
     })
-    return { kind: 'crown', items: items }
-  }).filter(function (row) { return row.order ? row.order.length : row.items.length })
+    // raw 按仓库口径生成（`A1 E10 Q10`）：服务器在顺序没变时会保留原写法，变了就用这份
+    talents.push({ kind: 'priority', order: order, raw: order.map(function (o) { return o.name + o.level }).join(' ') })
+    // 皇冠行与优先级行**同形**（数据里就是这样两份）：能让服务端按下标稳定合并，
+    // 也避免「只在模型里折平、却把皇冠行留在旧文件里」的隐性依赖。
+    // 条目顺序沿用原文件的皇冠行顺序（如 `Q` 在 `A` 前），保证「打开→保存」逐字节不变
+    var crownMap = {}
+    order.filter(function (o) { return o.level === 10 }).forEach(function (o) { crownMap[o.name] = o })
+    var prevOrder = asArray(asArray(m.crownOrder)[0])
+    var names = prevOrder.filter(function (n) { return crownMap[n] })
+    Object.keys(crownMap).forEach(function (n) { if (names.indexOf(n) < 0) names.push(n) })
+    var crowns = names.map(function (n) { return { name: n, level: 10, crown: true, ref: 'talent:' + n } })
+    if (crowns.length) talents.push({ kind: 'crown', items: crowns })
+  })
 
   var panels = mv2.panels.map(function (row) {
     var label = hasText(row.label) ? row.label : null
@@ -1478,13 +1607,19 @@ function buildBody () {
   })
 
   var teams = mv2.teams.map(function (row) {
+    // 段末备注行（`{kind:'note'}`）原样带回（界面不改它，但丢了就是数据损失）
+    if (row.kind === 'note') return { kind: 'note', text: str(row.text).trim() }
     var members = asArray(row.members).filter(function (m) { return hasText(m.name) }).map(function (m) {
-      var o = { name: m.name.trim(), ref: 'character:' + m.name.trim() }
+      // 一格可以带可替换项（`迪奥娜 / 阿罗夏`）：落盘仍是**一格一个 name**、格内用 ` / ` 连接，
+      // ref 取**第一个候选**（面板 / 网页版取图标同款口径）
+      var cands = memberCandidates(m.name)
+      var name = cands.length > 1 ? joinCandidates(cands) : cands[0]
+      var o = { name: name, ref: 'character:' + (cands[0] || name) }
       if (hasText(m.note)) o.note = m.note.trim()
       return o
     })
     return { label: hasText(row.label) ? row.label : null, members: members, text: str(row.text).trim() }
-  }).filter(function (row) { return row.members.length || hasText(row.text) || hasText(row.label) })
+  }).filter(function (row) { return asArray(row.members).length || hasText(row.text) || hasText(row.label) })
 
   return {
     name: state.current,
@@ -1706,16 +1841,26 @@ function handleAction (act, path, i, el) {
   } else if (act === 'move-item-down') {
     changed = moveRow(target, i, 1)
   } else if (act === 'add-priority') {
-    var lastPriority = -1
-    model.v2.talents.forEach(function (r, k) { if (r.kind === 'priority') lastPriority = k })
-    model.v2.talents.splice(lastPriority + 1, 0, { kind: 'priority', order: ['A', 'E', 'Q'] })
-  } else if (act === 'add-crown') {
-    model.v2.talents.push({ kind: 'crown', items: [{ name: 'A', level: '' }] })
+    // 天赋只有一行固定三格（A/E/Q）：空段就把三格补出来（等级默认 1）
+    model.v2.talents = foldCrownRows(model.v2.talents)
+  } else if (act === 'toggle-crown') {
+    // 皇冠格：点一下就切到 10 / 回到 1（等级是唯一真相）
+    var crownRow = getPath(model, path)
+    var cslot = getPath(model, path + '.slots.' + i)
+    if (crownRow && cslot && typeof cslot === 'object') {
+      cslot.level = (talentLevelText(cslot.level) === '10' && cslot.crown) ? '1' : '10'
+      cslot.crown = cslot.level === '10'
+      if (crownRow.kind === 'priority') crownRow.raw = ''
+    }
   } else if (act === 'add-member') {
     target.push({ name: nextTeamMember(getPath(model, path.replace(/\.members$/, '')), target), note: '' })
   } else if (act === 'open-members') {
     // 配队成员：可搜索多选选择器（path 是这一行的路径，如 v2.teams.0）
     openMemberPicker(path)
+    changed = false
+  } else if (act === 'open-candidates') {
+    // 这一格的候选（可替换项）：一格可以有多个候选，格内用 ` / ` 连接
+    openSlotCandidates(path)
     changed = false
   } else if (act === 'copy-prev') {
     // 「复制上一条」：把同一个列表里上一条的名字填进来（含 ref）
@@ -1793,10 +1938,47 @@ function openMemberPicker (path) {
     onConfirm: function (members) {
       var before = clone(team.members)
       if (window.Picker.sameMembers(before, members)) return
-      team.members = members
+      // 一格一个候选（普通成员）：第一个候选作为主名，其余候选并进同一格（`A / B`）
+      team.members = members.map(function (m, i) {
+        var cands = memberCandidates(m.name)
+        return { name: joinCandidates(cands), note: str(m.note), ref: 'character:' + (cands[0] || m.name) }
+      })
       markDirty(true)
       renderForm()
-      showStatus('已更新成员：' + (members.length ? members.map(function (m) { return m.name }).join(' + ') : '（空）'), 'ok')
+      var tip = team.members.map(function (m) { return memberCandidates(m.name)[0] }).filter(Boolean)
+      showStatus('已更新成员：' + (tip.length ? tip.join(' + ') : '（空）'), 'ok')
+    }
+  })
+}
+
+/**
+ * 「选择这一格的候选（可替换项）」：一格可以有多个候选，第一个是主选、其余是备选。
+ * 候选并进**同一格**，格内用 ` / ` 连接（用户口径：不加任何中文标注）。
+ * @param {string} path 形如 v2.teams.0.members.2
+ */
+function openSlotCandidates (path) {
+  var teamPath = path.replace(/\.members\.\d+$/, '')
+  var idx = Number((path.match(/\.members\.(\d+)$/) || [])[1])
+  var team = getPath(state.model, teamPath)
+  var member = getPath(state.model, path)
+  if (!team || !member || !Number.isInteger(idx)) { showStatus('找不到这一格成员', 'error'); return }
+  if (typeof window.Picker === 'undefined') { showStatus('选择器组件没加载（/picker.js 404？）', 'error', true); return }
+  window.Picker.openMembers({
+    title: '这一格的候选（顺序即优先级，第一个是主选）',
+    pool: memberPool(team.members),
+    members: memberCandidates(member.name).map(function (n) { return { name: n, ref: 'character:' + n } }),
+    confirmText: '确定候选',
+    onConfirm: function (members) {
+      var cands = members.map(function (m) { return memberCandidates(m.name)[0] }).filter(Boolean)
+      if (!cands.length) { showStatus('至少留一个候选', 'error'); return }
+      var before = memberCandidates(member.name)
+      var after = joinCandidates(cands)
+      if (before.join(' / ') === after) return
+      member.name = after
+      member.ref = 'character:' + cands[0]
+      markDirty(true)
+      renderForm()
+      showStatus('这一格：' + after, 'ok')
     }
   })
 }
@@ -1819,9 +2001,19 @@ function formEvents () {
   form.addEventListener('input', function (e) {
     var el = e.target
     if (!el || !el.getAttribute) return
-    // 皇冠勾选框：勾上 = 必需（level='必须'），取消 = 可选（level=''）
-    if (el.getAttribute && el.getAttribute('data-crown')) {
-      setPath(state.model, el.getAttribute('data-path'), el.checked ? '必须' : '')
+    // 天赋等级输入框：1–10；写 10 = 皇冠，写 1–9 = 取消皇冠；留空按 1
+    if (el.getAttribute('data-level')) {
+      var lvPath = el.getAttribute('data-path')
+      var row = getPath(state.model, lvPath.replace(/\.slots\.\d+\.level$/, ''))
+      var slot = getPath(state.model, lvPath)
+      var n = Number(String(el.value).trim())
+      if (!el.value.trim()) n = 1
+      if (!(n >= 1 && n <= 10)) n = 1
+      if (slot && typeof slot === 'object') {
+        slot.level = String(n)
+        slot.crown = n === 10
+      }
+      if (row && row.kind === 'priority') row.raw = ''
       markDirty(true)
       return
     }
@@ -2594,6 +2786,14 @@ window.__editor = {
   batchRun: batchRun,
   batchUndo: batchUndo,
   openMemberPicker: openMemberPicker,
+  openSlotCandidates: openSlotCandidates,
+  // 纯函数（供自动化检查：天赋三格 / 候选并格 / 落盘形状）
+  talentSlots: talentSlots,
+  talentLevelText: talentLevelText,
+  memberCandidates: memberCandidates,
+  joinCandidates: joinCandidates,
+  syncRefInputs: syncRefInputs,
+  toJson: buildBody,
   openRefPickerFor: openRefPickerFor,
   jumpTo: jumpTo,
   focusRow: focusRow,

@@ -47,7 +47,8 @@
       {
         "kind": "sub",
         "stats": [
-          "双爆"
+          "暴击率",
+          "暴击伤害"
         ],
         "sep": " > "
       }
@@ -57,15 +58,22 @@
         "kind": "priority",
         "order": [
           {
+            "name": "A",
+            "level": 1,
+            "ref": "talent:A"
+          },
+          {
             "name": "E",
+            "level": 1,
             "ref": "talent:E"
           },
           {
             "name": "Q",
+            "level": 1,
             "ref": "talent:Q"
           }
         ],
-        "raw": "E > Q"
+        "raw": "A1 E1 Q1"
       }
     ],
     "panels": [
@@ -116,13 +124,13 @@
       "lines": [
         "首选：黄金剧团",
         "主词条：空之杯：雷元素伤害加成 / 攻击力",
-        "副词条：双爆"
+        "副词条：暴击率 > 暴击伤害"
       ]
     },
     {
       "title": "3. 天赋加点",
       "lines": [
-        "优先级：E > Q"
+        "天赋：A1 E1 Q1"
       ]
     },
     {

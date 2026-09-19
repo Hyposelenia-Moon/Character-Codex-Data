@@ -451,6 +451,70 @@ textarea { resize: vertical; min-height: 54px; }
 .talent-row .handle { cursor: grab; color: var(--text-soft); user-select: none; }
 .talent-row .idx { width: 20px; color: var(--text-soft); font-size: 12px; }
 
+/* 天赋固定三格：字母 + 正下方等级输入 + 皇冠徽标（顺序固定 A → E → Q） */
+.talent-slots { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; padding: 2px 0; }
+.talent-slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 56px;
+}
+.talent-slot .ts-name {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+  user-select: none;
+}
+.talent-slot .ts-level {
+  width: 44px;
+  text-align: center;
+  padding: 3px 2px;
+  font-size: 13px;
+}
+.talent-slot .ts-level::-webkit-outer-spin-button,
+.talent-slot .ts-level::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.talent-slot .ts-level { -moz-appearance: textfield; appearance: textfield; }
+.talent-slot.crowned .ts-name { border-color: #c8891a; box-shadow: 0 0 0 2px rgba(200, 137, 26, 0.18); }
+.talent-slot.crowned .ts-level { color: #a8690d; font-weight: 600; }
+.talent-slot .ts-crown {
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  margin-left: -11px;
+  width: 22px;
+  height: 22px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: #fff;
+  color: #c9c4ba;
+  cursor: pointer;
+  opacity: 0.55;
+}
+.talent-slot .ts-crown svg { width: 100%; height: 100%; display: block; }
+.talent-slot .ts-crown:hover { opacity: 1; }
+.talent-slot.crowned .ts-crown { color: #c8891a; border-color: #c8891a; background: #fff7e6; opacity: 1; }
+
+/* 配队一格里的可替换项：格内 `A / B`，斜杠只是分隔，不加中文标注 */
+.member .cand-sep { color: var(--text-soft); }
+.member .cand-alt { color: var(--text-dim); }
+.member .cand-tag {
+  font-size: 11px;
+  color: var(--text-soft);
+  border-left: 1px solid var(--line);
+  padding: 0 2px 0 6px;
+}
+
 /* ---------------------------------------------------------------- 未识别行 */
 
 .unparsed-group { margin-bottom: 8px; }

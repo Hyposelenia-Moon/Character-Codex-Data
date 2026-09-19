@@ -298,11 +298,12 @@ export function deriveTags (data) {
 export function deriveSections (data) {
   const s = data?.v2 ?? {}
   const out = []
-  /** 段落数组里的备注行 → 段末 `注：` 文本（原始括注 → 语义化润色，多条 `；` 分隔） */
+  /** 段落数组里的备注行 → 段末 `注：` 文本（**整行原样**，多条 `；` 分隔） */
   const sectionNote = (rows) => {
-    const pool = artifactStatPool(rows)
-    return (rows ?? []).filter(isNoteRow).map(noteText).filter(Boolean)
-      .map(t => resolveNoteText(t, { polishPool: pool })?.polished ?? t)      .join(NOTE_SEP)
+    // 备注文本在数据里就是「要显示的文本」（parse-docx 入库时已认过语义、编辑器改过就是新值）：
+    // 这里**不再二次润色** —— 面板渲染的是同一条 `text`，再润色一次会让网页版 / 文档
+    // 显示成 `建议二命及以上` 而面板显示 `二命`（两端漂移）。
+    return (rows ?? []).filter(isNoteRow).map(noteText).filter(Boolean).join(NOTE_SEP)
   }
   /** 把段落数组渲染成「正文行 + 段末备注行」 */
   const pushSection = (title, lines, note) => {
@@ -331,9 +332,10 @@ export function deriveSections (data) {
   const t = []
   for (const row of s.talents ?? []) {
     if (isNoteRow(row)) continue
-    // priority 用 raw 原样写回（`A＞E＞Q` `E ≥ Q` `E / Q` 各不相同，joinItems 会归一成 `>`）
-    if (row.kind === 'priority') t.push(`优先级：${stripMarks(row.raw ?? '') || joinItems(row.order)}`)
-    else if (row.kind === 'crown') t.push(`皇冠：${(row.items ?? []).map(itemText).join('')}`)
+    // priority：**逐条写字母 + 等级**（`E10 ＞ Q10 ＞ A1`，没有等级的就只写字母 `E ＞ Q`）
+    // —— 等级是结构化字段（{name, level, crown}），文档里用紧凑写法 `E10` 表达，解析侧能读回
+    if (row.kind === 'priority') t.push(talentLevelLine(row))
+    else if (row.kind === 'crown') t.push(`皇冠：${(row.items ?? []).map(crownItemText).join('')}`)
   }
   pushSection('3. 天赋加点', t, sectionNote(s.talents))
 
@@ -367,6 +369,74 @@ export function deriveSections (data) {
   pushSection('6. 配队推荐', team, sectionNote(s.teams))
 
   return out
+}
+
+/** 天赋等级行的行首标记（面板 / 文档 / 网页版共用的展示口径） */
+export const TALENT_PREFIX = '天赋：'
+/** 旧的行首标记（解析侧仍兼容旧文档） */
+export const TALENT_PREFIX_LEGACY = '优先级：'
+
+/**
+ * 天赋等级行 → 文档文本（**固定顺序 A → E → Q，不用 `＞`**）
+ *
+ * 写法：`A1 E10 Q10`（数字 1..10，10 = 已投皇冠；缺省按 1）。三格固定顺序与面板一致，
+ * 优先级顺序不再用于展示（但数据里的 `order` / `raw` 仍保留，便于回溯）。
+ *
+ * ⚠️ 主格式用**空格**分隔；备选写法是 `A1｜E10｜Q10`（全角竖线）。解析侧两种都认。
+ * @param {object} row
+ * @param {{sep?: string, prefix?: string}} [opts] sep=分隔符（默认空格）、prefix=行首（默认 `天赋：`）
+ * @returns {string}
+ */
+export function talentLevelLine (row, opts = {}) {
+  const sep = opts.sep === undefined ? ' ' : String(opts.sep)
+  const prefix = opts.prefix === undefined ? `${TALENT_PREFIX}` : opts.prefix
+  const byName = new Map()
+  for (const it of row?.order ?? []) {
+    const name = String(typeof it === 'string' ? it : (it?.name ?? '')).trim().toUpperCase()
+    if (!/^[AEQ]$/.test(name)) continue
+    const rawLv = typeof it === 'object' && it !== null ? it.level : undefined
+    const lv = Number(rawLv)
+    const crowned = typeof it === 'object' && it !== null && it.crown === true
+    const level = crowned ? 10 : (Number.isInteger(lv) && lv >= 1 && lv <= 10 ? lv : 1)
+    byName.set(name, level)
+  }
+  if (!byName.size) return stripMarks(row?.raw ?? '') || ''
+  return prefix + TALENT_ORDER.map(name => `${name}${byName.has(name) ? byName.get(name) : 1}`).join(sep)
+}
+
+/**
+ * @deprecated 旧版「优先级行」写法（`E10 ＞ Q10 ＞ A1`）。保留导出只为兼容，正式输出用 talentLevelLine。
+ */
+export function priorityLine (row) {
+  const order = (row?.order ?? []).map(it => {
+    const name = String(typeof it === 'string' ? it : (it?.name ?? '')).trim().toUpperCase()
+    if (!/^[AEQ]$/.test(name)) return null
+    const rawLv = typeof it === 'object' && it !== null ? it.level : undefined
+    const lv = Number(rawLv)
+    const crowned = typeof it === 'object' && it !== null && it.crown === true
+    const level = crowned ? 10 : (Number.isInteger(lv) && lv >= 1 && lv <= 10 ? lv : 1)
+    return { name, level }
+  }).filter(Boolean)
+  if (!order.length) return stripMarks(row?.raw ?? '') || ''
+  const rawSeps = String(row?.raw ?? '').split(/[AEQaeq0-9\s]+/).filter(s => /[>＞≥＝=/／]/.test(s))
+  const sep = (i) => rawSeps[i] || (row?.sep ? String(row.sep) : '') || '＞'
+  return order.map((it, i) => `${it.name}${it.level}${i < order.length - 1 ? sep(i) : ''}`).join('')
+}
+
+/**
+ * 皇冠行条目 → 文本：`E（10）`、`E（10·建议）`（等级 + 可选建议用 `·` 连，避免两层括号）
+ * @param {object} item
+ * @returns {string}
+ */
+export function crownItemText (item) {
+  if (item == null) return ''
+  if (typeof item === 'string') return stripMarks(item)
+  const name = stripMarks(item.name ?? '')
+  const lv = Number(item.level)
+  const level = Number.isInteger(lv) && lv >= 1 && lv <= 10 ? String(lv) : ''
+  const note = item.note ? stripMarks(item.note) : ''
+  const inside = [level, note].filter(Boolean).join('·')
+  return `${name}${inside ? `（${inside}）` : ''}`
 }
 
 /** 单条武器行 → 文本行 */
@@ -482,6 +552,11 @@ export function renderArtifactRow (row) {
     case 'preferred':
     case 'transition':
     case 'optional': {
+      // 这里是**文档词汇**（首选 / 过渡 / 可选），不是显示词汇 ——
+      // deriveSections 的产物要能被 parse-docx 逐字读回（doc → JSON → doc 往返），
+      // 而 parse-docx 只认 `首选|次选|可选|过渡|套装`、**不认 `推荐`**，所以必须保持来源写法。
+      // 同一份映射的共享定义见 scripts/lib/guide-display.mjs 的 ARTIFACT_KIND_LABEL
+      // （插件侧只取那一份、再经 displayLabel 归一出显示词）；改这里请同步那一份。
       const head = { preferred: '首选', transition: '过渡', optional: '可选' }[row.kind]
       const sets = (row.sets ?? []).map(x => {
         const name = stripMarks(x.name ?? x)
