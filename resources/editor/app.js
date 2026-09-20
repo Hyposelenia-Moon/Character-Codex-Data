@@ -875,7 +875,8 @@ function renderArtifacts () {
         .map(function (slot) { return slot + '：' + asArray(row.stats[slot]).map(function (x) { return str(x).trim() }).filter(Boolean).join(' / ') })
         .join(' ｜ ')
       body2 = '<div class="muted main-hint">三个槽位是<strong>并列</strong>关系（槽内候选用 <code>/</code>，槽位之间渲染成 <code>｜</code>）。' +
-        '副词条另有口径：<code>/</code> 表示<strong>同级</strong>（渲染成 <code>=</code>），<code>&gt;</code> 表示<strong>优先级</strong>（渲染成 <code>＞</code>）；固定术语 <code>双爆</code> 恒等于 <code>暴击率=暴击伤害</code>。' +
+        '副词条另有口径：<strong>只有 暴击率 ↔ 暴击伤害 是同级</strong>（源文档写 <code>/</code> → 渲染 <code>=</code>），' +
+        '其余相邻词条一律<strong>优先级</strong>（写 <code>&gt;</code> → 渲染 <code>＞</code>）；固定术语 <code>双爆</code> 恒等于 <code>暴击率=暴击伤害</code>。' +
         (nowLine ? '<br>当前渲染：<code>主词条：' + esc(nowLine) + '</code>' : '<br>当前渲染：<code>（空，' + EMPTY_TEXT + '）</code>') +
         '</div>' +
         '<div class="grid-3">' + MAIN_SLOTS.map(function (slot) {
@@ -888,7 +889,7 @@ function renderArtifacts () {
         '<span class="muted" style="font-size:12px">对某个部位的**补充说明**才写这里（整行就是说明时不必写「注：」）</span>' +
         '</div>'
     } else if (row.kind === 'sub') {
-      body2 = multiValue('副词条（`/` = 同级 → 渲染 `=`；`>` = 优先级 → 渲染 `＞`；百分比写 `大生命`/`大攻击`/`大防御`，固定值写 `小生命`/`小攻击`/`小防御`）', p + '.stats', row.stats, '如 双爆 / 大攻击', '副词条')
+      body2 = multiValue('副词条（**只有 暴击率↔暴击伤害 是同级**（写 `/` → 渲染 `=`），其余一律用 `>`（渲染 `＞`）；百分比写 `大生命`/`大攻击`/`大防御`，固定值写 `小生命`/`小攻击`/`小防御`）', p + '.stats', row.stats, '如 双爆 / 大攻击', '副词条')
     } else if (row.kind === 'note') {
       body2 = '<div class="field"><span>备注（注：）</span>' +
         '<input type="text" data-path="' + p + '.text" value="' + esc(row.text) + '" placeholder="该段落末尾的一行「注：…」，多条用「；」分隔">' +

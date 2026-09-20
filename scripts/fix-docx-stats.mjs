@@ -112,6 +112,16 @@ function normalizeSubBody (body) {
     const b = tokens[i + 1].text
     if (CRIT_PAIRS.some(([x, y]) => a === x && b === y)) tokens[i] = { ...tokens[i], sep: ' / ' }
   }
+  // ②b **反向**（用户定稿：「只有暴击和爆伤是等价的，其他都是大于」）：
+  //     非暴击对之间的 `/` 一律改成 `>` —— 否则显示层会把它渲染成 `=`，把"优先级"说成"同级"。
+  for (let i = 0; i < tokens.length - 1; i++) {
+    const s = String(tokens[i].sep || '').trim()
+    if (!(s === '/' || s === '／')) continue
+    const a = tokens[i].text
+    const b = tokens[i + 1].text
+    if (CRIT_PAIRS.some(([x, y]) => a === x && b === y)) continue
+    tokens[i] = { ...tokens[i], sep: ' > ' }
+  }
   // ③ 拼回（保留每档原有分隔符）
   return tokens.map(p => p.text + p.sep).join('').replace(/\s+$/, '')
 }

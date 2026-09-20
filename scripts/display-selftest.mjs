@@ -243,13 +243,22 @@ console.log('\n================ 词条写法 ================')
 
   // ① 主词条：不写「百分比」（默认就是百分比）；副词条：百分比 大X / 固定值 小X
   const flat = mk({ artifacts: [{ kind: 'sub', stats: ['小攻击', '小生命', '小防御', '大攻击', '暴击率'], sep: ' / ' }] })
-  push('副词条：小X / 大X 原样显示（不被折成 攻击力 等）', rowText(flat, '圣遗物'), '小攻击=小生命=小防御=大攻击=暴击率')
+  push('副词条：小X / 大X 原样显示（不被折成 攻击力 等）', rowText(flat, '圣遗物'), '小攻击＞小生命＞小防御＞大攻击＞暴击率')
   push('副词条：文档层仍是原词', (flat.sections.find(s => /圣遗物/.test(s.title))?.lines ?? [])[0], '副词条：小攻击 / 小生命 / 小防御 / 大攻击 / 暴击率')
 
   // ② 副词条同级对：`/` → `=`，其余 `>` → `＞`（逐档分隔符）
   const crit = mk({ artifacts: [{ kind: 'sub', stats: ['暴击率', '暴击伤害', '大攻击'], sep: ' / > ' }] })
   push('副词条：暴击率 = 暴击伤害 ＞ 大攻击（逐档分隔符）', rowText(crit, '圣遗物'), '暴击率=暴击伤害＞大攻击')
   push('副词条：文档层保留 `/` 与 `>` 原写法', (crit.sections.find(s => /圣遗物/.test(s.title))?.lines ?? [])[0], '副词条：暴击率 / 暴击伤害 > 大攻击')
+
+  // ②b **只有暴击对是同级**（用户定稿：「只有暴击和爆伤是等价的，其他都是大于」）：
+  //     非暴击对之间的 `/` 必须渲染成 `＞`，不能渲染成 `=`
+  const notCrit = mk({ artifacts: [{ kind: 'sub', stats: ['暴击率', '暴击伤害', '元素充能效率', '元素精通'], sep: ' / ' }] })
+  push('副词条：全 `/` 行 —— 只有暴击对是 `=`，其余是 `＞`', rowText(notCrit, '圣遗物'), '暴击率=暴击伤害＞元素充能效率＞元素精通')
+  const noCrit = mk({ artifacts: [{ kind: 'sub', stats: ['元素充能效率', '元素精通', '小攻击'], sep: ' / ' }] })
+  push('副词条：没有暴击对时整行都是 `＞`', rowText(noCrit, '圣遗物'), '元素充能效率＞元素精通＞小攻击')
+  push('副词条：只剩一侧是暴击（暴击率 ＞ 小攻击）', rowText(mk({ artifacts: [{ kind: 'sub', stats: ['暴击率', '小攻击'], sep: ' / ' }] }), '圣遗物'), '暴击率＞小攻击')
+  push('副词条：`暴击` 与 `暴伤` 也认（展开后是暴击对）', rowText(mk({ artifacts: [{ kind: 'sub', stats: ['暴击', '暴伤', '大攻击'], sep: ' / ' }] }), '圣遗物'), '暴击率=暴击伤害＞大攻击')
 
   // ③ 圣遗物行：不显示件数（旧数据里即使还留着 pieces 也不画；套装候选按仓库口径渲染成 `＞`）
   const pieceRow = { kind: 'preferred', label: '首选', sep: ' / ', sets: [{ name: '翠绿之影', ref: 'artifact:翠绿之影' }, { name: '角斗士的终幕礼', ref: 'artifact:角斗士的终幕礼', pieces: '2件套' }] }
