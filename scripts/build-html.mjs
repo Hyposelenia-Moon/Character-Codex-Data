@@ -548,7 +548,8 @@ export function characterSections (data) {
         return {
           label: displayText(String(r?.label ?? '')),
           ref: '',
-          items: parts.map((p, i) => ({ text: displayText(p), sepAfter: i < parts.length - 1 ? '/' : '' }))
+          // `/` 只是拆分的依据，**不画字面分隔符**（用户反馈：chip 之间不该有残留的 `/`）
+          items: parts.map((p, i) => ({ text: displayText(p), sepAfter: '' }))
         }
       }).filter(Boolean)
       return { title, badge, type: 'stats', kind, rows: panelRows }

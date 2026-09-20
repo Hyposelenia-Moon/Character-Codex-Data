@@ -306,12 +306,12 @@ console.log('\n================ 词条写法 ================')
     const sec = panelSec(v2)
     return sec.empty ? '暂无' : sec.rows.map(r => (r.label ? r.label + '：' : '') + r.items.map(i => i.text + (i.sepAfter || '')).join('')).join(' ｜ ')
   }
-  push('面板：v2 键值对 + 说明行都能渲染', panelText([
+  push('面板：v2 键值对 + 说明行都能渲染（说明行的 `/` 只用来拆分，不画出来）', panelText([
     { label: null, k: '暴击率', v: '70%+' },
     { label: null, k: '暴击伤害', v: '220%+' },
     { label: null, k: '攻击力', v: '2200+' },
     { label: '辅助向', text: '暴击率70% / 暴伤220%+' }
-  ]), '暴击率：70%+\u3000暴击伤害：220%+\u3000攻击力：2200+ ｜ 辅助向：暴击率70%/暴击伤害220%+')
+  ]), '暴击率：70%+\u3000暴击伤害：220%+\u3000攻击力：2200+ ｜ 辅助向：暴击率70%暴击伤害220%+')
   // 渲染模型形状（另一条链路传进来的就是 `{label, items}`）：直接测归一函数
   {
     const { normalizePanelRows } = await import(pathToFileURL(path.join(root, 'scripts/lib/guide-display.mjs')).href)
