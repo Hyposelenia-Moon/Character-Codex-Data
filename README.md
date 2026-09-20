@@ -317,8 +317,8 @@ node scripts/build-doc.mjs       # 文档版 guide.md（Word 用可再打包 doc
 |---|---|---|
 | 圣遗物 | **同级套装两个 chip 紧挨着**（不画 `＞`）；2+2 仍在一个 chip 内用 `+` | `guide-display.mjs` 的 `SET_LEVEL_SEP` / `gapSepOf` ＋ `parse.js` 的 `resolveArtifactSetItems` |
 | 天赋 | 行首标签显示 **`推荐`**（不是 `天赋`）；三格 A/E/Q + 图标正下方等级数字（10 叠皇冠） | `build-html.mjs` 与 `parse.js` 的行模型（`label: '推荐', kind: 'talents'`） |
-| 命座 | **图标在 `命之座N` 之前**：`[图标] [命之座2] [说明]` | `codex.html` 的 `.grow-icon`（行首渲染）＋ `codex.css` 的 `.grow-constellation` 三列网格 |
-| 配队 | **头像之间 `+`**（槽位之间）；**同一槽位的可替换角色之间 `/`** | `codex.html` 的 `.team-plus` / `.team-slash`；候选头像由插件 `icons.js` 的 `attachTeamIcons` 逐个解析（`member.candidates`） |
+| 命座 | **图标在 `命之座N` 之前**：`[图标] [命之座2] [说明]`；命座图标是**白色线稿**，浅底上必须反相成深色（`rank-icon-line`）否则看不清 | `codex.html` 的 `.grow-icon`（行首渲染，**带 `rank-icon-line`**）＋ `codex.css` 的 `.grow-constellation` 三列网格 / `.rank-icon.rank-icon-line { filter: invert(1) brightness(.9) }` |
+| 配队 | **头像之间 `+`**（槽位之间）；**同一槽位的可替换角色之间 `/`，且这些候选头像要并列横排**（不要上下堆叠） | `codex.html` 的 `.team-plus` / `.team-alts` / `.team-slash`；候选头像由插件 `icons.js` 的 `attachTeamIcons` 逐个解析（`member.candidates`） |
 | Hero | 文字对比度：遮罩 0.52 + 近黑字 + 四向白色描边 | `resources/common/hero.css` 的 `.hero-bg` / `.hero-title` / `.hero-game` |
 
 面板离线核对（维护者侧，`.dsh/` 不入库）：`node .dsh/explore/codex/render.mjs <角色>`
