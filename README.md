@@ -1,4 +1,4 @@
-# Character-Codex-Data
+﻿# Character-Codex-Data
 
 角色攻略数据仓库。数据为纯 JSON，供 **Atlas-Plugin**（TRSS-Yunzai 图鉴插件）的 `#角色攻略` / `#角色指南` 页面读取；
 仓库根目录的 `guide.html` 是由 JSON 生成的网页版，`guide.md` 是由同一份数据生成的文档版文本。
@@ -19,13 +19,13 @@
 | 3 | **标记版 docx**（`out\…(标记版).docx` + `D:\…\…(标记版).docx`） | 由 `build-docx --write-main` 一并产出，无需手改 | 标记版 sha1 + "去标记后逐字一致：是" |
 | 4 | `guide.html` | `node scripts/build-html.mjs` | 卡片数 129 + `audit-guide-html` 通过 |
 | 5 | `guide.md` | `node scripts/build-doc.mjs`（**选 A 口径**：只过滤占位符，**文档词汇不变**） | `___`=0 + 文档词汇计数 + 新旧字节/行数 |
-| 6 | **编辑器**（表单文案 + `/api/preview` 预览） | `resources/editor/app.js`（文案 / 下拉 / **标签与档位联动**）＋ 服务端走共享层；**改完必须重启编辑器进程**（长驻进程会缓存旧模块） | `/api/preview` html 与 `guide.html` **逐字节一致** ＋ `.dsh/verify-editor-label.mjs` 12/12 |
+| 6 | **编辑器**（表单文案 + `/api/preview` 预览） | `resources/editor/app.js`（文案 / 下拉 / **标签与档位联动**）＋ 服务端走共享层；**改完必须重启编辑器进程**（长驻进程会缓存旧模块） | `/api/preview` html 与 `guide.html` **逐字节一致** ＋ `scripts/editor-selftest.mjs` 27/27 |
 | 7 | **插件面板** | `model/codexIndex/display.js`（**与 `scripts/lib/guide-display.mjs` 逐字节一致**）、`parse.js`、`resources/atlas/codex.html`、`codex.css` | `node scripts/check-display-sync.mjs` + `audit-web-vs-panel` |
 | 8 | `README` 与 `templates/` | 改受影响的说明、词汇表、符号语义、期望值 | 本节表格与预期计数 |
 | 9 | **审计脚本的期望值** | `audit-*` / `display-*` / `check-display-sync` 的断言与合法集 | 每个审计 `exit=0` |
 | 10 | 离线脚手架 | `.dsh/` 下的脚手架**不得再读陈旧副本**，统一用 `CODEX_DIR` 环境变量、缺省读**主仓库** | 离线渲染输出能反映主仓库最新数据 |
 
-### B. 固定验收集（十二条全绿才算完成）
+### B. 固定验收集（十四条全绿才算完成）
 
 ```bash
 node scripts/parse-docx.mjs --dry                 # 129 角色 / 未识别 0
@@ -35,12 +35,12 @@ node scripts/audit-web-vs-panel.mjs               # 真实角色 0 + 自定义�
 node scripts/audit-dup-items.mjs                  # 重复名 0/0、序列不一致 0
 node scripts/check-display-sync.mjs               # 两份显示级归一逐字节一致
 node scripts/scan-separators.mjs                  # 0
-node scripts/display-selftest.mjs <角色>           # 自定义档位词断言 7/7
+node scripts/display-selftest.mjs <角色>           # 自定义档位词 7/7 + 词条写法 7/7
+node scripts/editor-selftest.mjs                  # 编辑器规则 27/27（天赋等级 / 新增行 / 多值输入 / 标签互斥 / 配队槽位）
 node scripts/build-html.mjs && node scripts/build-doc.mjs   # 产物刷新
 # 编辑器 129 角色「打开→原样保存」逐字节不变 + /api/preview 与 guide.html 逐字节一致
 #   （需先 node scripts/editor.mjs --port <p> --no-open 起服务；改过共享层务必重启）
 node --check <每个改过的 .mjs>                     # 全过
-# 本地未入库：.dsh/verify-editor-label.mjs（编辑器 label/tier 口径 12/12）
 ```
 
 ### C. 传播矩阵（每次报告都要交）
@@ -216,7 +216,9 @@ node scripts/build-doc.mjs       # 文档版 guide.md（Word 用可再打包 doc
 | 档位 | `第一档` / `第二档` / `第三档`、`首选` / `次选` / `可选` / `过渡` / `套装`；**`label` 非空 = 自定义档位词**（如 `建议`，见下节） | `推荐` / `可选` / `过渡`（**三档**，第三档为空时整行不渲染） |
 | 命座 | `二命——说明` | `命之座2` |
 | 段落标题 | `1. 武器推荐` / `4. 毕业面板参考` / `5. 命座推荐` / `6. 配队推荐` | `武器` / `圣遗物` / `天赋` / `面板` / `命座` / `配队` |
-| **副词条百分比** | `生命值百分比` / `百分比生命值` / `攻击力百分比` / `百分比攻击力` / `防御力百分比` / `百分比防御力` | **`大生命` / `大攻击` / `大防御`**（**简写才是最终显示形态**，不再展开成 `生命值`/`攻击力`/`防御力` —— 那是"固定值"语义） |
+| **主词条** | `攻击力` / `生命值` / `防御力` / `元素精通` / `元素充能效率` / `暴击率` / `暴击伤害` / 各元素伤害加成 —— **不写「百分比」**（主词条默认就是百分比；旧写法 `攻击力百分比` 已全部改掉） | 原样（主词条不做简写） |
+| **副词条** | 百分比 = `大生命` / `大攻击` / `大防御`；固定值 = `小生命` / `小攻击` / `小防御`（旧写法 `生命值百分比` / `攻击力` 已全部改掉） | **`大X` / `小X` 本身就是显示形态**（不再展开成 `生命值`/`攻击力`/`防御力` —— 那是"固定值"语义，会弄错） |
+| 圣遗物件数 | **不写** `（2件套）`（旧写法已全部改掉）；2+2 写**属性词简写**：`2精通 + 2精通`、`翠绿之影 / 2攻击`、`昔日宗室之仪 / 2生命 + 2充能 + 角斗士的终幕礼` | 件数**不渲染**（网页版 / 面板都不画；`parseSetItem` 仍容错读取，旧数据往返不丢） |
 | 其它简写 | `充能` / `精通` / `暴伤` / `爆伤` / `大公鸡` … | `元素充能效率` / `元素精通` / `暴击伤害` / `攻击力` … |
 | 固定术语 | `双爆` | `暴击率=暴击伤害`（**同级**，恒等；只作词条时才展开，散文里原样） |
 | 出现位置 | 主文档 docx、`data/gi/*.json` 的 `v2.*.label` 与 `sections[].*`、`guide.md` | `guide.html`、插件面板、编辑器预览 |
@@ -226,6 +228,11 @@ node scripts/build-doc.mjs       # 文档版 guide.md（Word 用可再打包 doc
 源文档里 `/` 表示**同级**、`>` 表示**优先级**，所以显示层把副词条的 `/` 折成 `=`、`>` 折成 `＞`
 （`subSep()`）——**不允许**把 `/` 一律折成 `＞`，那会把"同级"说成"优先级"。
 `｜` 只用于主词条三个**槽位**之间的并列。
+
+**副词条逐档分隔符**：一行里可以混用（`暴击率 / 暴击伤害 > 大攻击` → 显示 `暴击率 = 暴击伤害 ＞ 大攻击`）。
+`v2.artifacts[kind=sub].sep` 按**空白分隔的逐档 token** 存（`' / > '` ＝ 第一档 `/`、第二档 `>`）；
+`parse-docx` 的 `gapSepOf` 负责生成、`schema.renderArtifactRow` 的 `sepTokens` 负责逐字写回。
+**暴击率与暴击伤害是同级**（用户定稿）：一律用 `/`（→ `=`）连接，不许写 `>`。
 
 **为什么 `v2.label` 里必须留着 `首选` / `过渡` / `第一档`：**
 
@@ -259,7 +266,7 @@ node scripts/build-doc.mjs       # 文档版 guide.md（Word 用可再打包 doc
 断言（改动显示层 / 文档层 / 编辑器标签时都要跑）：
 `scripts/display-selftest.mjs <角色>`（自定义档位词 7 条）、
 `scripts/audit-web-vs-panel.mjs` 的合成样例（3 条）、
-本地未入库的 `.dsh/verify-editor-label.mjs`（编辑器标签口径 12 条）。
+`scripts/editor-selftest.mjs`（编辑器规则 27 条：天赋等级 / 新增行可见 / 多值输入 / 标签互斥 / 配队槽位 / 界面标记不落盘）。
 
 **空值 / 占位符**：`data.tags` 与 `meta` 里**允许**留 `___级` / `___` / `___%` 这类"还没填"的占位
 （派生层刻意保留原文）。**是否显示由展示层判断**，三处共用同一个判空口径
@@ -450,6 +457,17 @@ node scripts/editor.mjs [--port 8787] [--no-open] [--exit-on-idle[=<秒>]]
 「保存并发布」或 `Ctrl+Shift+S` 走全链路（写 JSON → 重建索引 → 写回 Word 主文档 → 生成 `guide.html` → 三方一致性校验 → **自动提交，不推送**）；
 「发布」按钮只把**已保存的**数据重新生成 `guide.html` 与 Word 主文档，不写入正在编辑的表单。
 
+**表单里的几条硬规则**（都是用户报过问题后定稿的，改动前先看 `scripts/editor-selftest.mjs`）：
+
+| 栏目 | 规则 |
+|---|---|
+| 武器行 | 「自定义标签」与「档位」**二选一**：填了自定义词（如 `建议`）自动清空档位下拉，反之亦然；行首实时显示「显示为：X」 |
+| 圣遗物行 | 档位下拉与标签联动（`label` 就是文档原词，`kind` 跟着走）；**件数不再提供输入** |
+| 主词条 / 副词条 | 每个 chip 是**可编辑输入框**（点「＋」加一项后能直接打字，或点「▾」从候选表选）；主词条候选不带「百分比」，副词条候选是 `大X` / `小X` 两套 |
+| 天赋 | 固定三格 A / E / Q，**数字就是等级**（1–10，留空按 1）；数字本身就会生效，皇冠只是把这一格抬到 10 |
+| 配队 | 「＋ 成员」打开**槽位**选择器：点名字加进**当前格**，一格可多选（格内 ` / ` = 可替换），「＋ 新槽位」再开一格；`＋ 配队行` 加出来的空行**立刻可见可编辑** |
+| 任何栏目 | 「＋ 新增一行」加出来的空行用界面标记 `_new` 保证可见，**保存时不会落盘**（空行不写进 JSON） |
+
 **关闭网页后自动结束服务**（`--exit-on-idle`，默认关闭，只在手动开时生效）
 
 后台隐藏启动时（见下）关掉浏览器窗口，服务会变成任务管理器里的幽灵进程，所以加了空闲自动退出：
@@ -518,10 +536,10 @@ PowerShell 的隐藏命令，而不是直接指向 `node.exe`：
 逐条 `⚠ 解析告警：…` 打到 stderr，并汇总进 `data/_parse-report.json` 的 `warnings` 数组
 （既有 `注：` 备注走廊机制不变）。正常文档应为 `解析告警：0 条`。
 
-**已知的「名称校验问题」（不是告警，属正常）**：文档里 `过渡：2充能 + 2充能`、`可选：2攻击 + 2攻击`
-这类写法是**效果描述**（"带充能/攻击 2 件套的两套"），**不是套装名**，因此不在图鉴里 ——
-`parse-docx` 会记进 `_parse-report.json` 的 `issues`（当前 33 条 / 13 行），**不影响往返**。
-真名写法见 `首选：翠绿之影 / 角斗士的终幕礼（2件套）`。
+**已知的「名称校验问题」（不是告警，属正常）**：文档里 `过渡：2充能 + 2充能`、`可选：2攻击 + 2攻击`、
+`首选：翠绿之影 / 2攻击` 这类写法是**效果描述**（"带充能/攻击 2 件套的两套"），**不是套装名**，因此不在图鉴里 ——
+`parse-docx` 会记进 `_parse-report.json` 的 `issues`（当前 36 条），**不影响往返**。
+真名写法见 `首选：纺月的夜歌`、`首选：昔日宗室之仪 / 2生命 + 2充能 + 角斗士的终幕礼`。
 
 | 产出 | 说明 |
 |------|------|
@@ -647,6 +665,19 @@ node scripts/build-docx.mjs [--out 目标docx] [--template 模板docx] [--no-mar
 node scripts/build-html.mjs      # guide.html
 node scripts/build-doc.mjs       # guide.md
 ```
+
+### 5. 一次性文档迁移脚本（改完就留在仓库里当记录）
+
+脚本化改主文档（**跨 run 安全 + CAS + 备份 + 写后复验 + 幂等**），改完接着跑 `parse-docx.mjs` 与
+`build-docx.mjs --write-main`，往返必须是 129/129：
+
+```bash
+node scripts/fix-docx-dup-sets.mjs --dry   # 去重复套装项（优菈 / 烟绯 / 赛索斯 / 菲米尼 / 梦见月瑞希 / 鹿野院平藏 / 丽莎）
+node scripts/fix-docx-substats.mjs --dry   # 副词条百分比写法 → 大生命 / 大攻击 / 大防御
+node scripts/fix-docx-stats.mjs --dry      # 主词条去「百分比」+ 副词条固定值写 小X + 暴击率/暴击伤害 之间改 `/`（同级）+ 2+2 属性词简写、去件数
+```
+
+三者都只重写 `word/document.xml`（其余部件逐字节不动），`--dry` 只打印逐条 before → after。
 
 ## 旧版（无 v2）数据
 

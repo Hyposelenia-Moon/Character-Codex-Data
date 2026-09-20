@@ -100,6 +100,24 @@ function releaseMarks (token, held) {
 }
 
 /**
+ * 逐档分隔符 → v2 的 `sep` 写法。
+ *
+ *   · 各档相同 → 单 token（`' / '` / `' > '`），与历史数据逐字节一致；
+ *   · 混合写法 → 逐档（`' / > '` ＝ 第一档 `/`、第二档 `>`）—— `sepTokens` / `gapSeps`
+ *     就是按空白拆 token 逐档取的，所以这是仓库既有约定；
+ *   · 只有一条 / 认不出分隔符 → 退回 `splitItems` 的老口径（不制造无谓改动）。
+ * @param {Array<{text: string, sep: string}>} full
+ * @param {string} raw 原始行文本（兜底用）
+ * @returns {string}
+ */
+function gapSepOf (full, raw) {
+  const gaps = full.slice(0, -1).map(x => String(x.sep ?? '').trim() || '/')
+  if (!gaps.length) return splitItems(raw).sep
+  const uniq = [...new Set(gaps)]
+  return uniq.length === 1 ? ` ${uniq[0]} ` : ' ' + gaps.join(' ') + ' '
+}
+
+/**
  * 与 splitStats 同一套切分，但额外给出**每一项后面的分隔符原文**（末项为 ''）。
  * `优先级：Q＞E＞A` 要连 `＞` 一起逐字写回，不能被归一成 `>`。
  * @param {string} text
@@ -556,8 +574,12 @@ function parseBlock (lines, index) {
       }
       const sub = line.match(/^副词条[:：]\s*(.*)$/)
       if (sub) {
-        const { items: stats, sep } = splitItems(sub[1])
-        if (stats.length) data.v2.artifacts.push({ kind: 'sub', stats, sep })
+        // **逐档分隔符**（用户定稿：`暴击率 / 暴击伤害 > 大攻击` → 显示 `暴击率 = 暴击伤害 ＞ 大攻击`）。
+        // 全同分隔符仍写成单 token（`' / '` / `' > '`），与旧数据逐字节一致；
+        // 混合写法才写成逐档（`' / > '`），这样 `schema.renderArtifactRow` 能逐字写回原文。
+        const full = splitStatsFull(sub[1]).filter(x => x.text)
+        const stats = full.map(x => x.text)
+        if (stats.length) data.v2.artifacts.push({ kind: 'sub', stats, sep: gapSepOf(full, sub[1]) })
         continue
       }
       const setRow = line.match(/^(首选|次选|可选|过渡|套装)[:：]\s*(.*)$/)

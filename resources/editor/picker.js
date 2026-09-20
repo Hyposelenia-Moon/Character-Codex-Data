@@ -74,6 +74,50 @@ var Picker = (function () {
     return list
   }
 
+  /* ---------------------------------------------------- 槽位（配队成员用） */
+
+  /** 一格 = { names: ['迪奥娜','阿罗夏'], note: '' }；格内是**可替换项**（渲染成 `A / B`） */
+  function emptySlot () { return { names: [], note: '' } }
+
+  /**
+   * 成员数组 → 槽位数组。`{name:'迪奥娜 / 阿罗夏', note:'二命'}` → `[{names:['迪奥娜','阿罗夏'],note:'二命'}]`
+   * （`/` 是**格内**的可替换分隔符，用户口径：不加任何中文标注）
+   */
+  function slotsFromMembers (list) {
+    var out = []
+    ;(Array.isArray(list) ? list : []).forEach(function (m) {
+      if (m == null) return
+      var raw = typeof m === 'string' ? m : String(m.name == null ? '' : m.name)
+      var names = raw.split(/\s*[/／]\s*/).map(function (s) { return s.trim() }).filter(Boolean)
+      if (!names.length) return
+      var note = typeof m === 'object' && m.note != null ? String(m.note).trim() : ''
+      out.push({ names: names, note: note })
+    })
+    return out
+  }
+
+  /** 槽位数组 → 成员数组（格内 ` / ` 连接，note 跟着这一格） */
+  function membersFromSlots (slots) {
+    var out = []
+    ;(Array.isArray(slots) ? slots : []).forEach(function (s) {
+      var names = (s && Array.isArray(s.names) ? s.names : []).map(function (n) { return String(n == null ? '' : n).trim() }).filter(Boolean)
+      if (!names.length) return
+      var m = { name: names.join(' / '), ref: 'character:' + names[0] }
+      if (s && String(s.note || '').trim()) m.note = String(s.note).trim()
+      out.push(m)
+    })
+    return out
+  }
+
+  /** 移动槽位（拖动 / ←→ 排序用） */
+  function moveSlot (slots, from, to) {
+    var list = (Array.isArray(slots) ? slots : []).slice()
+    if (from < 0 || from >= list.length) return list
+    var item = list.splice(from, 1)[0]
+    list.splice(Math.max(0, Math.min(list.length, to)), 0, item)
+    return list
+  }
+
   /** 按指针位置算插入点：在某个 chip 左半边 → 它之前，右半边 → 它之后 */
   function insertIndexFromRects (rects, x) {
     for (var i = 0; i < rects.length; i++) {
@@ -221,22 +265,31 @@ var Picker = (function () {
   }
 
   /**
-   * 多选：配队成员用。
+   * 多选（配队成员）：**按「槽位」多选** —— 一个槽位可以放多个名字（=` / ` 可替换），
+   * 点名字＝加进**当前槽位**，点「＋ 新槽位」再放下一个队友。
+   *
+   * 例：先点 迪奥娜、再点 阿罗夏（同一槽位）→ `[迪奥娜 / 阿罗夏]`；
+   *     点「＋ 新槽位」后点 芙宁娜 → `[迪奥娜 / 阿罗夏] + [芙宁娜]`。
+   *
+   * 用户口径：格内用 ` / ` 连接可替换角色，成员之间用 ` + `（`+` 由编辑器落盘时按槽位拼）。
+   *
    * opts: { members, pool, title, onConfirm(members) }
-   * 支持：回车添加、↑↓ 选择、点选切换、已选 chip 拖动排序（也支持 ←→ 键重排）
+   * 支持：回车添加、↑↓ 选择、点选切换、拖动槽位排序（也可选中后用 ←/→ 键移动）。
    */
   function openMembers (opts) {
     var pool = Array.isArray(opts.pool) ? opts.pool.map(function (n) { return { name: String(n) } }) : []
-    var selected = normalizeMembers(opts.members)
+    var slots = slotsFromMembers(opts.members)
+    if (!slots.length) slots = [emptySlot()]
+    var active = slots.length - 1
     var hl = 0
     var filtered = []
     var dragFrom = -1
     var api = openShell({
       title: opts.title || '选择配队成员',
-      placeholder: '输入中文 / 拼音首字母（如 ldjj）过滤，回车添加',
-      confirmText: opts.confirmText || '确定（' + selected.length + '）',
+      placeholder: '输入中文 / 拼音首字母（如 ldjj）过滤，回车加进当前槽位',
+      confirmText: opts.confirmText || '确定',
       onOk: function () {
-        var out = selected.slice()
+        var out = membersFromSlots(slots)
         api.close()
         if (typeof opts.onConfirm === 'function') opts.onConfirm(out)
       }
@@ -244,21 +297,37 @@ var Picker = (function () {
     var listEl = api.q('list')
     var chipsEl = api.q('chips')
 
-    function selectedIndex (name) {
-      for (var i = 0; i < selected.length; i++) if (selected[i].name === name) return i
+    function allNames () {
+      var out = []
+      slots.forEach(function (s) { s.names.forEach(function (n) { out.push(n) }) })
+      return out
+    }
+    function slotOf (name) {
+      for (var i = 0; i < slots.length; i++) if (slots[i].names.indexOf(name) >= 0) return i
       return -1
     }
 
     function renderChips () {
-      api.q('count').textContent = '已选 ' + selected.length + ' 人 / 候选 ' + pool.length + ' 人'
-      api.q('ok').textContent = (opts.confirmText || '确定') + '（' + selected.length + '）'
-      chipsEl.className = 'picker-chips' + (selected.length ? '' : ' hidden')
-      chipsEl.innerHTML = selected.map(function (m, i) {
-        return '<span class="pk-chip" draggable="true" data-i="' + i + '" title="拖动可排序（也可选中后用 ←/→ 移动）">' +
-          '<span class="pk-av">' + esc(m.name.slice(0, 1)) + '</span>' +
-          '<span class="pk-nm">' + esc(m.name) + '</span>' +
-          '<span class="pk-x" data-del="' + i + '" title="移除">×</span></span>'
-      }).join('')
+      var total = allNames().length
+      api.q('count').textContent = '已选 ' + total + ' 人 / ' + slots.filter(function (s) { return s.names.length }).length +
+        ' 格（格内 ` / ` = 可替换）/ 候选 ' + pool.length + ' 人'
+      api.q('ok').textContent = (opts.confirmText || '确定') + '（' + total + '）'
+      chipsEl.className = 'picker-chips' + (total ? '' : ' hidden')
+      chipsEl.innerHTML = slots.map(function (s, i) {
+        var names = s.names.map(function (n, k) {
+          return (k ? '<span class="pk-sep"> / </span>' : '') +
+            '<span class="pk-chip' + (i === active ? ' on' : '') + '" draggable="true" data-s="' + i + '" data-k="' + k + '"' +
+            ' title="第 ' + (i + 1) + ' 格' + (s.names.length > 1 ? '（格内有 ' + s.names.length + ' 个可替换项）' : '') + '；拖动可排序">' +
+            '<span class="pk-av">' + esc(n.slice(0, 1)) + '</span>' +
+            '<span class="pk-nm">' + esc(n) + '</span>' +
+            '<span class="pk-x" data-del="' + i + ':' + k + '" title="移除">×</span></span>'
+        }).join('')
+        return '<span class="pk-slot' + (i === active ? ' active' : '') + '" data-slot="' + i + '" title="点一下把这一格设为当前格（下一个名字会加进来）">' +
+          '<span class="pk-slot-no">' + (i + 1) + '</span>' + names +
+          (s.names.length ? '' : '<span class="pk-empty">（空，下一个名字加这里）</span>') +
+          '</span>'
+      }).join('') + '<button type="button" class="btn mini" data-pk="addslot" title="再开一格（放另一个队友）">＋ 新槽位</button>'
+      api.q('ok').textContent = (opts.confirmText || '确定') + '（' + total + '）'
     }
 
     function renderList () {
@@ -267,14 +336,14 @@ var Picker = (function () {
       if (hl >= filtered.length) hl = Math.max(0, filtered.length - 1)
       var rows = filtered.slice(0, 400).map(function (c, i) {
         var name = String(c.name)
-        var idx = selectedIndex(name)
-        return '<div class="pick-item' + (i === hl ? ' hl' : '') + (idx >= 0 ? ' on' : '') + '" data-i="' + i + '" data-name="' + esc(name) + '">' +
+        var si = slotOf(name)
+        return '<div class="pick-item' + (i === hl ? ' hl' : '') + (si >= 0 ? ' on' : '') + '" data-i="' + i + '" data-name="' + esc(name) + '">' +
           '<span class="pk-av">' + esc(name.slice(0, 1)) + '</span>' +
           '<span class="pi-name">' + esc(name) + '</span>' +
-          '<span class="pi-tag">' + (idx >= 0 ? '已选 ' + (idx + 1) : '') + '</span></div>'
+          '<span class="pi-tag">' + (si >= 0 ? '第 ' + (si + 1) + ' 格' : '') + '</span></div>'
       }).join('')
       var typed = String(query).trim()
-      if (typed && !filtered.some(function (c) { return String(c.name) === typed }) && selectedIndex(typed) < 0) {
+      if (typed && !filtered.some(function (c) { return String(c.name) === typed }) && slotOf(typed) < 0) {
         rows = '<div class="pick-item pick-new" data-new="' + esc(typed) + '"><span class="pi-name">＋ 用自定义名字「' + esc(typed) + '」</span></div>' + rows
       }
       listEl.innerHTML = rows || '<div class="muted" style="padding:8px">没有匹配的角色</div>'
@@ -282,16 +351,25 @@ var Picker = (function () {
       if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: 'nearest' })
     }
 
+    /** 点名字：已在某一格 → 移除；否则加进**当前槽位** */
     function toggle (name) {
-      var i = selectedIndex(name)
-      if (i >= 0) selected.splice(i, 1)
-      else {
-        var r = appendMember(selected, name)
-        selected = r.list
+      var n = String(name == null ? '' : name).trim()
+      if (!n) return
+      var si = slotOf(n)
+      if (si >= 0) {
+        slots[si].names.splice(slots[si].names.indexOf(n), 1)
+        active = si
+        return
       }
+      if (active < 0 || active >= slots.length) active = Math.max(0, slots.length - 1)
+      slots[active].names.push(n)
     }
 
-    function refresh () { renderChips(); renderList() }
+    function refresh () {
+      if (active >= slots.length) active = Math.max(0, slots.length - 1)
+      renderChips()
+      renderList()
+    }
 
     api.q('search').oninput = function () { hl = 0; renderList() }
     api.q('search').onkeydown = function (e) {
@@ -301,21 +379,16 @@ var Picker = (function () {
         e.preventDefault()
         var typed = String(api.q('search').value).trim()
         var pick = filtered[hl] ? String(filtered[hl].name) : ''
-        if (pick && (!typed || compact(pick).indexOf(compact(typed)) >= 0 || filtered.length === 1)) {
-          toggle(pick)
-          api.q('search').value = ''
-          hl = 0
-          refresh()
-        } else if (typed) {
-          var r = appendMember(selected, typed)
-          selected = r.list
-          api.q('search').value = ''
-          hl = 0
-          refresh()
-        }
-      } else if (e.key === 'Backspace' && !api.q('search').value && selected.length) {
-        selected.pop()
+        if (pick && (!typed || compact(pick).indexOf(compact(typed)) >= 0 || filtered.length === 1)) toggle(pick)
+        else if (typed) toggle(typed)
+        else return
+        api.q('search').value = ''
+        hl = 0
         refresh()
+      } else if (e.key === 'Backspace' && !api.q('search').value) {
+        var last = -1
+        for (var i = slots.length - 1; i >= 0; i--) if (slots[i].names.length) { last = i; break }
+        if (last >= 0) { slots[last].names.pop(); active = last; refresh() }
       }
     }
 
@@ -323,8 +396,7 @@ var Picker = (function () {
       var t = e.target
       var custom = t && t.closest ? t.closest('.pick-new') : null
       if (custom) {
-        var r = appendMember(selected, custom.getAttribute('data-new'))
-        selected = r.list
+        toggle(custom.getAttribute('data-new'))
         api.q('search').value = ''
         hl = 0
         refresh()
@@ -338,28 +410,42 @@ var Picker = (function () {
     }
 
     chipsEl.onclick = function (e) {
-      var del = e.target && e.target.getAttribute ? e.target.getAttribute('data-del') : null
-      if (del == null) return
-      selected.splice(Number(del), 1)
-      refresh()
+      var t = e.target
+      if (!t || !t.getAttribute) return
+      if (t.getAttribute('data-pk') === 'addslot') {
+        slots.push(emptySlot())
+        active = slots.length - 1
+        refresh()
+        return
+      }
+      var del = t.getAttribute('data-del')
+      if (del != null) {
+        var parts = String(del).split(':')
+        var si = Number(parts[0]); var k = Number(parts[1])
+        if (slots[si]) {
+          slots[si].names.splice(k, 1)
+          active = si
+          refresh()
+        }
+        return
+      }
+      var chip = t.closest ? t.closest('.pk-chip') : null
+      if (chip) { active = Number(chip.getAttribute('data-s')); refresh() }
     }
     chipsEl.onkeydown = function (e) {
       var chip = e.target && e.target.closest ? e.target.closest('.pk-chip') : null
       if (!chip) return
-      var i = Number(chip.getAttribute('data-i'))
-      if (e.key === 'ArrowLeft' && i > 0) { e.preventDefault(); selected = moveMember(selected, i, i - 1); refresh(); focusChip(i - 1) }
-      else if (e.key === 'ArrowRight' && i < selected.length - 1) { e.preventDefault(); selected = moveMember(selected, i, i + 1); refresh(); focusChip(i + 1) }
-      else if (e.key === 'Delete') { e.preventDefault(); selected.splice(i, 1); refresh() }
-    }
-    function focusChip (i) {
-      var el = chipsEl.querySelector('.pk-chip[data-i="' + i + '"]')
-      if (el) el.focus()
+      var si = Number(chip.getAttribute('data-s'))
+      var k = Number(chip.getAttribute('data-k'))
+      if (e.key === 'ArrowLeft' && si > 0) { e.preventDefault(); slots = moveSlot(slots, si, si - 1); active = si - 1; refresh() }
+      else if (e.key === 'ArrowRight' && si < slots.length - 1) { e.preventDefault(); slots = moveSlot(slots, si, si + 1); active = si + 1; refresh() }
+      else if (e.key === 'Delete') { e.preventDefault(); slots[si].names.splice(k, 1); active = si; refresh() }
     }
 
     chipsEl.ondragstart = function (e) {
       var chip = e.target && e.target.closest ? e.target.closest('.pk-chip') : null
       if (!chip) return
-      dragFrom = Number(chip.getAttribute('data-i'))
+      dragFrom = Number(chip.getAttribute('data-s'))
       if (e.dataTransfer) {
         e.dataTransfer.effectAllowed = 'move'
         try { e.dataTransfer.setData('text/plain', String(dragFrom)) } catch (err) {}
@@ -368,12 +454,14 @@ var Picker = (function () {
     chipsEl.ondragover = function (e) {
       if (dragFrom < 0) return
       e.preventDefault()
-      var chips = [].slice.call(chipsEl.querySelectorAll('.pk-chip'))
-      var rects = chips.map(function (c) { return c.getBoundingClientRect() })
+      var boxes = [].slice.call(chipsEl.querySelectorAll('.pk-slot'))
+      var rects = boxes.map(function (c) { return c.getBoundingClientRect() })
       var to = insertIndexFromRects(rects, e.clientX)
       if (to === dragFrom || to === dragFrom + 1) return
-      selected = moveMember(selected, dragFrom, to > dragFrom ? to - 1 : to)
-      dragFrom = to > dragFrom ? to - 1 : to
+      var moved = moveSlot(slots, dragFrom, to > dragFrom ? to - 1 : to)
+      slots = moved
+      active = to > dragFrom ? to - 1 : to
+      dragFrom = active
       renderChips()
     }
     chipsEl.ondrop = function (e) { e.preventDefault(); dragFrom = -1 }
@@ -396,6 +484,9 @@ var Picker = (function () {
     normalizeMembers: normalizeMembers,
     appendMember: appendMember,
     moveMember: moveMember,
+    slotsFromMembers: slotsFromMembers,
+    membersFromSlots: membersFromSlots,
+    moveSlot: moveSlot,
     insertIndexFromRects: insertIndexFromRects,
     sameMembers: sameMembers,
     openRef: openRef,

@@ -293,9 +293,9 @@ function linesToModelRows (lines, labelHints = [], crownHint = null, levelHints 
         const name = String(x?.name ?? x ?? '').trim()
         if (!name) return
         if (sets.length) seps.push(toks[sets.length - 1] ?? toks[toks.length - 1] ?? '/')
-        // 套装件数括注（`千岩牢固（2件套）`）跟着名字走，与面板同形
-        const pieces = String(x?.pieces ?? '').trim()
-        sets.push({ name: pieces ? name + '（' + pieces + '）' : name })
+        // 件数（`（2件套）`）**不再显示**（用户定稿：圣遗物旁边不要件数；2+2 写 `2精通 + 2精通` 这类简写）。
+        // 旧数据里若还留着 `pieces`，这里**照样不画** —— 面板侧 parse.js 同一口径。
+        sets.push({ name })
       })
       if (process.env.DBG_SET) console.log('DBG v2Set', JSON.stringify({ value, label, sep: v2Set.sep, sets, seps }))
       const resolved = resolveSetItems(sets, seps, { sep: '／' })

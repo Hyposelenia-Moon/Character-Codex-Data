@@ -221,3 +221,44 @@ console.log('\n================ 自定义档位词（建议） ================'
   console.log(`自定义档位词断言：${checks.length - bad.length}/${checks.length}${bad.length ? ' ← 有失败' : ' 全通过'}`)
   if (bad.length) process.exitCode = 1
 }
+
+/* ---------- 词条写法（主词条去百分比 / 副词条大小前缀 / 暴击率=暴击伤害） ---------- */
+console.log('\n================ 词条写法 ================')
+{
+  const { characterSections } = await import(pathToFileURL(path.join(root, 'scripts/build-html.mjs')).href)
+  const { deriveSections, renderArtifactRow } = await import(pathToFileURL(path.join(root, 'scripts/lib/schema.mjs')).href)
+  const checks = []
+  const push = (what, got, want) => checks.push({ what, got, want, ok: JSON.stringify(got) === JSON.stringify(want) })
+  const mk = (v2) => {
+    const data = { schema: 2, name: '自检', game: 'gi', meta: {}, v2: Object.assign({ weapons: [], artifacts: [], talents: [], panels: [], constellations: [], teams: [] }, v2) }
+    data.sections = deriveSections(data)
+    data.tags = []
+    return data
+  }
+  /** 某一行的渲染条目拼成一个字符串（文本 + 分隔符） */
+  const rowText = (data, kw, idx = 0) => {
+    const rows = characterSections(data).find(s => s.title === kw)?.rows ?? []
+    return (rows[idx]?.items ?? []).map(it => it.text + (it.sepAfter || '')).join('')
+  }
+
+  // ① 主词条：不写「百分比」（默认就是百分比）；副词条：百分比 大X / 固定值 小X
+  const flat = mk({ artifacts: [{ kind: 'sub', stats: ['小攻击', '小生命', '小防御', '大攻击', '暴击率'], sep: ' / ' }] })
+  push('副词条：小X / 大X 原样显示（不被折成 攻击力 等）', rowText(flat, '圣遗物'), '小攻击=小生命=小防御=大攻击=暴击率')
+  push('副词条：文档层仍是原词', (flat.sections.find(s => /圣遗物/.test(s.title))?.lines ?? [])[0], '副词条：小攻击 / 小生命 / 小防御 / 大攻击 / 暴击率')
+
+  // ② 副词条同级对：`/` → `=`，其余 `>` → `＞`（逐档分隔符）
+  const crit = mk({ artifacts: [{ kind: 'sub', stats: ['暴击率', '暴击伤害', '大攻击'], sep: ' / > ' }] })
+  push('副词条：暴击率 = 暴击伤害 ＞ 大攻击（逐档分隔符）', rowText(crit, '圣遗物'), '暴击率=暴击伤害＞大攻击')
+  push('副词条：文档层保留 `/` 与 `>` 原写法', (crit.sections.find(s => /圣遗物/.test(s.title))?.lines ?? [])[0], '副词条：暴击率 / 暴击伤害 > 大攻击')
+
+  // ③ 圣遗物行：不显示件数（旧数据里即使还留着 pieces 也不画；套装候选按仓库口径渲染成 `＞`）
+  const pieceRow = { kind: 'preferred', label: '首选', sep: ' / ', sets: [{ name: '翠绿之影', ref: 'artifact:翠绿之影' }, { name: '角斗士的终幕礼', ref: 'artifact:角斗士的终幕礼', pieces: '2件套' }] }
+  push('圣遗物：件数不显示', rowText(mk({ artifacts: [pieceRow] }), '圣遗物'), '翠绿之影＞角斗士的终幕礼')
+  push('圣遗物：2+2 简写原样渲染', rowText(mk({ artifacts: [{ kind: 'preferred', label: '首选', sep: ' / ', sets: [{ name: '翠绿之影' }, { name: '2攻击' }] }] }), '圣遗物'), '翠绿之影＞2攻击')
+  push('圣遗物：文档层保留原写法（旧数据里若仍有件数，往返不丢）', renderArtifactRow(pieceRow)[0], '首选：翠绿之影 / 角斗士的终幕礼（2件套）')
+
+  const bad = checks.filter(c => !c.ok)
+  for (const c of checks) console.log(`${c.ok ? '✓' : '✗'} ${c.what}：${JSON.stringify(c.got)}${c.ok ? '' : `（期望 ${JSON.stringify(c.want)}）`}`)
+  console.log(`词条写法断言：${checks.length - bad.length}/${checks.length}${bad.length ? ' ← 有失败' : ' 全通过'}`)
+  if (bad.length) process.exitCode = 1
+}

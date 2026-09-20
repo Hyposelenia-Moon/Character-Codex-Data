@@ -127,6 +127,28 @@ var REF_KINDS = {
 
 var MAIN_SLOTS = ['时之沙', '空之杯', '理之冠']
 
+/**
+ * 主词条 / 副词条的**候选词表**（多值输入框的下拉候选）。
+ *
+ * 口径（用户定稿）：
+ *   · 主词条**不写「百分比」**（主词条默认就是百分比）：`攻击力` / `生命值` / `防御力`；
+ *     副词条才用大/小前缀区分：百分比 = `大攻击`、固定值 = `小攻击`。
+ *   · 主词条里 `攻击力` 与副词条里 `小攻击` 是同一个属性的两种写法，**不同栏目、按栏目区分**。
+ * 只用于输入提示（datalist / 选择器），**不校验、不改写**用户输入的任何值。
+ */
+var STAT_CANDIDATES = {
+  时之沙: ['攻击力', '生命值', '防御力', '元素精通', '元素充能效率'],
+  空之杯: ['攻击力', '生命值', '防御力', '元素精通', '元素伤害加成',
+    '火元素伤害加成', '水元素伤害加成', '雷元素伤害加成', '冰元素伤害加成',
+    '风元素伤害加成', '岩元素伤害加成', '草元素伤害加成', '物理伤害加成'],
+  理之冠: ['攻击力', '生命值', '防御力', '元素精通', '暴击率', '暴击伤害', '治疗加成'],
+  副词条: ['大攻击', '大生命', '大防御', '小攻击', '小生命', '小防御',
+    '暴击率', '暴击伤害', '元素精通', '元素充能效率', '充能效率']
+}
+
+/** 主词条槽位 → datalist id */
+var STAT_LIST_ID = { 时之沙: 'dl-stat-sand', 空之杯: 'dl-stat-goblet', 理之冠: 'dl-stat-circlet', 副词条: 'dl-stat-sub' }
+
 var state = {
   index: { weapons: [], artifacts: [], characters: [], talents: [], constellations: [] },
   order: [],
@@ -249,16 +271,33 @@ function foldCrownRows (rows) {
   list.forEach(function (r, i) { if (idx < 0 && r.kind === 'priority') idx = i })
   var slots = []
   if (idx >= 0) {
+    // ⚠ 之前这里只读 `order`：而 normalizeData 造的界面模型只有 `slots`（没有 order），
+    // 于是每次打开角色都把三格**重置成 1**，只有皇冠行能把对应格抬回 10 ——
+    // 表现就是用户报的「只填数字不激活，只有点皇冠才生效」。
+    // 现在**界面形状（slots）优先**，没有 slots 时才从数据形状（order）拆。
+    var incoming = asArray(list[idx].slots)
     var order = asArray(list[idx].order)
-    slots = TALENTS.map(function (L) {
-      var hit = order.filter(function (x) { return str(x && x.name).toUpperCase() === L })[0]
-      return { name: L, level: talentLevelText(hit && hit.level), crown: !!(hit && (hit.crown === true || talentLevelText(hit && hit.level) === '10')) }
-    })
-    order.forEach(function (x) {
-      var L = str(x && x.name).toUpperCase()
-      if (!L || TALENTS.indexOf(L) >= 0) return
-      slots.push({ name: str(x.name), level: talentLevelText(x.level), crown: x.crown === true, extra: true })
-    })
+    if (incoming.length) {
+      slots = incoming.map(function (s) {
+        return {
+          name: str(s && s.name),
+          level: talentLevelText(s && s.level),
+          crown: !!(s && (s.crown === true || talentLevelText(s && s.level) === '10')),
+          note: hasText(s && s.note) ? str(s.note) : undefined,
+          extra: s && s.extra ? true : undefined
+        }
+      }).filter(function (s) { return hasText(s.name) })
+    } else {
+      slots = TALENTS.map(function (L) {
+        var hit = order.filter(function (x) { return str(x && x.name).toUpperCase() === L })[0]
+        return { name: L, level: talentLevelText(hit && hit.level), crown: !!(hit && (hit.crown === true || talentLevelText(hit && hit.level) === '10')) }
+      })
+      order.forEach(function (x) {
+        var L = str(x && x.name).toUpperCase()
+        if (!L || TALENTS.indexOf(L) >= 0) return
+        slots.push({ name: str(x.name), level: talentLevelText(x.level), crown: x.crown === true, extra: true })
+      })
+    }
   } else {
     slots = TALENTS.map(function (L) { return { name: L, level: '1', crown: false } })
   }
@@ -671,6 +710,10 @@ function actBtn (act, path, text, cls, title, index) {
  */
 function rowVisible (row) {
   if (!row || typeof row !== 'object') return false
+  // 刚点「＋ 新增一行」加出来的行**必须可见** —— 否则它在表单里根本不渲染，
+  // 用户就会遇到「加了配队行却没法选角色 / 加了面板行却没法填」（用户报过）。
+  // `_new` 只是界面上的临时标记，落盘前会被 buildBody 丢掉。
+  if (row._new) return true
   switch (row.kind) {
     case 'main':
       return MAIN_SLOTS.some(function (slot) { return asArray(row.stats && row.stats[slot]).length > 0 }) || hasText(row.note)
@@ -719,11 +762,30 @@ function emptyNote (text) {
   return '<div class="muted" style="padding:6px 2px;font-size:13px">' + esc(text) + '</div>'
 }
 
-/** 多值输入：chips + 「＋」 */
-function multiValue (label, path, values, placeholder) {
+/**
+ * 多值输入：**可编辑**的 chips + 「＋」+ 每格一个「▾」候选选择器。
+ *
+ * 用户报过的问题：以前 chips 只是纯文本，点「＋」加进来一个空 chip **根本没法填 / 没法选**。
+ * 现在每个 chip 是一个输入框：
+ *   · 直接打字（`data-path` 走通用 input 事件写模型，不重绘 → 不丢焦点）；
+ *   · 或者点「▾」从候选表里选（主词条按槽位给候选、副词条给大/小前缀那套）；
+ *   · `list=` 让输入框自带浏览器下拉（开始打字就会提示）。
+ * @param {string} label
+ * @param {string} path
+ * @param {string[]} values
+ * @param {string} [placeholder]
+ * @param {string} [statKind] 候选类别：时之沙 / 空之杯 / 理之冠 / 副词条（缺省不给候选）
+ */
+function multiValue (label, path, values, placeholder, statKind) {
+  var listId = STAT_LIST_ID[statKind] || ''
   var chips = asArray(values).map(function (v, i) {
-    return '<span class="mv-chip">' + esc(v) +
-      actBtn('del-item', path, '×', 'row-del', '删除这一项', i) + '</span>'
+    return '<span class="mv-chip">' +
+      '<input type="text" class="mv-in" data-path="' + esc(path + '.' + i) + '" value="' + esc(v) + '"' +
+      (listId ? ' list="' + esc(listId) + '"' : '') +
+      ' placeholder="' + esc(placeholder || '词条') + '">' +
+      (listId ? actBtn('pick-item', path, '▾', 'mv-pick', '从候选里选', i) : '') +
+      actBtn('del-item', path, '×', 'row-del', '删除这一项', i) +
+      '</span>'
   }).join('')
   return '<div class="field"><span>' + esc(label) + '</span>' +
     '<div class="mv">' + chips + actBtn('add-item', path, '＋', 'mv-add', '添加一项') + '</div>' +
@@ -817,7 +879,7 @@ function renderArtifacts () {
         (nowLine ? '<br>当前渲染：<code>主词条：' + esc(nowLine) + '</code>' : '<br>当前渲染：<code>（空，' + EMPTY_TEXT + '）</code>') +
         '</div>' +
         '<div class="grid-3">' + MAIN_SLOTS.map(function (slot) {
-          return multiValue(slot, p + '.stats.' + slot, row.stats[slot], '如 攻击力')
+          return multiValue(slot, p + '.stats.' + slot, row.stats[slot], '如 ' + (STAT_CANDIDATES[slot] || [])[0], slot)
         }).join('') + '</div>' +
         '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px">' +
         '<span class="muted" style="font-size:12px">主词条括注</span>' +
@@ -826,7 +888,7 @@ function renderArtifacts () {
         '<span class="muted" style="font-size:12px">对某个部位的**补充说明**才写这里（整行就是说明时不必写「注：」）</span>' +
         '</div>'
     } else if (row.kind === 'sub') {
-      body2 = multiValue('副词条（`/` = 同级 → 渲染 `=`；`>` = 优先级 → 渲染 `＞`；百分比统一写 `大生命`/`大攻击`/`大防御`）', p + '.stats', row.stats, '如 双爆 / 大攻击')
+      body2 = multiValue('副词条（`/` = 同级 → 渲染 `=`；`>` = 优先级 → 渲染 `＞`；百分比写 `大生命`/`大攻击`/`大防御`，固定值写 `小生命`/`小攻击`/`小防御`）', p + '.stats', row.stats, '如 双爆 / 大攻击', '副词条')
     } else if (row.kind === 'note') {
       body2 = '<div class="field"><span>备注（注：）</span>' +
         '<input type="text" data-path="' + p + '.text" value="' + esc(row.text) + '" placeholder="该段落末尾的一行「注：…」，多条用「；」分隔">' +
@@ -838,9 +900,10 @@ function renderArtifacts () {
       var sets = (row.sets || []).map(function (set, j) {
         var q = p + '.sets.' + j
         var prev = j > 0 ? row.sets[j - 1] : null
+        // 件数（`（2件套）`）**不再显示、也不再提供输入**（用户定稿：圣遗物旁边不要件数；
+        // 2+2 直接写 `2精通 + 2精通` 这类简写）。旧数据里的 `pieces` 保存时原样带回，不丢。
         return '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
           refField('artifact', set.name, q + '.name') +
-          '<input type="text" class="w-xs" data-path="' + q + '.pieces" value="' + esc(set.pieces) + '" placeholder="件数">' +
           (prev ? actBtn('copy-prev', q + '.name', '⧉ 上一条', 'btn mini', '复制上一条的套装名' + (prev.name ? '（' + prev.name + '）' : '')) : '') +
           actBtn('del-item', p + '.sets', '×', 'row-del', '删除这个套装', j) +
           '</div>'
@@ -970,7 +1033,8 @@ function renderTeams () {
       actBtn('move-row-down', 'v2.teams', '↓', 'btn mini', '下移', i) +
       actBtn('del-row', 'v2.teams', '删除行', 'btn mini danger', '删除这一行', i) +
       '</div>' +
-      '<div class="field"><span>成员（点一格的名字选候选：可加「可替换项」，同一格内用 <b> / </b> 连接；拖动可排序）</span>' +
+      '<div class="field"><span>成员（点「＋ 成员」：**一格可以放多个名字** = 可替换角色，格内用 <b> / </b> 连接；' +
+      '点某一格把它设为当前格，下一个名字就加进这一格；点名字可只改这一格的候选；拖动可排序）</span>' +
       '<div class="members" data-members="' + esc(p) + '">' + members +
       '<button type="button" class="btn mini" data-act="open-members" data-path="' + esc(p) + '">＋ 成员</button></div></div>' +
       '<div class="field" style="margin-top:8px"><span>文本' + (asArray(row.members).length ? '（成员之外的补充说明）' : '（没有拆成成员时，整行按文本输出）') + '</span>' +
@@ -1092,6 +1156,8 @@ function renderDatalists () {
   fill('dl-weapon', state.index.weapons)
   fill('dl-artifact', state.index.artifacts)
   fill('dl-character', state.index.characters)
+  // 主词条 / 副词条候选（多值输入框的 list=）
+  Object.keys(STAT_LIST_ID).forEach(function (kind) { fill(STAT_LIST_ID[kind], STAT_CANDIDATES[kind]) })
 }
 
 /* ============================================================ 全局搜索 */
@@ -1861,14 +1927,26 @@ function moveRow (arr, i, delta) {
 }
 
 function newRow (kind) {
+  // `_new: true` = 界面上的「刚加的空行」标记：rowVisible 见到它就渲染（否则空行会被整行隐藏），
+  // buildBody 落盘时不会带上它（各栏目都是显式构造对象）。详见 rowVisible。
   switch (kind) {
     case 'weapons': return { label: '', tier: null, sep: ' > ', items: [{ name: '', note: '' }] }
-    case 'artifacts': return { kind: 'preferred', label: '', sep: ' > ', sets: [{ name: '', pieces: '' }] }
-    case 'panels': return { label: '', k: '', v: '' }
-    case 'constellations': return { name: '', text: '' }
-    case 'teams': return { label: '', members: [], text: '' }
+    case 'artifacts': return { kind: 'preferred', label: '', sep: ' > ', sets: [{ name: '' }] }
+    case 'panels': return { _new: true, label: '', k: '', v: '' }
+    case 'constellations': return { _new: true, name: '', text: '' }
+    case 'teams': return { _new: true, label: '', members: [], text: '' }
     default: return {}
   }
+}
+
+/**
+ * 多值路径 → 候选类别（主词条按槽位、副词条一套）：
+ *   `v2.artifacts.0.stats.时之沙` → `时之沙`；`v2.artifacts.0.stats` → `副词条`
+ */
+function statKindOfPath (path) {
+  var m = String(path).match(/\.stats\.(时之沙|空之杯|理之冠)$/)
+  if (m) return m[1]
+  return /\.stats$/.test(String(path)) ? '副词条' : ''
 }
 
 function handleAction (act, path, i, el) {
@@ -1888,7 +1966,7 @@ function handleAction (act, path, i, el) {
   } else if (act === 'add-item') {
     if (listPath.indexOf('v2.weapons') === 0) target.push({ name: '', note: '' })
     else if (listPath.indexOf('v2.artifacts') === 0) {
-      if (/\.sets$/.test(listPath)) target.push({ name: '', pieces: '' })
+      if (/\.sets$/.test(listPath)) target.push({ name: '' })
       else target.push('')  // 主词条/副词条多值
     } else if (/\.order$/.test(listPath)) target.push('A')
     else if (/\.items$/.test(listPath)) {
@@ -1923,6 +2001,25 @@ function handleAction (act, path, i, el) {
   } else if (act === 'open-candidates') {
     // 这一格的候选（可替换项）：一格可以有多个候选，格内用 ` / ` 连接
     openSlotCandidates(path)
+    changed = false
+  } else if (act === 'pick-item') {
+    // 主词条 / 副词条某一格的「▾」：从候选词条里选（不校验、可继续手改）
+    var statKind = statKindOfPath(path)
+    var cands = STAT_CANDIDATES[statKind] || []
+    if (typeof window.Picker === 'undefined') { showStatus('选择器组件没加载（/picker.js 404？）', 'error', true) }
+    else if (!cands.length) { showStatus('这一栏没有候选表，直接输入即可', 'warn') }
+    else {
+      window.Picker.openRef({
+        title: '选择词条（' + (statKind || '') + '）',
+        candidates: cands,
+        value: getPath(model, path + '.' + i),
+        onPick: function (name) {
+          setPath(model, path + '.' + i, name)
+          markDirty(true)
+          renderForm()
+        }
+      })
+    }
     changed = false
   } else if (act === 'copy-prev') {
     // 「复制上一条」：把同一个列表里上一条的名字填进来（含 ref）
@@ -1994,7 +2091,7 @@ function openMemberPicker (path) {
   if (!team) { showStatus('找不到这一行配队', 'error'); return }
   if (typeof window.Picker === 'undefined') { showStatus('选择器组件没加载（/picker.js 404？）', 'error', true); return }
   window.Picker.openMembers({
-    title: '选择配队成员（' + (hasText(team.label) ? team.label : path) + '）',
+    title: '配队成员（第 ' + ((team.members || []).length + 1) + ' 行）：点名字 = 加进当前格，格内可多选（` / ` 可替换）',
     pool: memberPool(team.members),
     members: team.members,
     onConfirm: function (members) {
@@ -2895,8 +2992,20 @@ window.__editor = {
   // 纯函数（供自动化检查：天赋三格 / 候选并格 / 落盘形状）
   talentSlots: talentSlots,
   talentLevelText: talentLevelText,
+  foldCrownRows: foldCrownRows,
+  rowVisible: rowVisible,
+  multiValue: multiValue,
+  statKindOfPath: statKindOfPath,
   memberCandidates: memberCandidates,
   joinCandidates: joinCandidates,
+  STAT_CANDIDATES: STAT_CANDIDATES,
+  /** 供自动化检查：把合成模型直接塞进状态（不联网、不读文件），配合 toJson 验证落盘形状 */
+  setModelForTest: function (model) {
+    state.model = model
+    state.current = str(model && model.name) || '自检'
+    state.before = null
+    return state.model
+  },
   syncRefInputs: syncRefInputs,
   toJson: buildBody,
   openRefPickerFor: openRefPickerFor,

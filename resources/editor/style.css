@@ -419,6 +419,22 @@ textarea { resize: vertical; min-height: 54px; }
 .mv-add:hover { border-color: var(--accent); color: var(--accent); }
 .mv input { min-width: 120px; }
 
+/* 主词条 / 副词条的**可编辑** chip：输入框 + 「▾」候选 + 「×」
+   （以前 chip 只是纯文本，点「＋」加进来根本没法填 / 没法选 —— 用户报过） */
+.mv-in {
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  width: 7.5em;
+  min-width: 4em;
+  padding: 1px 0;
+  outline: none;
+}
+.mv-in:focus { background: #fff; border-radius: 4px; box-shadow: 0 0 0 2px var(--accent-soft); }
+.mv-pick { color: var(--accent); }
+.mv-pick:hover { color: var(--accent-strong, var(--accent)); }
+
 /* ---------------------------------------------------------------- 团队/天赋行 */
 
 .members { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
@@ -824,6 +840,30 @@ textarea { resize: vertical; min-height: 54px; }
 }
 .pk-chip .pk-x { color: var(--text-soft); padding: 0 2px; cursor: pointer; }
 .pk-chip .pk-x:hover { color: var(--danger); }
+
+/* 配队成员选择器：**槽位**视图 —— 一格可放多个名字（格内 ` / ` = 可替换），
+   点一格把它设为「当前格」，下一个名字就加进这一格；拖动可整格排序 */
+.pk-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px 2px 2px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  background: #fbfcfe;
+}
+.pk-slot.active { border-color: var(--accent); background: var(--accent-soft); }
+.pk-slot-no {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--line);
+  color: var(--text-soft);
+  font-size: 11px;
+  cursor: pointer;
+}
+.pk-slot .pk-sep { color: var(--text-soft); font-size: 12px; }
+.pk-slot .pk-empty { color: var(--text-dim); font-size: 12px; padding: 0 4px; }
 .pk-av {
   display: inline-flex; align-items: center; justify-content: center;
   width: 20px; height: 20px; flex: 0 0 auto;
