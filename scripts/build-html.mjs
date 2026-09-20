@@ -275,7 +275,8 @@ function linesToModelRows (lines, labelHints = [], crownHint = null, levelHints 
         const lv = levelHints?.get(name)
         return { text: name, sepAfter: '', level: Number.isInteger(lv) ? lv : 1, crown: lv === 10 }
       })
-      out.push({ label: '天赋', kind: 'talents', raw: value, items: fixed })
+      // 行首标签用**显示词汇** `推荐`（与武器 / 圣遗物行一致；文档里仍写 `天赋：…`，面板同口径）
+      out.push({ label: '推荐', kind: 'talents', raw: value, items: fixed })
       return
     }
     const tokens = splitRankParts(value, '／')
@@ -298,10 +299,12 @@ function linesToModelRows (lines, labelHints = [], crownHint = null, levelHints 
         sets.push({ name })
       })
       if (process.env.DBG_SET) console.log('DBG v2Set', JSON.stringify({ value, label, sep: v2Set.sep, sets, seps }))
-      const resolved = resolveSetItems(sets, seps, { sep: '／' })
+      const resolved = resolveSetItems(sets, seps, { sep: '' })
       out.push({
         label,
-        items: resolved.map(r => ({ text: displayText(r.name), sepAfter: r.sepAfter === '／' ? '＞' : r.sepAfter }))
+        // 同级（源文档 `/`）→ **空**：两个 chip 紧挨着，不画 `＞`（用户定稿）；
+        // 优先级（`>`/`≥`）→ `＞`。见 guide-display.mjs 的 SET_LEVEL_SEP / gapSepOf。
+        items: resolved.map(r => ({ text: displayText(r.name), sepAfter: r.sepAfter ? '＞' : '' }))
       })
       return
     }

@@ -58,7 +58,10 @@ const itemSig = (i, withLevel) => {
   const noteText = i.note && !noteIsLevel ? `（${String(i.note).replace(/^[（(]|[）)]$/g, '')}）` : ''
   return canon(clean(i.text) + clean(noteText) + (level === null ? '' : `（${level}）`) + '|' + clean(i.sepAfter || ''))
 }
-const rowSig = row => canon((row.items || []).map(it => itemSig(it, /天赋/.test(String(row.label || '')))).join(' '))
+// 天赋行靠 `kind === 'talents'` 认（**不能只按 label 认**：行首标签现在是显示词 `推荐`，
+// 与武器 / 圣遗物行的标签同形，只按文字判会把它们混在一起）
+const isTalentRow = row => row.kind === 'talents' || /天赋/.test(String(row.label || ''))
+const rowSig = row => canon((row.items || []).map(it => itemSig(it, isTalentRow(row))).join(' '))
 /**
  * 配队行：两端都把「成员为空的说明」当行尾备注看（网页版放在 text、面板放在 note）。
  * 备注的 `注：` 前缀由显示层按 `notePrefix` 决定（整行就是备注时不加），

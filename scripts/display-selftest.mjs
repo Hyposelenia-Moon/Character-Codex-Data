@@ -260,11 +260,23 @@ console.log('\n================ 词条写法 ================')
   push('副词条：只剩一侧是暴击（暴击率 ＞ 小攻击）', rowText(mk({ artifacts: [{ kind: 'sub', stats: ['暴击率', '小攻击'], sep: ' / ' }] }), '圣遗物'), '暴击率＞小攻击')
   push('副词条：`暴击` 与 `暴伤` 也认（展开后是暴击对）', rowText(mk({ artifacts: [{ kind: 'sub', stats: ['暴击', '暴伤', '大攻击'], sep: ' / ' }] }), '圣遗物'), '暴击率=暴击伤害＞大攻击')
 
-  // ③ 圣遗物行：不显示件数（旧数据里即使还留着 pieces 也不画；套装候选按仓库口径渲染成 `＞`）
+  // ③ 圣遗物行：不显示件数；**同级（源文档 `/`）的两个 chip 紧挨着、不画 `＞`**（用户定稿）
   const pieceRow = { kind: 'preferred', label: '首选', sep: ' / ', sets: [{ name: '翠绿之影', ref: 'artifact:翠绿之影' }, { name: '角斗士的终幕礼', ref: 'artifact:角斗士的终幕礼', pieces: '2件套' }] }
-  push('圣遗物：件数不显示', rowText(mk({ artifacts: [pieceRow] }), '圣遗物'), '翠绿之影＞角斗士的终幕礼')
-  push('圣遗物：2+2 简写原样渲染', rowText(mk({ artifacts: [{ kind: 'preferred', label: '首选', sep: ' / ', sets: [{ name: '翠绿之影' }, { name: '2攻击' }] }] }), '圣遗物'), '翠绿之影＞2攻击')
+  push('圣遗物：件数不显示 + 同级紧挨着（无分隔符）', rowText(mk({ artifacts: [pieceRow] }), '圣遗物'), '翠绿之影角斗士的终幕礼')
+  push('圣遗物：2+2 简写原样渲染 + 同级紧挨着', rowText(mk({ artifacts: [{ kind: 'preferred', label: '首选', sep: ' / ', sets: [{ name: '翠绿之影' }, { name: '2攻击' }] }] }), '圣遗物'), '翠绿之影2攻击')
+  push('圣遗物：优先级（`>`）仍画 `＞`', rowText(mk({ artifacts: [{ kind: 'preferred', label: '首选', sep: ' > ', sets: [{ name: 'A套' }, { name: 'B套' }] }] }), '圣遗物'), 'A套＞B套')
+  push('圣遗物：`+` 组合仍在一个 chip 内', rowText(mk({ artifacts: [{ kind: 'preferred', label: '首选', sep: ' + ', sets: [{ name: '2生命' }, { name: '2充能' }] }] }), '圣遗物'), '2生命+2充能')
+  // 件数简写**不参与同名去重**（真套装名才去重）：`2精通 + 2精通` 要两个都留着
+  push('圣遗物：`2精通 + 2精通` 不去重', rowText(mk({ artifacts: [{ kind: 'transition', label: '过渡', sep: ' + ', sets: [{ name: '2精通' }, { name: '2精通' }] }] }), '圣遗物'), '2精通+2精通')
+  push('圣遗物：真套装名仍去重（A + A → A）', rowText(mk({ artifacts: [{ kind: 'transition', label: '过渡', sep: ' + ', sets: [{ name: '千岩牢固' }, { name: '千岩牢固' }] }] }), '圣遗物'), '千岩牢固')
   push('圣遗物：文档层保留原写法（旧数据里若仍有件数，往返不丢）', renderArtifactRow(pieceRow)[0], '首选：翠绿之影 / 角斗士的终幕礼（2件套）')
+
+  // ④ 天赋行的行首标签是**显示词 `推荐`**（文档里仍写 `天赋：…`）
+  const tal = mk({ talents: [{ kind: 'priority', raw: 'A1 E10 Q10', order: [{ name: 'A', level: 1 }, { name: 'E', level: 10, crown: true }, { name: 'Q', level: 10, crown: true }] }] })
+  const talRow = characterSections(tal).find(s => s.title === '天赋')?.rows?.[0]
+  push('天赋行标签是「推荐」', talRow?.label, '推荐')
+  push('天赋行仍带 kind=talents（判行不能只看标签）', talRow?.kind, 'talents')
+  push('天赋行文档层仍写「天赋：」', (tal.sections.find(s => /天赋/.test(s.title))?.lines ?? [])[0], '天赋：A1 E10 Q10')
 
   const bad = checks.filter(c => !c.ok)
   for (const c of checks) console.log(`${c.ok ? '✓' : '✗'} ${c.what}：${JSON.stringify(c.got)}${c.ok ? '' : `（期望 ${JSON.stringify(c.want)}）`}`)
