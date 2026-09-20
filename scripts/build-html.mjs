@@ -302,9 +302,9 @@ function linesToModelRows (lines, labelHints = [], crownHint = null, levelHints 
       const resolved = resolveSetItems(sets, seps, { sep: '' })
       out.push({
         label,
-        // 同级（源文档 `/`）→ **空**：两个 chip 紧挨着，不画 `＞`（用户定稿）；
-        // 优先级（`>`/`≥`）→ `＞`。见 guide-display.mjs 的 SET_LEVEL_SEP / gapSepOf。
-        items: resolved.map(r => ({ text: displayText(r.name), sepAfter: r.sepAfter ? '＞' : '' }))
+        // 同级（源文档 `/`）→ **`/`**（字面斜杠：`教官/勇者`）；优先级（`>`/`≥`）→ `＞`。
+        // 见 guide-display.mjs 的 SET_LEVEL_SEP / gapSepOf。
+        items: resolved.map(r => ({ text: displayText(r.name), sepAfter: r.sepAfter === '/' ? '/' : (r.sepAfter ? '＞' : '') }))
       })
       return
     }

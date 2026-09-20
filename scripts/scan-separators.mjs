@@ -30,6 +30,8 @@ const TRAILING_RE = /(?:[>＞]|≥|\/)\s*$/
 
 const hits = []
 const critHits = []
+/** 名字里含条目分隔符（`/`、`／`、`｜`）的条目 —— 这类名字写回文档后再解析会被切成两条 */
+const nameHits = []
 /** 显示后仍是「暴击率 / 暴击伤害」这一对？ */
 const isCritPair = (a, b) => {
   const x = String(a ?? '').trim()
@@ -67,6 +69,19 @@ for (const f of files) {
       checkSubCritOnly(line, name, sec.title)
     }
   }
+  // 名字里含分隔符（武器条目 / 套装名）：写回文档会被切成两条 → 往返不一致
+  for (const w of (d.v2?.weapons ?? [])) {
+    for (const it of (w.items ?? [])) {
+      const nm = String(it?.name ?? '')
+      if (/[/／｜]/.test(nm)) nameHits.push(`${name} 武器「${nm}」`)
+    }
+  }
+  for (const a of (d.v2?.artifacts ?? [])) {
+    for (const st of (a.sets ?? [])) {
+      const nm = String(st?.name ?? '')
+      if (/[/／｜]/.test(nm)) nameHits.push(`${name} 套装「${nm}」`)
+    }
+  }
 }
 
 if (process.argv.includes('--json')) {
@@ -84,6 +99,13 @@ if (process.argv.includes('--json')) {
   } else {
     console.log(`副词条非法同级对：${critHits.length} 处（应为 0）`)
     for (const h of critHits.slice(0, 20)) console.log(`  · ${h.character ?? ''} 「${h.left} / ${h.right}」 ${h.line}`)
+  }
+  // 名字里含分隔符：**只警告不影响退出码**（往返问题诊断脚本 diagnose-docx-json 会直接标出来）
+  if (!nameHits.length) {
+    console.log('名字里含条目分隔符（/ ／ ｜）的条目：0 处 ✅')
+  } else {
+    console.log(`[!] 名字里含条目分隔符的条目：${nameHits.length} 处（写回文档会被切成两条 → 往返不一致）`)
+    for (const h of nameHits.slice(0, 20)) console.log(`  · ${h}`)
   }
 }
 process.exit(hits.length || critHits.length ? 1 : 0)

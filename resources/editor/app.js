@@ -623,14 +623,23 @@ function modal (opts) {
 
 /* ============================================================ 渲染：类型徽标 */
 
-/** 类型徽标 + 带 datalist 的输入 + ⚠ 提示 + 「从名称库选」 */
+/**
+ * 类型徽标 + 带 datalist 的输入 + ⚠ 提示 + 「从名称库选」
+ *
+ * ⚠ 名字里**不能含 `/`、`／`、`｜`**：这些是文档里的条目分隔符，写回文档后再解析会被
+ * 切成两条（`88爆伤/44暴击武器` → `88爆伤` + `44暴击武器`），往返立刻不一致 —— 所以这里打警告。
+ */
 function refField (kind, value, path) {
   var k = REF_KINDS[kind]
   var ref = kind + ':' + str(value).trim()
   var issue = state.issueMap[ref]
-  var warn = issue
-    ? '<span class="warn-chip" title="' + esc(issue) + '">⚠</span>'
+  var name = str(value).trim()
+  var sepHit = /[/／｜]/.test(name)
+    ? '<span class="warn-chip" title="名字里有 `/`（文档的条目分隔符）：写回文档后再解析会被切成两条，往返不一致 —— 请改成两条独立条目，或换个写法">⚠ 含分隔符</span>'
     : ''
+  var warn = (issue
+    ? '<span class="warn-chip" title="' + esc(issue) + '">⚠</span>'
+    : '') + sepHit
   return '<span class="ref-wrap">' +
     '<span class="ref-field">' +
     '<span class="badge ' + kind + '" title="' + esc(k.text) + '"><span class="badge-icon">' + k.icon + '</span>' + esc(k.text) + '</span>' +

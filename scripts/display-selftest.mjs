@@ -265,11 +265,17 @@ console.log('\n================ 词条写法 ================')
   push('副词条：非暴击对写 `/` 仍渲染 `＞`', rowText(mk({ artifacts: [{ kind: 'sub', stats: ['大攻击', '元素精通'], sep: ' / ' }] }), '圣遗物'), '大攻击＞元素精通')
   push('副词条：`≥` 原样保留', rowText(mk({ artifacts: [{ kind: 'sub', stats: ['元素精通', '元素充能效率'], sep: ' ≥ ' }] }), '圣遗物'), '元素精通≥元素充能效率')
 
-  // ③ 圣遗物行：不显示件数；**同级（源文档 `/`）的两个 chip 紧挨着、不画 `＞`**（用户定稿）
+  // ③ 圣遗物行：不显示件数；**同级（源文档 `/`）→ 画字面 `/`**（用户定稿：`教官/勇者`）
   const pieceRow = { kind: 'preferred', label: '首选', sep: ' / ', sets: [{ name: '翠绿之影', ref: 'artifact:翠绿之影' }, { name: '角斗士的终幕礼', ref: 'artifact:角斗士的终幕礼', pieces: '2件套' }] }
-  push('圣遗物：件数不显示 + 同级紧挨着（无分隔符）', rowText(mk({ artifacts: [pieceRow] }), '圣遗物'), '翠绿之影角斗士的终幕礼')
-  push('圣遗物：2+2 简写原样渲染 + 同级紧挨着', rowText(mk({ artifacts: [{ kind: 'preferred', label: '首选', sep: ' / ', sets: [{ name: '翠绿之影' }, { name: '2攻击' }] }] }), '圣遗物'), '翠绿之影2攻击')
+  push('圣遗物：件数不显示 + 同级画 /', rowText(mk({ artifacts: [pieceRow] }), '圣遗物'), '翠绿之影/角斗士的终幕礼')
+  push('圣遗物：2+2 简写原样渲染 + 同级画 /', rowText(mk({ artifacts: [{ kind: 'preferred', label: '首选', sep: ' / ', sets: [{ name: '翠绿之影' }, { name: '2攻击' }] }] }), '圣遗物'), '翠绿之影/2攻击')
+  push('圣遗物：同级 `/` 例子（教官/烬城勇者绘卷）', rowText(mk({ artifacts: [{ kind: 'preferred', label: '首选', sep: ' / ', sets: [{ name: '教官' }, { name: '烬城勇者绘卷' }] }] }), '圣遗物'), '教官/烬城勇者绘卷')
   push('圣遗物：优先级（`>`）仍画 `＞`', rowText(mk({ artifacts: [{ kind: 'preferred', label: '首选', sep: ' > ', sets: [{ name: 'A套' }, { name: 'B套' }] }] }), '圣遗物'), 'A套＞B套')
+  // **武器**：正常武器是优先级链 —— 源文档写 `/` 也渲染成 `＞`（用户定稿）
+  push('武器：`/` 也渲染成 `＞`（正常武器是优先级）', rowText(mk({ weapons: [{ label: '满拐', tier: null, sep: ' / ', items: [{ name: 'A枪' }, { name: 'B枪' }] }] }), '武器'), 'A枪＞B枪')
+  push('武器：`>` 渲染成 `＞`', rowText(mk({ weapons: [{ label: null, tier: 1, sep: ' > ', items: [{ name: 'A枪' }, { name: 'B枪' }] }] }), '武器'), 'A枪＞B枪')
+  // 「同级且毫无区别」写在**条目文字**里（如 `88爆伤/44暴击武器`）：名字原样保留，不当分隔符
+  push('武器：条目名里的 `/` 原样保留（同级无区别的写法）', rowText(mk({ weapons: [{ label: null, tier: 1, sep: ' > ', items: [{ name: '霜结的誓金枝' }, { name: '88爆伤/44暴击武器' }] }] }), '武器'), '霜结的誓金枝＞88暴击伤害/44暴击率武器')
   push('圣遗物：`+` 组合仍在一个 chip 内', rowText(mk({ artifacts: [{ kind: 'preferred', label: '首选', sep: ' + ', sets: [{ name: '2生命' }, { name: '2充能' }] }] }), '圣遗物'), '2生命+2充能')
   // 件数简写**不参与同名去重**（真套装名才去重）：`2精通 + 2精通` 要两个都留着
   push('圣遗物：`2精通 + 2精通` 不去重', rowText(mk({ artifacts: [{ kind: 'transition', label: '过渡', sep: ' + ', sets: [{ name: '2精通' }, { name: '2精通' }] }] }), '圣遗物'), '2精通+2精通')

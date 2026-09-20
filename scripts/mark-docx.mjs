@@ -44,9 +44,9 @@ const eqJson = (a, b) => JSON.stringify(a) === JSON.stringify(b)
 
 /**
  * 拿到 parse-docx.mjs 里的 parseBlock（**不修改该文件**）：
- * 它没有 export，末尾又会直接跑 main()，所以在仓库内 .tmp 下克隆一份、
- * 只追加一行 export 再把 `main()` 那行注释掉，然后用动态 import 取出函数，
- * 这样本脚本用的是与 parse-docx 完全同一套解析语义。
+ * 它没有 export，所以在仓库内 .tmp 下克隆一份、只追加一行 export，然后用动态 import 取出函数；
+ * 克隆体被 import 时 `isDirectRun` 为假（argv[1] 是本脚本），parse-docx 的入口守卫不会跑 main()。
+ * 这里仍显式去掉那行调用，作为双保险（守卫若被移除也不会误跑）。
  * @returns {Promise<Function>}
  */
 export async function loadParseBlock () {
@@ -54,7 +54,7 @@ export async function loadParseBlock () {
   fs.rmSync(dir, { recursive: true, force: true })
   fs.mkdirSync(path.join(dir, 'lib'), { recursive: true })
   const code = fs.readFileSync(path.join(here, 'parse-docx.mjs'), 'utf8')
-  fs.writeFileSync(path.join(dir, 'parse-docx.mjs'), code.replace(/^main\(\)$/m, '') + '\nexport { parseBlock }\n', 'utf8')
+  fs.writeFileSync(path.join(dir, 'parse-docx.mjs'), code.replace(/^if \(isDirectRun\) main\(\)$/m, '') + '\nexport { parseBlock }\n', 'utf8')
   for (const f of ['docx.mjs', 'schema.mjs', 'parse-warnings.mjs']) {
     const src = path.join(here, 'lib', f)
     if (fs.existsSync(src)) fs.copyFileSync(src, path.join(dir, 'lib', f))

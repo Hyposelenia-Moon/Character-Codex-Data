@@ -12,7 +12,7 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { readDocx, SEPARATOR } from './lib/docx.mjs'
 import { makeRef, parseRef, deriveSections, deriveTags, validate, constellationIndex, extractMarks, stripMarks, MARK_RE, parseNoteLine, resolveNoteText, artifactStatPool, isNoteRow } from './lib/schema.mjs'
 import { warn, getWarnings, resetWarnings, setWarnContext } from './lib/parse-warnings.mjs'
@@ -819,4 +819,20 @@ function main () {
   }
 }
 
-main()
+/**
+ * 入口守卫：**只有** `node scripts/parse-docx.mjs` 直接运行时才执行 main()（才会写盘）。
+ *
+ * 为什么必须有：本文件是脚本、不是库，`import('./scripts/parse-docx.mjs')` 之前会**直接跑到底**，
+ * 也就是「只想看一眼导出」会把整个 data/gi 按文档重写一遍（2026-09-20 真出过一次事故）。
+ * 加上守卫后：被 import 时只定义函数/常量，不解析、不写盘；`mark-docx.mjs` 克隆复用 parseBlock
+ * 也依赖这一点（克隆体被 import，argv[1] 是 mark-docx.mjs，守卫自然为假）。
+ */
+const isDirectRun = (() => {
+  try {
+    return !!process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url
+  } catch {
+    return false
+  }
+})()
+
+if (isDirectRun) main()
