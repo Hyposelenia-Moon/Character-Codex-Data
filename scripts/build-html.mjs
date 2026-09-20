@@ -520,7 +520,8 @@ export function characterSections (data) {
     if (!src) return { title, badge, type: kind, kind, rows: [], teams: [] }
     const lines = displayLines(src.lines ?? [])
     if (kind === 'teams') {
-      // 段末备注行 `注：…`：**整行备注**（按 NOTE_PREFIX_RULE 不加 `注：` 前缀）。
+      // 段末备注行 `注：…`：**整行备注**，是这一段的**最下方那条文字行** ——
+      // 用户定稿：**只有它**用 `注：`（成员自带的括注渲染成 `希诺宁（二命）`，不再提到行尾）。
       // 它总是**独立一行**渲染（与面板侧 parse.js / display.js 的 note 行一致）：
       // 面板把 `{kind:'note'}` 转成「没有成员、只有 note」的一行，网页版也必须画出来，
       // 否则网页版会整行丢掉这条备注（曾经就是漏的）。同一段多条备注用 `；` 拼成一行。
@@ -528,7 +529,7 @@ export function characterSections (data) {
       const teams = teamsFromLines(teamLines)
       const noteText = lines.filter(l => /^注\s*[:：]/.test(l))
         .map(l => l.replace(/^注\s*[:：]\s*/, '').trim()).filter(Boolean).join('；')
-      if (noteText) teams.push({ tag: '', members: [], text: '', note: noteText, notePrefix: false })
+      if (noteText) teams.push({ tag: '', members: [], text: '', note: noteText, notePrefix: true })
       return { title, badge, type: 'teams', kind, rows: [], teams }
     }
     // 面板段：**与面板侧 parse.js 的 v2PanelRows 同源**。只有 v2 分得清「键值对」和「说明行」

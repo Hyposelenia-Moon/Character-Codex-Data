@@ -383,7 +383,7 @@ node .dsh/verify-editor-e2e.mjs      # 端到端：用真实的 buildBody 出 pa
 | 天赋 | 行首标签显示 **`推荐`**（不是 `天赋`）；三格 A/E/Q + 图标正下方等级数字（10 叠皇冠） | `build-html.mjs` 与 `parse.js` 的行模型（`label: '推荐', kind: 'talents'`） |
 | **面板** | **键值对**（`{k,v}`）→ 行首标签留空、把 `暴击率：70%+` 放进条目；**说明行**（`辅助向：暴击率70% / 暴伤220%+`）→ 标签就是 `辅助向`、值按 `/` 拆成多个 chip；**同一标签 ≤3 条合并成一行**（行间用全角空格 `　`，行内 `/` 保留）、>3 条维持分行 | 两条链路都按这个约定产出行：`parse.js` 的 `v2PanelRows`（面板）与 `build-html.mjs` 的面板段（网页版，读 `v2.panels`）；合并由 `guide-display.mjs` 的 `normalizePanelRows` 完成 |
 | 命座 | **图标在 `命之座N` 之前**：`[图标] [命之座2] [说明]`；命座图标是**白色线稿**，浅底上必须反相成深色（`rank-icon-line`）否则看不清 | `codex.html` 的 `.grow-icon`（行首渲染，**带 `rank-icon-line`**）＋ `codex.css` 的 `.grow-constellation` 三列网格 / `.rank-icon.rank-icon-line { filter: invert(1) brightness(.9) }` |
-| 配队 | **头像之间 `+`**（槽位之间）；**同一槽位的可替换角色之间 `/`，且这些候选头像要并列横排**（不要上下堆叠） | `codex.html` 的 `.team-plus` / `.team-alts` / `.team-slash`；候选头像由插件 `icons.js` 的 `attachTeamIcons` 逐个解析（`member.candidates`） |
+| 配队 | **头像之间 `+`**（槽位之间）；**同一槽位的可替换角色之间 `/`，且这些候选头像要并列横排**（不要上下堆叠）；**成员括注用行内全角括弧**（`叶洛亚 / 希诺宁（二命）`，与圣遗物 `千岩牢固（四件套）` 同款）；**`注：` 只给段末那条纯文字行**（`注：建议二命及以上；高金配置`），带档位词、整行就是内容的不加（`可选：自由选择`） | `codex.html` 的 `.team-plus` / `.team-alts` / `.team-slash` / `.team-member-note`；候选头像由插件 `icons.js` 的 `attachTeamIcons` 逐个解析（`member.candidates`）；`注：` 前缀由 `guide-display.mjs` 的 `normalizeTeams` 的 `notePrefix` 决定（两链路口径一致，`audit-web-vs-panel` 会逐字比前缀） |
 | Hero | 文字对比度：遮罩 0.52 + 近黑字 + 四向白色描边 | `resources/common/hero.css` 的 `.hero-bg` / `.hero-title` / `.hero-game` |
 
 面板离线核对（维护者侧，`.dsh/` 不入库）：`node .dsh/explore/codex/render.mjs <角色>`

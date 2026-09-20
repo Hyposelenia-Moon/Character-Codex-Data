@@ -307,10 +307,10 @@ function buildSetRow (segments, baseSep, parse) {
  *   · `/` 连接的是**同一格的可替换项**（二选一）→ **并进同一个成员格**，格内原样保留 ` / `
  *     （`A + B + C / D` → 3 个成员，第 3 个是 `C / D`）；`/` 不拆成额外成员格
  *
- * 成员带**命座 / 成本类**括注（`纳西妲（二命）` `妮露（高金）`）时拆成
- * `{name:'纳西妲', ref:'character:纳西妲'}` + 一条段末备注 `{kind:'note', text:'二命'}`
- * —— 正文行保持干净标准名（ref 能取图标），括注进 `注：` 行。
- * 精炼/其它类括注（`（精五）` 等）仍留在 note 字段里，由 itemText 写回 `（精五）`。
+ * 成员带**括注**（`纳西妲（二命）` `爱可菲 / 尼可`）时**留在成员上**
+ * （`{name:'纳西妲', note:'二命'}`）—— 显示层渲染成**行内全角括弧**，与圣遗物的
+ * `千岩牢固（四件套）` 同款（用户定稿 2026-09-20：成员备注用括弧、`注：` 只留给段末纯文字行）。
+ * 以前这里会把命座/成本类括注提到段末 `注：` 行，现在不再拆开。
  * @returns {{members: object[], notes: string[]} | null}
  */
 function parseMembers (text, index) {
@@ -326,8 +326,8 @@ function parseMembers (text, index) {
     const sn = splitNameNote(merged)
     // 取图标用第一个候选名（面板 / 网页版同款：格内首个候选代表这一格）
     const first = sn.name.split(/\s*\/\s*/)[0].trim()
-    let note = sn.note
-    if (resolveNoteText(note, { readPool: [] })) { notes.push(note); note = '' }
+    // 括注**留在成员上**（渲染成行内括弧），不再提到段末 `注：` 行
+    const note = String(sn.note ?? '').trim()
     return { name: sn.name, ...(note ? { note } : {}), ref: makeRef('character', first) }
   })
   // 至少一个候选能对上角色名就认为是队伍（候选项并格后成员数变少，不能按「一半」判）

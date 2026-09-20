@@ -370,8 +370,26 @@ console.log('\n================ 词条写法 ================')
       sections: [{ title: '6. 配队推荐', lines: ['二命进月结晶：兹白 + 哥伦比娅 + 莉奈娅 + 希诺宁（二命）'] }]
     }
     const team = characterSections(d).find(s => s.kind === 'teams')?.teams?.[0] ?? {}
-    push('配队：成员括注拆成备注（成员名不带括注）', (team.members ?? []).map(m => m.name + (m.note ? `（${m.note}）` : '')).join(' + '), '兹白 + 哥伦比娅 + 莉奈娅 + 希诺宁')
-    push('配队：成本备注（二命）提到行尾并加「注：」', team.notePrefix === true ? `注：${team.note}` : String(team.note ?? ''), '注：二命')
+    // 用户定稿 2026-09-20：成员括注**留在成员上**（行内全角括弧，与圣遗物 `千岩牢固（四件套）` 同款），
+    // 不再提到行尾当 `注：`；`注：` 只留给段落最下方那条纯文字行。
+    push('配队：成员括注留在成员上（渲染成行内括弧）', (team.members ?? []).map(m => m.name + (m.note ? `（${m.note}）` : '')).join(' + '), '兹白 + 哥伦比娅 + 莉奈娅 + 希诺宁（二命）')
+    push('配队：成员括注不再提到行尾（这一行没有「注：」）', team.notePrefix === true ? `注：${team.note}` : String(team.note ?? ''), '')
+  }
+  // ③f 段末那条**纯文字行**才用 `注：`；带档位词、整行就是内容的（`可选：自由选择`）不加
+  {
+    const d = {
+      schema: 2,
+      name: '自检',
+      game: 'gi',
+      meta: {},
+      v2: { teams: [] },
+      sections: [{ title: '6. 配队推荐', lines: ['首选：丝柯克 + 芙宁娜', '可选：自由选择', '注：建议二命及以上；高金配置'] }]
+    }
+    const teams = characterSections(d).find(s => s.kind === 'teams')?.teams ?? []
+    const bottom = teams.find(t => /建议二命及以上/.test(String(t.note ?? ''))) ?? {}
+    push('配队：段末纯文字行加「注：」', bottom.notePrefix === true ? `注：${bottom.note}` : String(bottom.note ?? ''), '注：建议二命及以上；高金配置')
+    const freeChoice = teams.find(t => /自由选择/.test(String(t.note ?? ''))) ?? {}
+    push('配队：`可选：自由选择`（整行就是内容）不加「注：」', freeChoice.notePrefix === true ? `注：${freeChoice.note}` : String(freeChoice.note ?? ''), '自由选择')
   }
 
   // ④ 天赋行的行首标签是**显示词 `推荐`**（文档里仍写 `天赋：…`）

@@ -77,7 +77,10 @@ const teamSig = (t) => {
   const members = (t.members || []).map(m => clean(m.name).replace(/\s*\/\s*/g, '/')).join('§')
   const options = (t.options || []).map(m => clean(m.name)).join('§')
   const note = clean(String(t.note || t.text || '').replace(/^注\s*[:：]/, ''))
-  return canon([t.tag || '', members, options, note].join('|'))
+  // `注：` 前缀**也要比**（用户定稿：只有段末那条纯文字行才加），
+  // 以前这里把前缀剥掉再比 → 「网页版漏了注：」这类漂移查不出来。
+  const prefixed = note ? (t.notePrefix === true ? '注：' : '〔无前缀〕') : ''
+  return canon([t.tag || '', members, options, prefixed + note].join('|'))
 }
 /**
  * 插件侧把**段末备注行**（`注：…`）也塞进 `section.teams` 里渲染成「只有备注、没有成员」的一行；
