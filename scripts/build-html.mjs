@@ -555,9 +555,41 @@ export function characterSections (data) {
     const rows = linesToModelRows(lines, title === '武器' ? weaponHints : [], title === '天赋' ? crownHint : null, title === '天赋' ? levelHints : null,
       title === '圣遗物' ? (data?.v2?.artifacts ?? []) : [],
       title === '武器' ? (data?.v2?.weapons ?? []) : [])
-    return { title, badge, type: kind === 'stats' ? 'stats' : 'rows', kind, rows }
+    // 主词条行的 `note` / `noteSlot`（`理之冠：…防御力（特殊）` 里的「特殊」）：
+    // 面板直接读 v2 字段；网页版读的是**文档层行**，所以这里把字段里的括注补挂到对应部位的那个值上，
+    // 渲染成同一份小字备注（值里已经带括注的不重复挂 —— 那种由显示层折成 note，见 guide-display）。
+    const withNotes = title === '圣遗物' ? attachMainNotes(rows, data?.v2?.artifacts ?? []) : rows
+    return { title, badge, type: kind === 'stats' ? 'stats' : 'rows', kind, rows: withNotes }
   })
   return normalizeSections(model)
+}
+
+/**
+ * 把 v2 主词条行的 `note`（+ `noteSlot`）挂到网页版模型的那个部位条目上。
+ * 与面板侧 parse.js 的取法同序：两边都按 v2 里 `kind:'main'` 行的**出现顺序**对齐。
+ * @param {object[]} rows 文档层行模型
+ * @param {object[]} v2Artifacts v2.artifacts
+ * @returns {object[]}
+ */
+function attachMainNotes (rows, v2Artifacts) {
+  const mains = (v2Artifacts ?? []).filter(r => r && r.kind === 'main')
+  if (!mains.length) return rows
+  const isMainRow = (row) => (row?.items ?? []).some(it => it.slot)
+  let seen = 0
+  return (rows ?? []).map(row => {
+    if (!isMainRow(row)) return row
+    const src = mains[seen++]
+    const note = String(src?.note ?? '').trim()
+    if (!note) return row
+    const wantSlot = String(src?.noteSlot ?? '').trim()
+    const items = (row.items ?? []).map(it => ({ ...it }))
+    // 目标部位：noteSlot 指定的那个；没指定就取第一个「值里还没有括注」的部位
+    const target = (wantSlot && items.find(it => it.slot === wantSlot)) ||
+      items.find(it => !/[（(][^）)]*[）)]/.test(String(it.text ?? '')))
+    if (!target || /[（(][^）)]*[）)]\s*$/.test(String(target.text ?? ''))) return row
+    target.note = note
+    return { ...row, items }
+  })
 }
 
 /**

@@ -719,6 +719,8 @@ function actBtn (act, path, text, cls, title, index) {
  */
 function rowVisible (row) {
   if (!row || typeof row !== 'object') return false
+  // 墓碑（点了「删除行」）：位置留着不挪（保存时按下标与原文件对齐），但表单里不渲染。
+  if (row.__deleted === true) return false
   // 刚点「＋ 新增一行」加出来的行**必须可见** —— 否则它在表单里根本不渲染，
   // 用户就会遇到「加了配队行却没法选角色 / 加了面板行却没法填」（用户报过）。
   // `_new` 只是界面上的临时标记，落盘前会被 buildBody 丢掉。
@@ -752,9 +754,27 @@ function visibleRows (list) {
 
 /** 隐藏的占位行提示 */
 function hiddenNote (list) {
-  var hidden = list.length - visibleRows(list).length
+  var hidden = 0
+  for (var i = 0; i < list.length; i++) if (!rowVisible(list[i]) && !(list[i] && list[i].__deleted === true)) hidden++
   if (hidden <= 0) return ''
   return '<div class="muted" style="font-size:12px;margin:6px 0 0">已隐藏 ' + hidden + ' 个空占位行（旧数据里的待填行，保存时原样保留；点「删除行」可清掉）</div>'
+}
+
+/**
+ * 已删除的行提示（墓碑）+ 撤销。
+ *
+ * 删除**不缩短数组**、只在原位放 `{__deleted:true}`：这样后面各行与原文件始终逐下标对齐，
+ * 保存时服务器才能既做字段级保留、又真的把这一行删掉（以前按位置补齐 → 删了又回来，
+ * 用户报的「预览与实际修改不符」）。
+ */
+function deletedNote (path, list) {
+  var idx = []
+  for (var i = 0; i < list.length; i++) if (list[i] && list[i].__deleted === true) idx.push(i)
+  if (!idx.length) return ''
+  return '<div class="deleted-note">已删除 ' + idx.length + ' 行（保存后消失）：' +
+    idx.map(function (i) {
+      return '<button type="button" class="btn mini" data-act="undelete-row" data-path="' + esc(path) + '" data-i="' + i + '" title="把这一行恢复回来">撤销第 ' + (i + 1) + ' 行</button>'
+    }).join(' ') + '</div>'
 }
 
 /** 行列表：rows → html 拼接 + 尾部「新增一行」按钮
@@ -764,7 +784,7 @@ function rowList (path, rows, renderRow, addLabel) {
   var html = visible.map(function (v) { return renderRow(v.row, v.i, path + '.' + v.i, path + '.' + v.i) }).join('')
   var body = visible.length ? html : emptyNote('还没有' + addLabel + '，点下面的按钮新增')
   return '<div class="row-list">' + body + '</div>' +
-    '<div style="margin-top:8px">' + actBtn('add-row', path, '＋ ' + addLabel, 'btn mini') + '</div>' + hiddenNote(rows)
+    '<div style="margin-top:8px">' + actBtn('add-row', path, '＋ ' + addLabel, 'btn mini') + '</div>' + deletedNote(path, rows) + hiddenNote(rows)
 }
 
 function emptyNote (text) {
@@ -1661,31 +1681,32 @@ function buildBody () {
   }
 
   var weapons = mv2.weapons.map(function (row) {
+    // 删除行：原位提交墓碑（位置不动 → 后面各行仍与原文件逐下标对齐）
+    if (row && row.__deleted === true) return { __deleted: true }
     var out = { label: hasText(row.label) ? row.label : null }
     // 自定义标签与档位**互斥**：文档一行只有一个标签词（label 非空 → 文档写 `建议：`，
     // 写不进「第N档」）。输入时已联动清空，这里是保存前的兜底，防止手工改过 JSON 的行带进来。
     out.tier = out.label ? null : row.tier
     out.items = row.items.filter(function (it) { return hasText(it.name) }).map(function (it) {
-      var o = { name: it.name.trim(), ref: 'weapon:' + it.name.trim() }
-      if (hasText(it.note)) o.note = it.note.trim()
-      return o
+      // `note` 显式提交（清空就提交 null）：否则「清掉一条备注」会被原文件顶回来
+      return { name: it.name.trim(), note: hasText(it.note) ? it.note.trim() : null, ref: 'weapon:' + it.name.trim() }
     })
     return out
-    // 完全空白的行不提交（旧数据里的空行由服务器 mergeV2 按位置带回来）
-  }).filter(function (row) { return row.items.length > 0 })
+    // ⚠ 这里**不再过滤空行**：每行都要占一个下标（删行靠墓碑表达），
+    //   空行由服务器 normalizeV2 丢掉（main 占位行按设计保留）。
+  })
 
   var artifacts = mv2.artifacts.map(function (row) {
+    if (row && row.__deleted === true) return { __deleted: true }
     if (row.kind === 'note') return { kind: 'note', text: str(row.text).trim() }
     if (row.kind === 'main') {
       var stats = {}
       MAIN_SLOTS.forEach(function (slot) {
         stats[slot] = asArray(row.stats && row.stats[slot]).map(function (x) { return x.trim() }).filter(Boolean)
       })
-      var main = { kind: 'main' }
-      if (hasText(row.note)) {
-        main.note = row.note.trim()
-        if (hasText(row.noteSlot)) main.noteSlot = row.noteSlot
-      }
+      // note / noteSlot 显式提交（清空 → null），否则清不掉
+      var main = { kind: 'main', note: hasText(row.note) ? row.note.trim() : null }
+      if (hasText(row.noteSlot)) main.noteSlot = row.noteSlot
       main.stats = stats
       return main
     }
@@ -1707,13 +1728,6 @@ function buildBody () {
       return o
     })
     return o3
-  }).filter(function (row) {
-    // 主词条行永远保留（旧数据里有整行留空的占位行，丢掉就是数据损失）
-    if (row.kind === 'main') return true
-    if (row.kind === 'note') return hasText(row.text)
-    if (row.kind === 'sub') return row.stats.length > 0
-    if (row.kind === 'text') return hasText(row.text)
-    return row.sets.length || hasText(row.label)
   })
 
   var talents = []
@@ -1746,17 +1760,25 @@ function buildBody () {
   })
 
   var panels = mv2.panels.map(function (row) {
+    if (row && row.__deleted === true) return { __deleted: true }
     var label = hasText(row.label) ? row.label : null
     if (hasText(row.k)) return { label: label, k: row.k.trim(), v: str(row.v).trim() }
     return { label: label, text: str(row.text).trim() }
-  }).filter(function (row) { return hasText(row.k) || hasText(row.text) })
+    // 空行不再在这里丢掉（要占下标）；服务器 normalizeV2 会丢弃没有 k / text 的行
+  })
 
-  var constellations = mv2.constellations.filter(function (row) { return hasText(row.name) }).map(function (row) {
-    var idx = constellationIndex(row.name)
-    return { name: row.name.trim(), index: idx, text: str(row.text).trim() }
+  var constellations = mv2.constellations.map(function (row) {
+    if (row && row.__deleted === true) return { __deleted: true }
+    // 名字为空 → 提交 null（占着下标，服务器按「没有名字」丢掉）
+    return {
+      name: hasText(row.name) ? row.name.trim() : null,
+      index: constellationIndex(row.name),
+      text: str(row.text).trim()
+    }
   })
 
   var teams = mv2.teams.map(function (row) {
+    if (row && row.__deleted === true) return { __deleted: true }
     // 段末备注行（`{kind:'note'}`）原样带回（界面不改它，但丢了就是数据损失）
     if (row.kind === 'note') return { kind: 'note', text: str(row.text).trim() }
     var members = asArray(row.members).filter(function (m) { return hasText(m.name) }).map(function (m) {
@@ -1764,12 +1786,11 @@ function buildBody () {
       // ref 取**第一个候选**（面板 / 网页版取图标同款口径）
       var cands = memberCandidates(m.name)
       var name = cands.length > 1 ? joinCandidates(cands) : cands[0]
-      var o = { name: name, ref: 'character:' + (cands[0] || name) }
-      if (hasText(m.note)) o.note = m.note.trim()
-      return o
+      // note 显式提交（清空 → null），否则成员括注清不掉
+      return { name: name, note: hasText(m.note) ? m.note.trim() : null, ref: 'character:' + (cands[0] || name) }
     })
     return { label: hasText(row.label) ? row.label : null, members: members, text: str(row.text).trim() }
-  }).filter(function (row) { return asArray(row.members).length || hasText(row.text) || hasText(row.label) })
+  })
 
   return {
     name: state.current,
@@ -1980,7 +2001,13 @@ function handleAction (act, path, i, el) {
   if (act === 'add-row') {
     target.push(newRow(path.split('.').pop()))
   } else if (act === 'del-row') {
-    target.splice(i, 1)
+    // **不缩短数组**：原位放墓碑，保存时服务器才知道"这一行被删了"（否则按位置又补回来）。
+    // 撤销 = undelete-row（见下）。
+    if (target[i] && typeof target[i] === 'object') target[i] = { __deleted: true }
+    else target.splice(i, 1)
+  } else if (act === 'undelete-row') {
+    var dead = target[i]
+    if (dead && dead.__deleted === true) delete target[i].__deleted
   } else if (act === 'move-row-up') {
     changed = moveRow(target, i, -1)
   } else if (act === 'move-row-down') {

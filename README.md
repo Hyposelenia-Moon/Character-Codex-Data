@@ -19,7 +19,7 @@
 | 3 | **标记版 docx**（`out\…(标记版).docx` + `D:\…\…(标记版).docx`） | 由 `build-docx --write-main` 一并产出，无需手改 | 标记版 sha1 + "去标记后逐字一致：是" |
 | 4 | `guide.html` | `node scripts/build-html.mjs` | 卡片数 129 + `audit-guide-html` 通过 |
 | 5 | `guide.md` | `node scripts/build-doc.mjs`（**选 A 口径**：只过滤占位符，**文档词汇不变**） | `___`=0 + 文档词汇计数 + 新旧字节/行数 |
-| 6 | **编辑器**（表单文案 + `/api/preview` 预览） | `resources/editor/app.js`（文案 / 下拉 / **标签与档位联动**）＋ 服务端走共享层；**改完必须重启编辑器进程**（长驻进程会缓存旧模块） | `/api/preview` html 与 `guide.html` **逐字节一致** ＋ `scripts/editor-selftest.mjs` 27/27 |
+| 6 | **编辑器**（表单文案 + `/api/preview` 预览） | `resources/editor/app.js`（文案 / 下拉 / **标签与档位联动** / **删行墓碑**）＋ `scripts/editor.mjs`（保存协议：删行墓碑、清空＝显式 `null`）；**改完必须重启编辑器进程**（长驻进程会缓存旧模块） | `/api/preview` html 与 `guide.html` **逐字节一致** ＋ `scripts/editor-selftest.mjs` 42/42 ＋ `.dsh/verify-editor-delete.mjs`（含 129 角色原样保存逐字节不变）＋ `.dsh/verify-editor-e2e.mjs` |
 | 7 | **插件面板** | `model/codexIndex/display.js`（**与 `scripts/lib/guide-display.mjs` 逐字节一致**）、`parse.js`、`resources/atlas/codex.html`、`codex.css` | `node scripts/check-display-sync.mjs` + `audit-web-vs-panel` |
 | 8 | `README` 与 `templates/` | 改受影响的说明、词汇表、符号语义、期望值 | 本节表格与预期计数 |
 | 9 | **审计脚本的期望值** | `audit-*` / `display-*` / `check-display-sync` 的断言与合法集 | 每个审计 `exit=0` |
@@ -36,7 +36,7 @@ node scripts/audit-dup-items.mjs                  # 重复名 0/0、序列不一
 node scripts/check-display-sync.mjs               # 两份显示级归一逐字节一致
 node scripts/scan-separators.mjs                  # 悬挂 0 + 副词条非法同级对 0（`/` 只许出现在暴击对之间）
 node scripts/display-selftest.mjs <角色>           # 自定义档位词 7/7 + 词条写法 7/7
-node scripts/editor-selftest.mjs                  # 编辑器规则 27/27（天赋等级 / 新增行 / 多值输入 / 标签互斥 / 配队槽位）
+node scripts/editor-selftest.mjs                  # 编辑器规则 42/42（天赋等级 / 新增行 / 多值输入 / 标签互斥 / 配队槽位）
 node scripts/build-html.mjs && node scripts/build-doc.mjs   # 产物刷新
 # 编辑器 129 角色「打开→原样保存」逐字节不变 + /api/preview 与 guide.html 逐字节一致
 #   （需先 node scripts/editor.mjs --port <p> --no-open 起服务；改过共享层务必重启）
@@ -274,17 +274,27 @@ node scripts/build-doc.mjs       # 文档版 guide.md（Word 用可再打包 doc
 文档：首选：A套 > B套                 →  显示：[A套]＞[B套]            （优先级）
 ```
 
-**主词条 / 副词条值末尾的括注 → 条目的 `note`（小字弱化）**（用户定稿 2026-09-20：
-「主词条的括注没有对所有角色生效」）。数据里两种写法在**显示层收敛成同一个效果**，JSON / docx 一个字不改：
+**主词条 / 副词条的括注：统一写在「值里」**（用户定稿 2026-09-20）
+
+写法就一种 —— 括注跟在**那个具体值**后面、且只出现在**值末尾**：
 
 ```text
 数据：理之冠：防御力（特殊）        →  显示：[理之冠：防御力] + 小字「（特殊）」
 数据：副词条：暴击（西风）          →  显示：[暴击率] + 小字「（西风）」
-数据：kind:'main' 的 note=二命      →  显示：挂在 noteSlot 那个部位的值后面，同样是**小字**
+数据：空之杯：水元素伤害加成（二命）  →  显示：[空之杯：水元素伤害加成] + 小字「（二命）」
 ```
 
-⚠ 括注要在**判分隔符之前**拆掉（`暴击率（西风）` 得先认出是 `暴击率`，才判得出它是暴击对）；
-两条链路（网页版 / 面板）都走同一个 `normalizeArtifactRows`。文档层仍把括注写在值里（往返逐字不变）。
+- **为什么选值里（而不是 `note` + `noteSlot` 字段）**：文档就是这么写的（`防御力（特殊）`），
+  数据与文档**同形** → `doc→JSON→doc` 逐字相等；括注天然跟着那个值，不需要 `noteSlot` 回指，
+  也不会有「一行只能写一条括注」的限制。字段形式是**历史写法**，显示层仍兼容（见下），但**不再新增**。
+- **剥离逻辑只有一份**：`guide-display.mjs` 的 `splitStatNote(value) → {text, note}`
+  （只认末尾那一层括号，与 `parse-docx` 的 `NAME_NOTE_RE` 同判据）。
+  显示层在**判分隔符之前**先剥括注（`暴击率（西风）` 得先认出是 `暴击率`，才判得出它是暴击对）；
+  两条链路（网页版 / 面板）都走同一个 `normalizeArtifactRows`。
+  凡是要**按值精确匹配**的新代码（候选表 / 别名归一 / 审计比对）也都要先过这个函数。
+- **历史字段写法**（`kind:'main'` 的 `note` + `noteSlot`）仍能正确显示（网页版与面板都会把它
+  挂到对应部位的小字备注上），但迁移已把数据折回值里：`node .dsh/normalize-main-notes.mjs`。
+- `scan-separators.mjs` 会检查「括注只在值末尾」（写在中间会被分隔符逻辑切开 → 文档与数据漂移）。
 
 **武器行的分隔符（用户定稿：正常武器用 `＞`）**：武器档位是**优先级链**，所以**源文档写 `/` 也显示 `＞`**：
 
@@ -327,9 +337,31 @@ node scripts/build-doc.mjs       # 文档版 guide.md（Word 用可再打包 doc
 `建议：第一档：西风剑` —— `parse-docx` 认不出（往返立刻不再 129/129）。
 
 断言（改动显示层 / 文档层 / 编辑器标签时都要跑）：
-`scripts/display-selftest.mjs <角色>`（自定义档位词 7 条）、
+`scripts/display-selftest.mjs <角色>`（自定义档位词 7 条 + 词条写法 42 条）、
 `scripts/audit-web-vs-panel.mjs` 的合成样例（3 条）、
-`scripts/editor-selftest.mjs`（编辑器规则 27 条：天赋等级 / 新增行可见 / 多值输入 / 标签互斥 / 配队槽位 / 界面标记不落盘）。
+`scripts/editor-selftest.mjs`（编辑器规则 42 条：天赋等级 / 新增行可见 / 多值输入 / 标签互斥 /
+配队槽位 / 界面标记不落盘 / **删行墓碑** / **清空字段提交 null**）。
+
+**编辑器的保存协议（删行 / 清空 / 空占位行，用户 2026-09-20 定稿）**
+
+| 用户的动作 | 编辑器提交什么 | 服务器怎么处理 |
+|---|---|---|
+| 点「删除行」 | **原位墓碑** `{__deleted:true}`（**不缩短数组**） | `mergeRows` 透传墓碑 → `normalizeV2` 丢掉 → 数据里真的没有这一行 |
+| 清空一个字段（标签 / 备注 / 条目列表） | **显式提交 `null` / `[]`** | `mergeField` 只把 `undefined` 当「没提交」→ 空值就是清空 |
+| 「＋新增一行」后没填 | 提交一个空行（占住下标） | 空行由 `isEmptyRow` 丢掉，数据里不会多出空行 |
+| 空占位行（旧数据里的待填行） | 原样提交（表单里隐藏着） | **留还是删由用户决定**：不点删除就一直保留，「删除行」就真的删掉 |
+
+⚠ 为什么删行要用墓碑而不是 `splice`：数组一变短，后面每一行都跟原文件**错位一格**，
+服务器按位置做字段级保留（`source` / 套装 `pieces` / 天赋旧写法…）就会张冠李戴；
+墓碑让位置永远对齐，删除则显式表达。兼容：客户端**完全没提交**的下标仍按原文件补回
+（旧页面缓存不会因此丢行）。
+
+集成验收（需要先起一个隔离实例：把仓库复制到 `.tmp/editor-rt/`，用 `--port 8799` 起同一个编辑器）：
+
+```text
+node .dsh/verify-editor-delete.mjs   # 契约：129 角色原样保存逐字节不变 + 删行/清空/占位 11 项
+node .dsh/verify-editor-e2e.mjs      # 端到端：用真实的 buildBody 出 payload 再保存，6 项
+```
 
 **空值 / 占位符**：`data.tags` 与 `meta` 里**允许**留 `___级` / `___` / `___%` 这类"还没填"的占位
 （派生层刻意保留原文）。**是否显示由展示层判断**，三处共用同一个判空口径

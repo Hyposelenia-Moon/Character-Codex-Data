@@ -180,15 +180,6 @@ function splitNameNote (token) {
   return { name: raw, note: '' }
 }
 
-/**
- * 去掉面板数值里的**命座括注**（`水元素伤害加成（二命）` → `水元素伤害加成`）。
- * 保留 `（特殊）` `（华馆）` 这类部位/套装说明，保证解析与文档逐字一致。
- * @param {string} text
- */
-function stripCostParens (text) {
-  return String(text ?? '').replace(/[（(][一二三四五六\d]+\s*命[）)]/g, '')
-}
-
 /** 「名称（备注）」或「[[w:名称]]」→ {name, note, ref} */
 function parseWeaponItem (token, index) {
   const { name, note } = splitNameNote(token)
@@ -351,28 +342,17 @@ function parseMembers (text, index) {
  * 部位内部候选值用 `/`，优先级才用 `＞`。`ITEM_SEP_RE` 会把 `｜` 与 `/` 都切开，
  * 靠 `时之沙：` 这类部位前缀把片段归位，所以两种写法都能还原成三个槽位。
  *
- * 词条值上的**命座/成本类括注**（`水元素伤害加成（二命）`）会被剥出来放进 `out`
- * —— 它是「这个杯给二命以上用」，属于备注走廊（回到 JSON 的 `kind:'main'` 的 `note` +
- * `noteSlot`，渲染时挂回**同一个部位**）。`（特殊）` `（华馆）` 这类词条本身的限定照旧留在值里。
+ * 词条值上的括注（`水元素伤害加成（二命）`、`防御力（特殊）`）**一律留在值里**
+ * —— 用户定稿（2026-09-20）：「统一放括注里面」。所以这里不再把它剥成 `note` / `noteSlot`
+ * 字段；显示层会把值末尾的括注折成小字备注（见 guide-display 的 normalizeArtifactRows），
+ * 两条链路看起来完全一样，而 JSON / 文档两边都是同一种写法（往返逐字相等）。
  * @param {string} text
  * @param {object} [into]
- * @param {{note?: string|null, slot?: string|null}} [out] 命中的括注与部位（第一个）
  */
-function parseMainStats (text, into = { 时之沙: [], 空之杯: [], 理之冠: [] }, out = {}) {
+function parseMainStats (text, into = { 时之沙: [], 空之杯: [], 理之冠: [] }) {
   const slots = ['时之沙', '空之杯', '理之冠']
   let current = null
-  const take = (raw) => {
-    let v = String(raw ?? '').trim()
-    const before = v
-    const m = v.match(NAME_NOTE_RE)
-    if (m && !out.note && resolveNoteText(m[2], { readPool: [] })) {
-      out.note = m[2]
-      out.slot = current
-      v = m[1].trim()
-      if (!current) warn(`主词条括注「（${m[2]}）」出现在任何部位之前，无法归位，已兜底按「时之沙」处理（原文：${before}）`)
-    }
-    return stripCostParens(v).trim()
-  }
+  const take = (raw) => String(raw ?? '').trim()
   for (const seg of splitStats(text)) {
     const hit = slots.find(s => seg.startsWith(s + '：') || seg.startsWith(s + ':'))
     if (hit) {
@@ -476,12 +456,6 @@ function parseCrown (text) {
   return out
 }
 
-/** 主词条的括注字段（字段顺序固定 kind, note, [noteSlot], stats） */
-function mainNoteFields (out) {
-  if (!out.note) return {}
-  return { note: out.note, ...(out.slot ? { noteSlot: out.slot } : {}) }
-}
-
 /** 单个角色块 → v2 数据。`parsed.stray` = 文档里没认出来的行（必须为 0） */
 function parseBlock (lines, index) {
   const data = { meta: {}, v2: { weapons: [], artifacts: [], talents: [], panels: [], constellations: [], teams: [] } }
@@ -554,21 +528,18 @@ function parseBlock (lines, index) {
     if (section === '圣遗物推荐') {
       const main = line.match(/^主词条[:：]\s*(.*)$/)
       if (main) {
-        const out = { note: null, slot: null }
-        const stats = parseMainStats(main[1], undefined, out)
-        data.v2.artifacts.push({ kind: 'main', ...mainNoteFields(out), stats })
+        const stats = parseMainStats(main[1])
+        data.v2.artifacts.push({ kind: 'main', stats })
         continue
       }
       const single = line.match(/^(时之沙|空之杯|理之冠)[:：]\s*(.*)$/)
       if (single) {
-        const out = { note: null, slot: null }
-        const stats = parseMainStats(`${single[1]}：${single[2]}`, undefined, out)
+        const stats = parseMainStats(`${single[1]}：${single[2]}`)
         const last = data.v2.artifacts[data.v2.artifacts.length - 1]
         if (last && last.kind === 'main') {
           last.stats[single[1]] = stats[single[1]]
-          if (out.note && !last.note) Object.assign(last, mainNoteFields(out))
         } else {
-          data.v2.artifacts.push({ kind: 'main', ...mainNoteFields(out), stats })
+          data.v2.artifacts.push({ kind: 'main', stats })
         }
         continue
       }

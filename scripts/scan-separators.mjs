@@ -32,6 +32,12 @@ const hits = []
 const critHits = []
 /** 名字里含条目分隔符（`/`、`／`、`｜`）的条目 —— 这类名字写回文档后再解析会被切成两条 */
 const nameHits = []
+/**
+ * 主词条 / 副词条里**括注没写在值末尾**（`防御力（华馆）x` 这种）。
+ * 用户定稿：括注统一写在值里、且只跟在**那个值的末尾**（`防御力（特殊）`）；
+ * 出现在中间会被部位/档位分隔符逻辑切开，文档与数据就会漂移。**只警告，不影响退出码**。
+ */
+const parenHits = []
 /** 显示后仍是「暴击率 / 暴击伤害」这一对？ */
 const isCritPair = (a, b) => {
   const x = String(a ?? '').trim()
@@ -81,6 +87,16 @@ for (const f of files) {
       const nm = String(st?.name ?? '')
       if (/[/／｜]/.test(nm)) nameHits.push(`${name} 套装「${nm}」`)
     }
+    // 主词条 / 副词条：括注必须在**值末尾**（`防御力（特殊）`）
+    const lists = a.kind === 'main' ? Object.values(a.stats ?? {})
+      : (a.kind === 'sub' ? [a.stats ?? []] : [])
+    for (const list of lists) {
+      for (const v of list) {
+        const s = String(v ?? '')
+        if (!/[（(]/.test(s)) continue
+        if (!/^(.*?)\s*[（(]([^（()）]+)[）)]\s*$/.test(s)) parenHits.push(`${name} ${a.kind} 「${s}」`)
+      }
+    }
   }
 }
 
@@ -106,6 +122,12 @@ if (process.argv.includes('--json')) {
   } else {
     console.log(`[!] 名字里含条目分隔符的条目：${nameHits.length} 处（写回文档会被切成两条 → 往返不一致）`)
     for (const h of nameHits.slice(0, 20)) console.log(`  · ${h}`)
+  }
+  if (!parenHits.length) {
+    console.log('主词条 / 副词条括注位置（只许在值末尾）：0 处问题 ✅')
+  } else {
+    console.log(`[!] 括注没写在值末尾的：${parenHits.length} 处（会被分隔符逻辑切开 → 文档与数据漂移）`)
+    for (const h of parenHits.slice(0, 20)) console.log(`  · ${h}`)
   }
 }
 process.exit(hits.length || critHits.length ? 1 : 0)

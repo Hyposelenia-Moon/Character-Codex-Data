@@ -158,7 +158,11 @@ push('旧空行仍然隐藏（不显示占位行）', fn('rowVisible')({ label: 
   api.setModelForTest(model)
   const out = fn('toJson')()
   push('_new 不落盘（teams）', JSON.stringify(out).includes('_new'), false)
-  push('空的新行不落盘（teams）', out.v2.teams.length, 0)
+  // 删行靠**原位墓碑**表达，所以每行都要占一个下标；「空的新行要不要留」由服务器
+  // 按 isEmptyRow 决定（空行不落盘）——客户端只负责把模型原样提交、位置不乱。
+  // 空行不落盘这条保证由 `.dsh/verify-editor-delete.mjs` 对着真实保存结果钉住。
+  push('空的新行仍占一个下标（位置不乱，服务器据此对齐）', out.v2.teams.length, 1)
+  push('空的新行不带墓碑（不是「删除」，只是空）', out.v2.teams.filter(r => r.__deleted).length, 0)
 }
 
 /* 3. 主词条 / 副词条：多值输入框可填可选 */
@@ -209,6 +213,50 @@ push('配队：候选拆分', fn('memberCandidates')('迪奥娜 / 阿罗夏'), [
   api.setModelForTest(model)
   const out = fn('toJson')()
   push('圣遗物：落盘不带 pieces', JSON.stringify(out.v2.artifacts).includes('pieces'), false)
+}
+
+/* 7. 删除行 / 清空字段：编辑器提交的形状（用户报「预览与实际修改不符」）
+ *    · 删行 = 原位墓碑 `{__deleted:true}`（**不缩短数组**，位置不乱 → 服务器才能按下标对齐）
+ *    · 清空 = 显式提交 null（以前省略这个键，被服务器当成「没改」→ 原文件的值顶回来）
+ *    · 空占位行是用户的：留/删都由用户决定，编辑器不替用户丢
+ */
+{
+  const mkWeapons = () => mkData({
+    weapons: [
+      { label: '满拐', tier: null, sep: ' > ', items: [{ name: '岩峰巡歌', ref: 'weapon:岩峰巡歌' }, { name: '圣显之钥', ref: 'weapon:圣显之钥' }] },
+      { label: '循环', tier: null, sep: ' > ', items: [{ name: '西风剑', ref: 'weapon:西风剑' }] }
+    ]
+  })
+  {
+    const model = ctx.__editor.internals.normalizeData(mkWeapons())
+    model.v2.weapons[0].__deleted = true
+    api.setModelForTest(model)
+    const out = fn('toJson')()
+    push('删行：提交原位墓碑、数组不缩短', out.v2.weapons.map(w => (w.__deleted ? '(墓碑)' : (w.label ?? '(无)'))), ['(墓碑)', '循环'])
+    push('删行：墓碑行在表单里不渲染', fn('rowVisible')(model.v2.weapons[0]), false)
+  }
+  {
+    const model = ctx.__editor.internals.normalizeData(mkWeapons())
+    model.v2.weapons[0].label = ''
+    model.v2.weapons[0].items[0].note = ''
+    api.setModelForTest(model)
+    const out = fn('toJson')()
+    push('清空标签：显式提交 null', [out.v2.weapons[0].label, out.v2.weapons[0].tier], [null, null])
+    push('清空条目备注：显式提交 null', out.v2.weapons[0].items[0].note, null)
+  }
+  {
+    const model = ctx.__editor.internals.normalizeData(mkData({ artifacts: [{ kind: 'main', stats: { 时之沙: [], 空之杯: [], 理之冠: [] } }] }))
+    api.setModelForTest(model)
+    const out = fn('toJson')()
+    push('空占位行（main）照旧提交（留/删由用户决定）', out.v2.artifacts.filter(r => r.kind === 'main').length, 1)
+  }
+  {
+    const model = ctx.__editor.internals.normalizeData(mkWeapons())
+    model.v2.teams = [{ _new: true, label: '', members: [], text: '' }]
+    api.setModelForTest(model)
+    const out = fn('toJson')()
+    push('界面标记 `_new` 不落盘', JSON.stringify(out).includes('_new') || JSON.stringify(out).includes('__deleted'), false)
+  }
 }
 
 /* ---------------------------------------------------------------- 汇总 */

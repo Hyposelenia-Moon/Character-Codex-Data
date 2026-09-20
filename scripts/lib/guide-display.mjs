@@ -777,6 +777,26 @@ function subSepBetween (sep, left, right) {
  * @param {object[]} rows
  * @returns {object[]}
  */
+/**
+ * **主词条 / 副词条值末尾的括注** → `{ text, note }`（用户定稿 2026-09-20：括注统一写在**值里**）。
+ *
+ * 数据里括注跟在**具体那个值**后面：`防御力（特殊）`、`暴击率（西风）`、`水元素伤害加成（二命）`、
+ * `暴击率（携带西风秘典时）`。显示时折成「值 + 小字备注」，走与面板/网页版模板 `note` 分支
+ * 完全相同的一条路，所以两种历史写法（值里 / `note`+`noteSlot` 字段）看起来一模一样。
+ *
+ * 只认**末尾那一层**括号（与 parse-docx 的 `NAME_NOTE_RE` 同一判据）；括号出现在值中间
+ * 说明写法不对（`scan-separators.mjs` 会警告），因为部位内部的分隔符逻辑会把它切开。
+ *
+ * ⚠ 凡是要**按值精确匹配**的地方（候选表、别名归一、审计比对）都要先过这个函数拿 `text`。
+ * @param {string} value
+ * @returns {{text: string, note: string}}
+ */
+export function splitStatNote (value) {
+  const s = String(value ?? '')
+  const m = s.match(/^(.*?)\s*[（(]([^（()）]+)[）)]\s*$/)
+  return m ? { text: m[1].trim(), note: m[2].trim() } : { text: s, note: '' }
+}
+
 export function normalizeArtifactRows (rows) {
   return (rows ?? []).map(row => {
     const fromLabel = String(row.label ?? '')
@@ -784,15 +804,10 @@ export function normalizeArtifactRows (rows) {
     const isSub = /副词条/.test(fromLabel)
     const src = row.items ?? []
     // **主词条 / 副词条值末尾的括注 → 条目的 `note`（渲染成小字弱化）**
-    // （用户定稿 2026-09-20：「主词条的括注没有对所有角色生效」）
-    //   数据里有两种写法，必须收敛成同一个效果：
-    //     · `kind:'main'` 的 `note` + `noteSlot` 字段（面板本来就画成 note，网页版却画成行内括注）
-    //     · 直接写在值里的括注（`防御力（特殊）`、`暴击率（西风）`、`暴击率（携带西风秘典时）`）
-    //   在显示层统一拆出来，两条链路就都走模板的 `note`（小字）分支，文档 / JSON 一个字不改。
-    const splitNote = (t) => {
-      const m = String(t ?? '').match(/^(.*?)\s*[（(]([^（()）]+)[）)]\s*$/)
-      return m ? { text: m[1].trim(), note: m[2].trim() } : { text: String(t ?? ''), note: '' }
-    }
+    // （用户定稿 2026-09-20：括注统一写在**值里**，见 splitStatNote）
+    //   历史数据里还有另一种写法：`kind:'main'` 的 `note` + `noteSlot` 字段（面板本来就画成
+    //   note、网页版却画成行内括注）。两种写法在显示层收敛到同一个效果 —— 模板的 `note` 分支。
+    const splitNote = splitStatNote
     // 先把每条的显示文本算出来（`暴击` → `暴击率`、`爆伤` → `暴击伤害`…），
     // 分隔符要**看着左右两边的文本**决定：只有暴击对才是 `=`，其余都是 `＞`。
     // 括注要在**算分隔符之前**拆掉，否则 `暴击率（西风）` 认不出是暴击对。

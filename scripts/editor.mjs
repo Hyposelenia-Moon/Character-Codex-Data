@@ -275,17 +275,33 @@ function hasContent (arr) {
   return asArray(arr).some(v => isProvided(typeof v === 'object' && v !== null ? (v.name || v.text || v.ref) : v))
 }
 
-/** 行数组字段的合并：编辑器给了有内容的数组就用它，否则沿用原文件 */
+/**
+ * 行数组字段的合并：**编辑器提交了这个键**就用它的值（空值 = 明确清空），
+ * 只有**根本没提交**（`undefined`）才沿用原文件。
+ *
+ * ⚠ 这里以前是「空值也算没提交」（`isProvided` / `hasContent` 判断），于是
+ * 「删掉最后一项 / 清空标签 / 清空一条备注」都会被原文件顶回来 —— 用户报的
+ * 「预览与实际修改不符」就是这个。区分「没提交」与「提交了空值」是本次修复的关键：
+ * 编辑器**不认识**的字段（`source` / 套装 `pieces` / 天赋旧写法 / `highlight` …）
+ * 都是根本不提交的，所以照样原样保留。
+ * @param {unknown} x 编辑器提交的值
+ * @param {unknown} y 原文件里的值
+ */
 function mergeField (x, y) {
-  if (!isProvided(x)) return y
-  if (Array.isArray(x) && Array.isArray(y) && !hasContent(x)) return y
-  return x
+  return x === undefined ? y : x
 }
 
 /**
- * 把两个行数组按位置合并：以编辑器提交的为准，缺的字段从原文件取。
- * 为什么需要：编辑器只提交自己认识的字段（例如不提交 raw、不提交套装件数 pieces 之外的老写法），
- * 「打开再保存」时未被编辑的字段必须从 data/gi/<角色>.json 里带回来，避免静默丢数据。
+ * 把两个行数组按下标合并：以编辑器提交的为准，缺的字段从原文件取。
+ *
+ * 为什么按下标（而不是让编辑器提交整份）：编辑器只提交自己认识的字段
+ * （例如不提交 `source`、不提交套装 `pieces` 之外的老写法），「打开再保存」时
+ * 未被编辑的字段必须从 `data/gi/<角色>.json` 里带回来，避免静默丢数据。
+ *
+ * 删除行怎么表达：客户端点了「删除行」**不把数组缩短**，而是在原位放一个墓碑
+ * `{__deleted:true}`（见 resources/editor/app.js 的 del-row / buildBody）——
+ * 位置不动，后面各行才始终与原文件**逐下标对齐**；墓碑在这里直接透传，
+ * 最后被 `normalizeV2` 丢掉。客户端没提交的下标仍按原文件补回（兼容旧页面缓存）。
  * @param {unknown} a 编辑器提交的数组
  * @param {unknown} b 原文件里的数组
  * @returns {object[]}
@@ -298,6 +314,10 @@ function mergeRows (a, b) {
   for (let i = 0; i < n; i++) {
     const x = left[i]
     const y = right[i]
+    if (x && typeof x === 'object' && !Array.isArray(x) && x.__deleted === true) {
+      out.push({ __deleted: true })
+      continue
+    }
     if (x && y && typeof x === 'object' && typeof y === 'object' && !Array.isArray(x) && !Array.isArray(y)) {
       const row = { ...y }
       for (const [k, v] of Object.entries(x)) row[k] = mergeField(v, y[k])
@@ -338,6 +358,8 @@ function normalizeV2 (v2) {
     .filter(r => r && typeof r === 'object')
     .map(row => {
       // 备注行（段末 `注：`）：整行只有 kind + text，原样保留
+      // 墓碑（编辑器里点了「删除行」）：这一行就是删掉了，不落盘
+      if (row.__deleted === true) return null
       if (isNoteRow(row)) return { kind: 'note', text: String(row.text ?? '').trim() }
       const items = asArray(row.items)
         .filter(it => it && typeof it === 'object' && hasText(it.name))   // 空条目（只有空名字）不落盘
@@ -357,12 +379,17 @@ function normalizeV2 (v2) {
       r.items = items
       return r
     })
+    // ⚠ 条目为空的武器行**保留**（不在这里丢掉）：空占位行是用户的，用户可以自己选择
+    //   删掉（「删除行」→ 墓碑，见 mergeRows）或自己新增一个待填的行；
+    //   编辑器不替用户做这个决定。真正要消失的行由墓碑表达。
     .filter(r => !isEmptyRow(r))
 
   out.artifacts = asArray(src.artifacts)
     .filter(r => r && typeof r === 'object')
     .map(row => {
       // 备注行（段末 `注：`）
+      // 墓碑（编辑器里点了「删除行」）：这一行就是删掉了，不落盘
+      if (row.__deleted === true) return null
       if (isNoteRow(row)) return { kind: 'note', text: String(row.text ?? '').trim() }
       const kind = ['preferred', 'transition', 'optional', 'main', 'sub', 'text'].includes(row.kind) ? row.kind : 'text'
       const label = hasText(row.label) ? row.label.trim() : null
@@ -413,6 +440,8 @@ function normalizeV2 (v2) {
   out.talents = asArray(src.talents)
     .filter(r => r && typeof r === 'object')
     .map(row => {
+      // 墓碑（编辑器里点了「删除行」）：这一行就是删掉了，不落盘
+      if (row.__deleted === true) return null
       if (isNoteRow(row)) return { kind: 'note', text: String(row.text ?? '').trim() }
       if (row.kind === 'priority') {
         const order = asArray(row.order)
@@ -471,6 +500,8 @@ function normalizeV2 (v2) {
   out.panels = asArray(src.panels)
     .filter(r => r && typeof r === 'object')
     .map(row => {
+      // 墓碑（编辑器里点了「删除行」）：这一行就是删掉了，不落盘
+      if (row.__deleted === true) return null
       if (isNoteRow(row)) return { kind: 'note', text: String(row.text ?? '').trim() }
       const label = hasText(row.label) ? row.label.trim() : null
       if (hasText(row.k)) return { label, k: row.k.trim(), v: hasText(row.v) ? row.v.trim() : '' }
@@ -482,6 +513,8 @@ function normalizeV2 (v2) {
   out.constellations = asArray(src.constellations)
     .filter(r => r && typeof r === 'object')
     .map(row => {
+      // 墓碑（编辑器里点了「删除行」）：这一行就是删掉了，不落盘
+      if (row.__deleted === true) return null
       if (isNoteRow(row)) return { kind: 'note', text: String(row.text ?? '').trim() }
       const name = hasText(row.name) ? row.name.trim() : ''
       if (!name) return null
@@ -494,6 +527,8 @@ function normalizeV2 (v2) {
   out.teams = asArray(src.teams)
     .filter(r => r && typeof r === 'object')
     .map(row => {
+      // 墓碑（编辑器里点了「删除行」）：这一行就是删掉了，不落盘
+      if (row.__deleted === true) return null
       if (isNoteRow(row)) return { kind: 'note', text: String(row.text ?? '').trim() }
       const members = asArray(row.members)
         .filter(m => m && typeof m === 'object')

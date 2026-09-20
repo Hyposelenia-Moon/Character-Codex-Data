@@ -499,19 +499,24 @@ export function isCostNoteText (text) {
  * 主词条的括注要指回**具体那个杯/沙/冠**，所以它不像其它备注那样单起一行 `注：`，
  * 而是挂在**该词条值后面**（全角括号，括注文本与 JSON 里的 `note` 逐字相同 —— 不润色，
  * 这样 parse-docx → build-docx → parse-docx 才不会漂移）。
+ *
+ * ⚠ **任何括注都要写**（2026-09-20 修订）：以前只写「命座 / 成本」类括注（`isCostNoteText`），
+ * 于是 `（特殊）` `（华馆）` `（西风）` 这类限定被**文档层丢掉** —— 网页版读文档行，就跟着看不见
+ * （面板读 `note` 字段所以还能显示）→ 两条链路不一致。现在一律写进文档行，
+ * 显示层再把行尾括注折回小字备注（见 guide-display 的 normalizeArtifactRows）。
  * @param {object} row
  * @returns {string} 要附在行尾的括注（含全角括号），没有则 ''
  */
 export function mainRowNoteSuffix (row) {
   const raw = stripMarks(String(row?.note ?? '')).trim()
-  if (!raw || !isCostNoteText(raw)) return ''
+  if (!raw) return ''
   return `（${raw}）`
 }
 
 /** 主词条行 JSON 里 `note` 该挂在哪个部位（没有 noteSlot 时按本行顺序取第一个落点） */
 export function pickMainNoteSlot (row) {
   const raw = stripMarks(String(row?.note ?? '')).trim()
-  if (!raw || !isCostNoteText(raw)) return null
+  if (!raw) return null
   const st = row.stats ?? {}
   const slots = ['时之沙', '空之杯', '理之冠'].filter(k => (st[k] ?? []).length)
   if (!slots.length) return null
@@ -535,7 +540,7 @@ function mainStatsLine (row, label) {
   const slots = ['时之沙', '空之杯', '理之冠'].filter(k => (st[k] ?? []).length)
   if (!slots.length) return ''
   const raw = stripMarks(String(row.note ?? '')).trim()
-  const note = raw && isCostNoteText(raw) ? `（${raw}）` : ''
+  const note = raw ? `（${raw}）` : ''
   const slot = note ? pickMainNoteSlot(row) : null
   const parts = slots.map(k => {
     let list = (st[k] ?? []).map(stripMarks)
