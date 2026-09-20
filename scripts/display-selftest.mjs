@@ -182,3 +182,42 @@ for (const [name, fn] of cases) {
   console.log(`[${name}]`)
   for (const line of out) console.log('  ' + line)
 }
+
+/* ---------- 自定义档位词（label 优先于 tier）：三处口径必须一致 ---------- */
+console.log('\n================ 自定义档位词（建议） ================')
+{
+  const { characterSections } = await import(pathToFileURL(path.join(root, 'scripts/build-html.mjs')).href)
+  const { deriveSections, renderWeaponRow } = await import(pathToFileURL(path.join(root, 'scripts/lib/schema.mjs')).href)
+  const mk = (row) => {
+    const data = { schema: 2, name: '自检', game: 'gi', meta: {}, v2: { weapons: [row], artifacts: [], talents: [], panels: [], constellations: [], teams: [] } }
+    // 网页版走 data.sections[].lines（= 文档层产物），所以这里必须像真实 JSON 一样带上
+    data.sections = deriveSections(data)
+    data.tags = []
+    return { data, sections: data.sections }
+  }
+  const checks = []
+  const push = (what, got, want) => checks.push({ what, got, want, ok: got === want })
+
+  push('displayLabel(建议, tier=1) —— 自定义词顶掉档位词', displayLabel('建议', 1), '建议')
+  push('displayLabel(空, tier=1) —— 没有自定义词才看档位', displayLabel('', 1), '推荐')
+
+  const custom = mk({ label: '建议', tier: null, sep: ' > ', items: [{ name: '西风剑', ref: 'weapon:西风剑' }] })
+  const docLine = (custom.sections.find(s => /武器/.test(s.title))?.lines ?? [])[0] ?? ''
+  const webLabel = characterSections(custom.data).find(s => s.title === '武器')?.rows?.[0]?.label ?? ''
+  console.log(`文档行   ${docLine}`)
+  console.log(`网页版   ${webLabel}`)
+  push('文档层写自定义词', docLine, '建议：西风剑')
+  push('网页版显示自定义词', webLabel, '建议')
+
+  // 档位行（没有自定义词）不受影响
+  push('档位行文档层', renderWeaponRow({ tier: 2, sep: ' > ', items: [{ name: '西风剑' }] })[0], '第二档：西风剑')
+  // 两个都有的历史数据：**label 优先**，且文档层不再拼出 `建议：第一档：…`
+  push('label+tier 并存时文档层只写 label', renderWeaponRow({ label: '建议', tier: 1, sep: ' > ', items: [{ name: '西风剑' }] })[0], '建议：西风剑')
+  const both = mk({ label: '建议', tier: 1, sep: ' > ', items: [{ name: '西风剑', ref: 'weapon:西风剑' }] })
+  push('label+tier 并存时网页版显示 label', characterSections(both.data).find(s => s.title === '武器')?.rows?.[0]?.label ?? '', '建议')
+
+  const bad = checks.filter(c => !c.ok)
+  for (const c of checks) console.log(`${c.ok ? '✓' : '✗'} ${c.what}：${JSON.stringify(c.got)}${c.ok ? '' : `（期望 ${JSON.stringify(c.want)}）`}`)
+  console.log(`自定义档位词断言：${checks.length - bad.length}/${checks.length}${bad.length ? ' ← 有失败' : ' 全通过'}`)
+  if (bad.length) process.exitCode = 1
+}

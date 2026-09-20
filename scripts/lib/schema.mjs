@@ -441,8 +441,11 @@ export function crownItemText (item) {
 
 /** 单条武器行 → 文本行 */
 export function renderWeaponRow (row) {
+  // **自定义档位词优先**（与圣遗物行 / 显示层同口径）：`label` 非空时它就是这一行的标签
+  // （`建议：西风剑`），此时**不再写** `第N档：` —— 否则会拼出 `建议：第一档：西风剑`，
+  // 那是 parse-docx 认不出的写法（往返必然丢 tier / 多出一个假条目）。
   const label = row.label ? `${stripMarks(row.label)}：` : ''
-  const tier = row.tier ? `第${CN_NUM[row.tier] ?? row.tier}档：` : ''
+  const tier = !row.label && row.tier ? `第${CN_NUM[row.tier] ?? row.tier}档：` : ''
   const items = joinItems(row.items, row.sep ?? ' > ')
   const text = `${label}${tier}${items}`.trim()
   return text ? [text] : []

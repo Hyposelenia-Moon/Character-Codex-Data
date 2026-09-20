@@ -33,6 +33,13 @@
  *     `displayLabel` 对它们**直接放行**（不做二次归一，见 displayLabel 内的提前返回）。
  *   - 档位行内容为空时**整行不渲染**（不允许出现「过渡：」这种只有标签没有内容的行），
  *     由 `rowIsEmpty` + `normalizeSection` 统一保证，网页版与面板共用同一条规则。
+ *   - **自定义档位词**（用户定稿）：行的 `label` 非空时**它就是这一行的标签**
+ *     （如把「推荐」写成「建议」→ 文档 `建议：西风剑`、网页版 / 面板同显 `建议`）；
+ *     此时**不写** `第N档：`、也不看 `tier`。两端与文档层同口径：
+ *     显示 = `displayLabel`（本文件）、文档 = `schema.renderWeaponRow`。
+ *     所以「自定义词」与「档位序号」在文档里是**互斥**的（一行只有一个标签词），
+ *     编辑器负责在输入时二选一（见 `resources/editor/app.js` 的 `isCustomLabel`），
+ *     避免出现 `建议：第一档：…` 这种文档层无法还原的写法。
  *
  * ===================================================================
  * 符号语义（用户定稿，四处一致：正文行 / 面板 / 网页版 / 文档）
@@ -328,24 +335,30 @@ export function displayPanelText (text) {
  * `推荐` / `可选` / `过渡` **本身就是显示词汇**，命中即原样放行（见下面的提前返回）：
  * 其中 `过渡` 既是来源写法也是第三档的显示词，**不再折成 `可选`** —— 这是三档口径的定稿行为。
  * @param {string} label
- * @param {number|string|null} [tier] 档位序号（有 tier 时优先用它）
+ * @param {number|string|null} [tier] 档位序号（**只在 `label` 为空时**才用它）
  * @returns {string}
  */
 export function displayLabel (label, tier = null) {
+  const raw = String(label ?? '').trim()
+  // **自定义词优先**（与文档层 schema.renderWeaponRow、编辑器同口径）：
+  // `label` 非空就用它（`建议` 这类自定义档位词原样显示），只有 label 为空时才看档位序号。
+  // 为什么必须 label 优先：网页版 / 编辑器预览过去按 tier 算标签，于是
+  // 「档位=推荐 + 自定义词=建议」时网页版显示 `推荐`、面板显示 `建议`（两端漂移）。
+  if (raw) {
+    // 已经是显示词汇（推荐 / 可选 / 过渡）就直接放行，避免二次归一 ——
+    // 尤其 `过渡` 是三档口径的第三档显示词，折成 `可选` 会让两个档位撞名。
+    if (TIER_BY_INDEX.includes(raw)) return raw
+    if (Object.prototype.hasOwnProperty.call(TIER_LABEL, raw)) return TIER_LABEL[raw]
+    const m = raw.match(/^第([一二三四五六123456])[档挡]$/)
+    if (m) {
+      const idx = '一二三四五六'.indexOf(m[1]) + 1 || Number(m[1])
+      return TIER_BY_INDEX[idx] ?? raw
+    }
+    return raw
+  }
   const t = Number(tier)
   if (Number.isInteger(t) && t > 0 && TIER_BY_INDEX[t]) return TIER_BY_INDEX[t]
-  const raw = String(label ?? '').trim()
-  if (!raw) return ''
-  // 已经是显示词汇（推荐 / 可选 / 过渡）就直接放行，避免二次归一 ——
-  // 尤其 `过渡` 是三档口径的第三档显示词，折成 `可选` 会让两个档位撞名。
-  if (TIER_BY_INDEX.includes(raw)) return raw
-  if (Object.prototype.hasOwnProperty.call(TIER_LABEL, raw)) return TIER_LABEL[raw]
-  const m = raw.match(/^第([一二三四五六123456])[档挡]$/)
-  if (m) {
-    const idx = '一二三四五六'.indexOf(m[1]) + 1 || Number(m[1])
-    return TIER_BY_INDEX[idx] ?? raw
-  }
-  return raw
+  return ''
 }
 
 /**

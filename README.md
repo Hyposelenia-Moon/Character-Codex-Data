@@ -19,26 +19,28 @@
 | 3 | **标记版 docx**（`out\…(标记版).docx` + `D:\…\…(标记版).docx`） | 由 `build-docx --write-main` 一并产出，无需手改 | 标记版 sha1 + "去标记后逐字一致：是" |
 | 4 | `guide.html` | `node scripts/build-html.mjs` | 卡片数 129 + `audit-guide-html` 通过 |
 | 5 | `guide.md` | `node scripts/build-doc.mjs`（**选 A 口径**：只过滤占位符，**文档词汇不变**） | `___`=0 + 文档词汇计数 + 新旧字节/行数 |
-| 6 | **编辑器**（表单文案 + `/api/preview` 预览） | `resources/editor/app.js`（文案/下拉）＋ 服务端走共享层；**改完必须重启编辑器进程**（长驻进程会缓存旧模块） | `/api/preview` html 与 `guide.html` **逐字节一致** |
+| 6 | **编辑器**（表单文案 + `/api/preview` 预览） | `resources/editor/app.js`（文案 / 下拉 / **标签与档位联动**）＋ 服务端走共享层；**改完必须重启编辑器进程**（长驻进程会缓存旧模块） | `/api/preview` html 与 `guide.html` **逐字节一致** ＋ `.dsh/verify-editor-label.mjs` 12/12 |
 | 7 | **插件面板** | `model/codexIndex/display.js`（**与 `scripts/lib/guide-display.mjs` 逐字节一致**）、`parse.js`、`resources/atlas/codex.html`、`codex.css` | `node scripts/check-display-sync.mjs` + `audit-web-vs-panel` |
 | 8 | `README` 与 `templates/` | 改受影响的说明、词汇表、符号语义、期望值 | 本节表格与预期计数 |
 | 9 | **审计脚本的期望值** | `audit-*` / `display-*` / `check-display-sync` 的断言与合法集 | 每个审计 `exit=0` |
 | 10 | 离线脚手架 | `.dsh/` 下的脚手架**不得再读陈旧副本**，统一用 `CODEX_DIR` 环境变量、缺省读**主仓库** | 离线渲染输出能反映主仓库最新数据 |
 
-### B. 固定验收集（十条全绿才算完成）
+### B. 固定验收集（十二条全绿才算完成）
 
 ```bash
 node scripts/parse-docx.mjs --dry                 # 129 角色 / 未识别 0
 node scripts/build-docx.mjs --write-main          # 往返 129/129 深度相等 + 幂等
 node scripts/diagnose-docx-json.mjs               # 不一致 0
-node scripts/audit-web-vs-panel.mjs               # 0
+node scripts/audit-web-vs-panel.mjs               # 真实角色 0 + 自定义档位词合成样例 3 条一致
 node scripts/audit-dup-items.mjs                  # 重复名 0/0、序列不一致 0
 node scripts/check-display-sync.mjs               # 两份显示级归一逐字节一致
 node scripts/scan-separators.mjs                  # 0
+node scripts/display-selftest.mjs <角色>           # 自定义档位词断言 7/7
 node scripts/build-html.mjs && node scripts/build-doc.mjs   # 产物刷新
 # 编辑器 129 角色「打开→原样保存」逐字节不变 + /api/preview 与 guide.html 逐字节一致
 #   （需先 node scripts/editor.mjs --port <p> --no-open 起服务；改过共享层务必重启）
 node --check <每个改过的 .mjs>                     # 全过
+# 本地未入库：.dsh/verify-editor-label.mjs（编辑器 label/tier 口径 12/12）
 ```
 
 ### C. 传播矩阵（每次报告都要交）
@@ -211,7 +213,7 @@ node scripts/build-doc.mjs       # 文档版 guide.md（Word 用可再打包 doc
 
 | | 文档词汇（**源**，必须原样保留） | 显示词汇（**呈现**，只由显示层产出） |
 |---|---|---|
-| 档位 | `第一档` / `第二档` / `第三档`、`首选` / `次选` / `可选` / `过渡` / `套装` | `推荐` / `可选` / `过渡`（**三档**，第三档为空时整行不渲染） |
+| 档位 | `第一档` / `第二档` / `第三档`、`首选` / `次选` / `可选` / `过渡` / `套装`；**`label` 非空 = 自定义档位词**（如 `建议`，见下节） | `推荐` / `可选` / `过渡`（**三档**，第三档为空时整行不渲染） |
 | 命座 | `二命——说明` | `命之座2` |
 | 段落标题 | `1. 武器推荐` / `4. 毕业面板参考` / `5. 命座推荐` / `6. 配队推荐` | `武器` / `圣遗物` / `天赋` / `面板` / `命座` / `配队` |
 | **副词条百分比** | `生命值百分比` / `百分比生命值` / `攻击力百分比` / `百分比攻击力` / `防御力百分比` / `百分比防御力` | **`大生命` / `大攻击` / `大防御`**（**简写才是最终显示形态**，不再展开成 `生命值`/`攻击力`/`防御力` —— 那是"固定值"语义） |
@@ -238,6 +240,26 @@ node scripts/build-doc.mjs       # 文档版 guide.md（Word 用可再打包 doc
 > 改成短标题）之后，`build-docx --write-main` 写出的文档将无法被 `parse-docx` 读回 ——
 > `推荐：…` 会掉进 `unparsed`，往返校验立刻**不再是 129/129**。真要去掉这些词，顺序必须是：
 > 先改 `parse-docx` 的识别规则 → 再改文档与数据 → 最后才改落盘词。
+
+### 自定义档位词（把「推荐」写成「建议」）
+
+行的 `label` **非空**时它就是这一行的标签词 —— 这是唯一一处"文档 / 数据 / 网页 / 面板"四处都要一致的口径：
+
+| 位置 | 规则 |
+|---|---|
+| 数据 | `v2.weapons[].label = '建议'` 时 `tier` 必须是 `null`；圣遗物 `label = '输出向'` 时 `kind` 必须是 `preferred` |
+| 文档层 `schema.renderWeaponRow` | `label` 非空 → `建议：西风剑`（**不再写** `第N档：`）；为空才写 `第一档：西风剑` |
+| 显示层 `displayLabel(label, tier)` | `label` 非空 → 归一后原样显示（`首选`→`推荐` 等仍生效）；为空才用 `TIER_BY_INDEX[tier]` |
+| 网页版 `build-html.weaponLabelHints` | **同一条规则**（过去这里按 `tier` 算，所以自定义词"不生效"，还与面板漂移） |
+| 编辑器 | label 输入框实时显示「显示为：建议」；输入自定义词自动清空档位下拉，选档位词自动清空自定义标签（圣遗物则把 `kind` 同步成 `首选`/`过渡`/`可选`） |
+
+**为什么「自定义词」与「档位」互斥**：文档一行只有**一个标签词**。二者并存会拼出
+`建议：第一档：西风剑` —— `parse-docx` 认不出（往返立刻不再 129/129）。
+
+断言（改动显示层 / 文档层 / 编辑器标签时都要跑）：
+`scripts/display-selftest.mjs <角色>`（自定义档位词 7 条）、
+`scripts/audit-web-vs-panel.mjs` 的合成样例（3 条）、
+本地未入库的 `.dsh/verify-editor-label.mjs`（编辑器标签口径 12 条）。
 
 **空值 / 占位符**：`data.tags` 与 `meta` 里**允许**留 `___级` / `___` / `___%` 这类"还没填"的占位
 （派生层刻意保留原文）。**是否显示由展示层判断**，三处共用同一个判空口径
@@ -495,6 +517,11 @@ PowerShell 的隐藏命令，而不是直接指向 `node.exe`：
 `parse-docx` 遇到**无法保留 / 无法归位**的括注或标记时会显式告警：
 逐条 `⚠ 解析告警：…` 打到 stderr，并汇总进 `data/_parse-report.json` 的 `warnings` 数组
 （既有 `注：` 备注走廊机制不变）。正常文档应为 `解析告警：0 条`。
+
+**已知的「名称校验问题」（不是告警，属正常）**：文档里 `过渡：2充能 + 2充能`、`可选：2攻击 + 2攻击`
+这类写法是**效果描述**（"带充能/攻击 2 件套的两套"），**不是套装名**，因此不在图鉴里 ——
+`parse-docx` 会记进 `_parse-report.json` 的 `issues`（当前 33 条 / 13 行），**不影响往返**。
+真名写法见 `首选：翠绿之影 / 角斗士的终幕礼（2件套）`。
 
 | 产出 | 说明 |
 |------|------|

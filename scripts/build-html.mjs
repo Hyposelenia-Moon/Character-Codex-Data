@@ -200,7 +200,7 @@ function renderBody (section, indent, dir) {
  * 与两条显示级分隔符规则（主词条部位之间用 `｜`、部位内部候选用 `/`；符号语义见 splitRankParts），
  * 其余措辞、档位标签、简写展开、皇冠并入、命座命名全部交给 guide-display.mjs。
  * @param {string[]} lines 原始文本行（未归一）
- * @param {string[]} [labelHints] 逐行的显示标签覆盖（武器行按 v2 的 tier 算，见 weaponLabelHints）
+ * @param {string[]} [labelHints] 逐行的显示标签覆盖（武器行：自定义词优先，否则按 v2 的 tier 算，见 weaponLabelHints）
  * @param {string|null} [crownHint] 天赋优先级行的「皇冠必需字母」（来自 v2.talents 的皇冠行）
  * @returns {Array<{label: string, kind?: string, items: Array}>}
  */
@@ -451,18 +451,23 @@ function splitRankParts (text, candidateSep) {
 }
 
 /**
- * 武器行的**档位标签**：从 v2 数据取真实档位（1/2/3），
- * 文档里的「第N档」只是**显示文本**，第 3 档在圣遗物侧会被归到「可选」，
- * 所以这里必须按 v2 的 tier 算，保证网页版与面板（插件读 v2）措辞一致。
+ * 武器行的**档位标签**：与显示层 `displayLabel` / 文档层 `renderWeaponRow` 同口径 ——
+ *   · `label` 非空 = **自定义档位词**（用户定稿：可以把「推荐」写成「建议」）→ 原样用它；
+ *   · `label` 为空才按 v2 的 `tier` 算（1/2/3 → 推荐 / 可选 / 过渡）。
+ * ⚠ 过去这里是「tier 优先」，于是「档位=推荐 + 自定义词=建议」时网页版显示 `推荐`、
+ *   面板显示 `建议`（`audit-web-vs-panel` 漂移）。文档里的「第N档」只是显示文本，
+ *   所以仍以 v2 的 tier 为准（第 3 档在圣遗物侧会被归到「可选」）。
  * @param {object} data
  * @returns {string[]} 与武器行一一对应的显示标签
  */
 function weaponLabelHints (data) {
   return (data?.v2?.weapons ?? [])
     .filter(row => row && !row.kind)
-    .map(row => (Number.isInteger(row.tier) && row.tier > 0
-      ? (TIER_BY_INDEX[row.tier] ?? '')
-      : (row.label ?? '')))
+    .map(row => {
+      const custom = String(row.label ?? '').trim()
+      if (custom) return custom
+      return Number.isInteger(row.tier) && row.tier > 0 ? (TIER_BY_INDEX[row.tier] ?? '') : ''
+    })
 }
 
 /**

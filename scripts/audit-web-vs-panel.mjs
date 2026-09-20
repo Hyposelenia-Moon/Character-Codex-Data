@@ -21,6 +21,7 @@ const readJson = f => JSON.parse(fs.readFileSync(f, 'utf8').replace(/^\uFEFF/, '
 const names = readJson(path.join(giDir, '_order.json'))
 const { parseGuideJson } = await import(pathToFileURL(path.join(PLUGIN, 'model/codexIndex/parse.js')).href)
 const build = await import(pathToFileURL(path.join(root, 'scripts/build-html.mjs')).href)
+const { deriveSections } = await import(pathToFileURL(path.join(root, 'scripts/lib/schema.mjs')).href)
 
 /** 去标签 + 去括注（件数/命座类括注只影响展示细节） */
 const clean = s => String(s ?? '').replace(/<[^>]*>/g, '').replace(/&gt;/g, '>').trim()
@@ -115,6 +116,34 @@ for (const n of names) {
 }
 
 console.log(`角色 ${names.length} 个 / 渲染行 ${rows} 行`)
-console.log(`网页版与面板渲染不一致的角色：${bad.length}（应为 0）`)
+
+/* ------------------------------------------------------------------ *
+ * 合成样例：**自定义档位词**（用户反馈过「编辑器里把推荐改成建议，网页版 / 预览还是推荐」）
+ *
+ * 真实数据里目前没有 `label` 与 `tier` 并存的行，所以这条规则只能靠合成数据守住：
+ * 网页版过去按 `tier` 算标签（`weaponLabelHints`），面板按 `label` 算 → 两端漂移。
+ * 现在两边同口径：**label 非空就用它，为空才看 tier**（文档层 `renderWeaponRow` 同理，
+ * 且 label 非空时不再写「第N档」，避免 `建议：第一档：…`）。
+ * ------------------------------------------------------------------ */
+const synthCases = [
+  ['自定义档位词（建议）', { label: '建议', tier: null, sep: ' > ', items: [{ name: '西风剑', ref: 'weapon:西风剑' }] }],
+  ['自定义词 + 档位并存（建议 / 第一档）', { label: '建议', tier: 1, sep: ' > ', items: [{ name: '西风剑', ref: 'weapon:西风剑' }] }],
+  ['档位词（第一档）', { label: null, tier: 1, sep: ' > ', items: [{ name: '西风剑', ref: 'weapon:西风剑' }] }]
+]
+let synthBad = 0
+for (const [名称, weapon] of synthCases) {
+  const data = { schema: 2, name: '合成样例', game: 'gi', meta: {}, v2: { weapons: [weapon], artifacts: [], talents: [], panels: [], constellations: [], teams: [] } }
+  data.sections = deriveSections(data) // 网页版走 sections[].lines（= 文档层产物），与真实 JSON 一致
+  const sig = (rows) => (rows ?? []).map(r => `[武器/${clean(r.label)}] ${rowSig(r)}`)
+  const web = sig(build.characterSections(data).find(s => s.title === '武器')?.rows)
+  const panel = sig(parseGuideJson(data, { fileDir: giDir, fileName: '合成样例' }).sections.find(s => s.title === '武器')?.rows)
+  const same = web.join('\n') === panel.join('\n')
+  if (same) rows += Math.max(web.length, panel.length)
+  else synthBad++
+  console.log(`合成样例（${名称}）：网页版 ${web.join(' ') || '(空)'} ｜ 面板 ${panel.join(' ') || '(空)'} —— ${same ? '一致' : '不一致 ← 漂移'}`)
+  if (!same) bad.push(`合成样例（${名称}）\n  web  ${web.join('\n  web  ')}\n  panel${panel.join('\n  panel')}`)
+}
+
+console.log(`网页版与面板渲染不一致的角色：${bad.length - synthBad}（应为 0）；合成样例不一致：${synthBad}（应为 0）`)
 for (const b of bad.slice(0, 8)) console.log('· ' + b)
 process.exitCode = bad.length ? 1 : 0

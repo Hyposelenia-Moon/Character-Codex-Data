@@ -27,6 +27,17 @@ var ARTIFACT_KINDS = [
 ]
 
 /**
+ * 圣遗物档位词 ↔ `kind`（**与 parse-docx 的 setRow 映射、`schema.renderArtifactRow` 同一份**）。
+ *
+ * 文档里一行**只有一个标签词**，所以 `label`（文档里的原词）与 `kind` 必须互相吻合：
+ * `首选`/`套装`→preferred、`可选`/`次选`→optional、`过渡`→transition；
+ * 认不出的自定义词（`输出向`）走 parse-docx 的兜底 → `kind: 'preferred'`。
+ * 编辑器按同一规则联动下拉，保证「保存 → 写文档 → 再解析」不会漂移。
+ */
+var ARTIFACT_WORD_KIND = { 首选: 'preferred', 套装: 'preferred', 可选: 'optional', 次选: 'optional', 过渡: 'transition' }
+var ARTIFACT_KIND_WORD = { preferred: '首选', transition: '过渡', optional: '可选' }
+
+/**
  * 武器档位下拉：与面板 / 网页版同一套术语 —— 1/2/3 → 推荐 / 可选 / 过渡。
  * 仓库里数据只有 1~3 档；真出现第 4 档以上就显示「第N档」（不静默改写数据）。
  * @param {number|string} tier
@@ -60,6 +71,49 @@ function labelHint (label) {
   var shown = labelText(raw)
   if (!raw || shown === raw) return ''
   return '<span class="muted" style="font-size:11px" title="数据里存的是「' + esc(raw) + '」，面板 / 网页版显示为「' + esc(shown) + '」">显示为：' + esc(shown) + '</span>'
+}
+
+/**
+ * 这一行的**档位标签**最终会显示成什么（只读预览，不改数据）。
+ *
+ * 与显示层 `scripts/lib/guide-display.mjs` 的 `displayLabel` 同口径：
+ * **`label` 非空时它就是标签**（自定义词，如 `建议`），为空才看档位 `tier`。
+ * 编辑器过去把自定义词写进 `label` 却仍显示档位词（网页版 / 预览按 tier 算），
+ * 于是「档位=推荐 + 自定义词=建议」看起来「不生效」；现在两边都 label 优先。
+ * @param {object} row
+ * @returns {string}
+ */
+function resolvedLabelText (row, fallback) {
+  var custom = str(row && row.label).trim()
+  if (custom) return labelText(custom)
+  if (fallback) return fallback
+  return tierLabel(row && row.tier)
+}
+
+/** 圣遗物行的档位词（`kind` → 界面用词），作为 `label` 为空时的显示兜底 */
+function artifactKindWord (kind) {
+  for (var i = 0; i < ARTIFACT_KINDS.length; i++) if (ARTIFACT_KINDS[i].value === kind) return ARTIFACT_KINDS[i].label
+  return str(kind)
+}
+
+/**
+ * 自定义档位词 = 非空、且**不是**档位词本身（`推荐`/`可选`/`过渡` 直接写进 label 也算自定义，
+ * 但那时它就是显示词，不再看 tier）。
+ * @param {string} label
+ * @returns {boolean}
+ */
+function isCustomLabel (label) {
+  return !!str(label).trim()
+}
+
+/** 武器行 / 圣遗物行「标签」控件的说明文案（两者口径一致：自定义词顶掉档位词） */
+var LABEL_TIP = '自定义标签：填了就显示你写的词（如把「推荐」写成「建议」），档位下拉会被清空；两处只能留一个 —— 文档里一行只有一个标签词，同时写会往返不一致'
+
+/** 行首标签的「显示为」预览（武器行 / 圣遗物行共用；`fallback` = label 为空时的档位词） */
+function resolvedHint (row, fallback) {
+  var shown = resolvedLabelText(row, fallback)
+  if (!shown) return '<span class="muted" style="font-size:11px">未设标签（该行不显示标签）</span>'
+  return '<span class="muted" style="font-size:11px" title="' + esc(LABEL_TIP) + '">显示为：' + esc(shown) + '</span>'
 }
 
 /** 空模块占位文案（与面板 / 网页版一致） */
@@ -720,9 +774,10 @@ function renderWeapons () {
     return '<div class="box"' + rowAttr(rowId) + '>' +
       '<div class="box-head">' +
       '<span class="box-title">行 ' + (i + 1) + '</span>' +
-      '<input type="text" class="w-sm" data-path="' + p + '.label" value="' + esc(row.label) + '" placeholder="标签（可空，如 辅助向）" title="界面按显示层显示：首选 → 推荐、其他 → 可选">' +
+      '<input type="text" class="w-sm" data-path="' + p + '.label" value="' + esc(row.label) + '" placeholder="自定义标签（可空，如 建议 / 辅助向）" title="' + esc(LABEL_TIP) + '">' +
       selectBox(p + '.tier', row.tier === null ? '' : row.tier, [{ value: '', label: '档位：不标' }].concat(TIERS.map(function (t) { return { value: t, label: tierLabel(t) } })), 'w-sm') +
       (Number(row.tier) > 3 ? '<span class="warn-chip" title="数据里出现了第 ' + row.tier + ' 档：面板 / 网页版只认 1~3 档（推荐 / 可选 / 过渡），请确认是否该并档">⚠ 第 ' + row.tier + ' 档</span>' : '') +
+      resolvedHint(row) +
       '<span class="spacer"></span>' +
       actBtn('move-row-up', 'v2.weapons', '↑', 'btn mini', '上移', i) +
       actBtn('move-row-down', 'v2.weapons', '↓', 'btn mini', '下移', i) +
@@ -741,7 +796,8 @@ function renderArtifacts () {
     var head = '<div class="box-head">' +
       '<span class="box-title">行 ' + (i + 1) + '</span>' +
       selectBox(p + '.kind', row.kind, ARTIFACT_KINDS, 'w-sm') +
-      (row.kind === 'main' ? '' : '<input type="text" class="w-sm" data-path="' + p + '.label" value="' + esc(row.label) + '" placeholder="标签（可空，如 输出向）">') +
+      (row.kind === 'main' ? '' : '<input type="text" class="w-sm" data-path="' + p + '.label" value="' + esc(row.label) + '" placeholder="自定义标签（可空，如 输出向 / 建议）" title="' + esc(LABEL_TIP) + '">' +
+        resolvedHint(row, artifactKindWord(row.kind))) +
       '<span class="spacer"></span>' +
       actBtn('move-row-up', 'v2.artifacts', '↑', 'btn mini', '上移', i) +
       actBtn('move-row-down', 'v2.artifacts', '↓', 'btn mini', '下移', i) +
@@ -1518,7 +1574,9 @@ function buildBody () {
 
   var weapons = mv2.weapons.map(function (row) {
     var out = { label: hasText(row.label) ? row.label : null }
-    out.tier = row.tier
+    // 自定义标签与档位**互斥**：文档一行只有一个标签词（label 非空 → 文档写 `建议：`，
+    // 写不进「第N档」）。输入时已联动清空，这里是保存前的兜底，防止手工改过 JSON 的行带进来。
+    out.tier = out.label ? null : row.tier
     out.items = row.items.filter(function (it) { return hasText(it.name) }).map(function (it) {
       var o = { name: it.name.trim(), ref: 'weapon:' + it.name.trim() }
       if (hasText(it.note)) o.note = it.note.trim()
@@ -1551,6 +1609,10 @@ function buildBody () {
     if (row.kind === 'text') return { kind: 'text', label: hasText(row.label) ? row.label : null, text: str(row.text) }
     var o3 = cleanRow(row)
     o3.kind = row.kind
+    // 圣遗物档位行的 `label` 就是**文档里的原词**（首选 / 过渡 / 可选 / 自定义词）：
+    // 留空的话文档会退回写 kind 的头词，解析回来 label 就多出一个词（往返不一致），
+    // 所以这里补上 kind 对应的文档词（与 schema.renderArtifactRow 的 head 同一份映射）。
+    if (!hasText(o3.label) && ARTIFACT_KIND_WORD[row.kind]) o3.label = ARTIFACT_KIND_WORD[row.kind]
     o3.sets = asArray(row.sets).filter(function (s) { return hasText(s.name) }).map(function (s) {
       var o = { name: s.name.trim(), ref: 'artifact:' + s.name.trim() }
       if (hasText(s.pieces)) o.pieces = s.pieces.trim()
@@ -2031,6 +2093,31 @@ function formEvents () {
       }
     }
     markDirty(true)
+
+    // 行首标签：文档里**一行只有一个标签词**，所以「自定义词」与「档位」必须二选一。
+    // 不联动的话会拼出 `建议：第一档：西风剑`（parse-docx 认不出，往返必然不一致），
+    // 或者 `输出向：…` 把 kind 丢掉（解析回来变 preferred）——两种都会让「保存并发布」后文档与 JSON 漂移。
+    var labelRow = /^v2\.(weapons|artifacts)\.\d+\.label$/.test(path)
+      ? getPath(state.model, path.replace(/\.label$/, ''))
+      : null
+    if (labelRow) {
+      var word = str(value).trim()
+      if (/^v2\.weapons\./.test(path)) {
+        // 武器：自定义词进 label，文档就不写「第N档」，所以档位必须清空
+        if (word && labelRow.tier !== null && labelRow.tier !== undefined) {
+          labelRow.tier = null
+          showStatus('已清空「档位」下拉：自定义标签会顶掉档位词（文档一行只有一个标签词）', 'ok')
+        }
+      } else if (word) {
+        // 圣遗物：label 就是文档里的原词，kind 按同一份映射跟着走
+        var wantKind = ARTIFACT_WORD_KIND[word] || 'preferred'
+        if (labelRow.kind !== wantKind) {
+          labelRow.kind = wantKind
+          showStatus('已把档位改为「' + (ARTIFACT_KIND_WORD[wantKind] || wantKind) + '」：这一行的标签词由自定义标签决定（文档一行只有一个标签词）', 'ok')
+        }
+      }
+      markDirty(true)
+    }
   })
 
   form.addEventListener('change', function (e) {
@@ -2038,8 +2125,26 @@ function formEvents () {
     if (!el || !el.getAttribute) return
     if (el.tagName === 'SELECT' && el.getAttribute('data-path') && !el.getAttribute('data-ref-kind')) {
       var path = el.getAttribute('data-path')
-      if (/\.tier$/.test(path)) setPath(state.model, path, el.value === '' ? null : Number(el.value))
-      else if (/\.kind$/.test(path)) setPath(state.model, path, el.value)
+      if (/\.tier$/.test(path)) {
+        setPath(state.model, path, el.value === '' ? null : Number(el.value))
+        // 档位是文档里的「第N档」写法，装不下自定义词 → 二选一（见上面的 input 联动）
+        var wRow = getPath(state.model, path.replace(/\.tier$/, ''))
+        if (el.value !== '' && wRow && str(wRow.label).trim()) {
+          wRow.label = ''
+          showStatus('已清空「自定义标签」：档位词（推荐 / 可选 / 过渡）会写进文档，一行只有一个标签词', 'ok')
+        }
+      } else if (/\.kind$/.test(path)) {
+        setPath(state.model, path, el.value)
+        // 圣遗物：kind 决定文档里的档位词（首选 / 过渡 / 可选），所以 label 要跟着改，
+        // 否则「label=输出向 + kind=transition」会让文档只写出 `输出向：…`，解析回来 kind 变 preferred。
+        var aRow = getPath(state.model, path.replace(/\.kind$/, ''))
+        var kindWord = ARTIFACT_KIND_WORD[el.value]
+        if (aRow && kindWord && str(aRow.label).trim() !== kindWord) {
+          var had = str(aRow.label).trim()
+          aRow.label = kindWord
+          if (had && !ARTIFACT_WORD_KIND[had]) showStatus('已把自定义标签「' + had + '」改为「' + kindWord + '」：档位下拉的词会写进文档，一行只有一个标签词', 'ok')
+        }
+      }
       markDirty(true)
       renderForm()
       return
