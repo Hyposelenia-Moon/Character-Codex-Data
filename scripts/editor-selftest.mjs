@@ -149,7 +149,23 @@ const mkData = (v2, name = '自检') => ({
 push('新行可见：配队', fn('rowVisible')({ _new: true, label: '', members: [], text: '' }), true)
 push('新行可见：面板', fn('rowVisible')({ _new: true, label: '', k: '', v: '' }), true)
 push('新行可见：命座', fn('rowVisible')({ _new: true, name: '', text: '' }), true)
-push('旧空行仍然隐藏（不显示占位行）', fn('rowVisible')({ label: '', members: [], text: '' }), false)
+push('空行判定：rowVisible 为假（是否渲染由下面的「空占位行」开关决定）', fn('rowVisible')({ label: '', members: [], text: '' }), false)
+
+/* 2a. 空占位行**默认显示**，按钮可折叠（用户定稿 2026-09-20：不自动隐藏） */
+{
+  const empties = [
+    { kind: 'sub', stats: [], sep: ' > ' },
+    { kind: 'preferred', label: '首选', sep: ' > ', sets: [] }
+  ]
+  const filled = { kind: 'sub', stats: ['暴击率'], sep: ' > ' }
+  const dead = { __deleted: true }
+  const v = fn('visibleRows')
+  api.setShowEmptyForTest(true)
+  push('空占位行默认显示（不自动隐藏）', v([...empties, filled, dead]).length, 3)
+  api.setShowEmptyForTest(false)
+  push('折叠后只剩有内容的行（墓碑永远不显示）', v([...empties, filled, dead]).length, 1)
+  api.setShowEmptyForTest(true)
+}
 
 /* 2b. 界面标记不许落盘 */
 {

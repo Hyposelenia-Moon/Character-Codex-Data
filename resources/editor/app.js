@@ -174,7 +174,10 @@ var state = {
   drawerOpen: false,     // 右侧抽屉（回收站 / 批量替换 / 名称库 / 全局检索）是否展开
   drawerTab: 'search',   // 抽屉当前页签
   previewOpen: false,    // 右侧「实时预览」面板是否展开
-  previewText: false     // 预览显示形态：false = 渲染视图，true = 逐行文本
+  previewText: false,    // 预览显示形态：false = 渲染视图，true = 逐行文本
+  // 空占位行（旧数据里的待填行）**默认显示**（用户定稿 2026-09-20：不自动隐藏），
+  // 由工具栏的「空占位行」按钮切换；选择记在 localStorage 里，下次打开沿用。
+  showEmpty: true
 }
 
 var $ = function (id) { return document.getElementById(id) }
@@ -745,19 +748,53 @@ function rowVisible (row) {
   return hasText(row.label) || hasText(row.k) || hasText(row.v) || hasText(row.text) || hasText(row.name)
 }
 
-/** 渲染某类行时用的可见行（保留原始下标） */
+/**
+ * 是不是「空占位行」——只有标签、没有任何实质内容（`首选：` 这种）。
+ *
+ * 与 `rowVisible` 的区别：**忽略 label**。`rowVisible` 要跟服务端 `isEmptyRow` 对齐
+ * （保存时占位行要原样留下，所以「有 label」算有内容），而**折叠**是纯界面行为 ——
+ * 用户在意的正是那些只剩个标签的空行（五郎那条 `首选：` 就是这么来的）。
+ * `_new`（刚点「＋新增一行」）永远算「非空」，否则新行会一加出来就看不见。
+ */
+function isEmptyPlaceholder (row) {
+  if (!row || typeof row !== 'object') return false
+  if (row._new) return false
+  switch (row.kind) {
+    case 'main': return !MAIN_SLOTS.some(function (k) { return asArray(row.stats && row.stats[k]).length > 0 }) && !hasText(row.note)
+    case 'sub': return asArray(row.stats).length === 0
+    case 'note': return !hasText(row.text)
+    case 'priority': return asArray(row.slots).length === 0 && asArray(row.order).length === 0
+    case 'crown': return asArray(row.items).length === 0
+    default: break
+  }
+  if (asArray(row.items).length || asArray(row.sets).length || asArray(row.members).length) return false
+  if (hasText(row.text) || hasText(row.k) || hasText(row.v) || hasText(row.name)) return false
+  return true
+}
+
+/** 渲染某类行时用的可见行（保留原始下标）
+ *
+ *  · 墓碑（点了「删除行」）**永远不渲染**；
+ *  · 空占位行**默认显示** —— 用户定稿：不自动隐藏，由工具栏的「空占位行」按钮决定要不要折叠
+ *    （见 `state.showEmpty` / `toggleEmptyRows`）。
+ */
 function visibleRows (list) {
   var out = []
-  for (var i = 0; i < list.length; i++) if (rowVisible(list[i])) out.push({ i: i, row: list[i] })
+  for (var i = 0; i < list.length; i++) {
+    var row = list[i]
+    if (!row || row.__deleted === true) continue
+    if (!state.showEmpty && isEmptyPlaceholder(row)) continue
+    out.push({ i: i, row: row })
+  }
   return out
 }
 
-/** 隐藏的占位行提示 */
+/** 折叠提示（只有真的折叠了才提示） */
 function hiddenNote (list) {
   var hidden = 0
-  for (var i = 0; i < list.length; i++) if (!rowVisible(list[i]) && !(list[i] && list[i].__deleted === true)) hidden++
-  if (hidden <= 0) return ''
-  return '<div class="muted" style="font-size:12px;margin:6px 0 0">已隐藏 ' + hidden + ' 个空占位行（旧数据里的待填行，保存时原样保留；点「删除行」可清掉）</div>'
+  for (var i = 0; i < list.length; i++) if (isEmptyPlaceholder(list[i])) hidden++
+  if (hidden <= 0 || state.showEmpty) return ''
+  return '<div class="muted" style="font-size:12px;margin:6px 0 0">已折叠 ' + hidden + ' 个空占位行（点顶部「空占位行」按钮可展开；保存时它们原样保留，「删除行」可清掉）</div>'
 }
 
 /**
@@ -2731,6 +2768,31 @@ function togglePreviewText () {
   renderPreviewNow()
 }
 
+/**
+ * 空占位行（旧数据里的待填行）：**默认显示**，点按钮折叠 / 展开。
+ *
+ * 用户定稿 2026-09-20：「以后关于空占位行不自动隐藏，加一个按钮选择是否隐藏」。
+ * 折叠只是**界面行为**：保存时空占位行一律原样保留（要清掉就点那一行的「删除行」，
+ * 或跑 `.dsh/clean-empty-rows.mjs <角色>`）。选择记在 localStorage，下次打开沿用。
+ */
+function applyEmptyRowsButton () {
+  var btn = $('btn-empty-rows')
+  if (!btn) return
+  btn.textContent = state.showEmpty ? '空占位行：显示' : '空占位行：已折叠'
+  btn.title = state.showEmpty
+    ? '旧数据里的空占位行（待填行）现在**显示**着。点一下折叠起来（保存时一样原样保留）。'
+    : '空占位行已折叠。点一下展开；保存时它们仍会原样保留，要清掉请点那一行的「删除行」。'
+  if (btn.classList) btn.classList.toggle('on', !state.showEmpty)
+}
+
+function toggleEmptyRows () {
+  state.showEmpty = !state.showEmpty
+  try { localStorage.setItem('dsh.showEmpty', state.showEmpty ? '1' : '0') } catch (e) {}
+  applyEmptyRowsButton()
+  renderForm()
+  showStatus(state.showEmpty ? '已显示空占位行' : '已折叠空占位行（保存时仍原样保留）', '', true)
+}
+
 function globalEvents () {
   $('search').addEventListener('input', function (e) {
     state.filter = e.target.value
@@ -2938,6 +3000,10 @@ function globalEvents () {
   $('btn-preview-refresh').addEventListener('click', function () { renderPreviewNow() })
   $('btn-preview-text').addEventListener('click', function () { togglePreviewText() })
 
+  /* ------------------------------------------------ 空占位行：显示 / 折叠 */
+  var emptyBtn = $('btn-empty-rows')
+  if (emptyBtn) emptyBtn.addEventListener('click', function () { toggleEmptyRows() })
+
   /* ------------------------------------------------ 快捷键 */
   document.addEventListener('keydown', function (e) {
     var key = String(e.key || '').toLowerCase()
@@ -3030,6 +3096,13 @@ function reorderBy (delta) {
 /* ============================================================ 启动 */
 
 function boot () {
+  // 空占位行：沿用上次的选择（默认**显示**，不自动隐藏）
+  try {
+    var saved = localStorage.getItem('dsh.showEmpty')
+    if (saved === '0') state.showEmpty = false
+    if (saved === '1') state.showEmpty = true
+  } catch (e) {}
+  applyEmptyRowsButton()
   formEvents()
   globalEvents()
   checkIdleExit()   // 先在状态条里说清楚「关掉网页会不会自动退」
@@ -3072,6 +3145,13 @@ window.__editor = {
   setTalentSlotLevel: setTalentSlotLevel,
   foldCrownRows: foldCrownRows,
   rowVisible: rowVisible,
+  visibleRows: visibleRows,
+  toggleEmptyRows: toggleEmptyRows,
+  /** 供自动化检查：直接设定「是否显示空占位行」（不碰 localStorage） */
+  setShowEmptyForTest: function (on) {
+    state.showEmpty = on !== false
+    return state.showEmpty
+  },
   multiValue: multiValue,
   statKindOfPath: statKindOfPath,
   memberCandidates: memberCandidates,
