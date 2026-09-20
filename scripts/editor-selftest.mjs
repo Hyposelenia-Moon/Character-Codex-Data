@@ -123,6 +123,28 @@ const mkData = (v2, name = '自检') => ({
   push('天赋：皇冠行按 10 重建', (out.v2.talents.find(r => r.kind === 'crown') || {}).items.map(i => i.name), ['E', 'Q'])
 }
 
+/* 1b. 天赋：**在输入框里打字**（走 setTalentSlotLevel）必须立刻生效 —— 不需要点皇冠。
+ *     这条以前是坏的：`getPath(model,'…slots.0.level')` 返回的是那个字符串值、不是格子对象，
+ *     于是赋值被 `typeof slot === 'object'` 挡掉，打字完全没反应（只有点皇冠生效）。 */
+{
+  const data = mkData({ talents: [{ kind: 'priority', raw: 'A1 E1 Q1', order: [{ name: 'A', level: 1 }, { name: 'E', level: 1 }, { name: 'Q', level: 1 }] }] })
+  const model = ctx.__editor.internals.normalizeData(data)
+  const setLv = fn('setTalentSlotLevel')
+  push('天赋输入：A 写 6 → 返回 true', setLv(model, 'v2.talents.0.slots.0.level', '6'), true)
+  push('天赋输入：A 格子 level = "6"', model.v2.talents[0].slots[0].level, '6')
+  push('天赋输入：6 不是皇冠', !!model.v2.talents[0].slots[0].crown, false)
+  setLv(model, 'v2.talents.0.slots.1.level', '10')
+  push('天赋输入：E 写 10 → 自动算皇冠', [model.v2.talents[0].slots[1].level, !!model.v2.talents[0].slots[1].crown], ['10', true])
+  setLv(model, 'v2.talents.0.slots.2.level', '')
+  push('天赋输入：留空按 1', model.v2.talents[0].slots[2].level, '1')
+  setLv(model, 'v2.talents.0.slots.2.level', '99')
+  push('天赋输入：越界按 1', model.v2.talents[0].slots[2].level, '1')
+  api.setModelForTest(model)
+  const out = fn('toJson')()
+  push('天赋输入：落盘 order = [6,10,1]', (out.v2.talents.find(r => r.kind === 'priority') || {}).order.map(o => o.level), [6, 10, 1])
+  push('天赋输入：raw 跟着改成 A6 E10 Q1', (out.v2.talents.find(r => r.kind === 'priority') || {}).raw, 'A6 E10 Q1')
+}
+
 /* 2. 新增的空行必须可见（否则「加了配队行没法选角色」） */
 push('新行可见：配队', fn('rowVisible')({ _new: true, label: '', members: [], text: '' }), true)
 push('新行可见：面板', fn('rowVisible')({ _new: true, label: '', k: '', v: '' }), true)

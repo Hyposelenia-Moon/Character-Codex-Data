@@ -1152,7 +1152,11 @@ function visibleListNames () {
 /** 下拉候选 */
 function renderDatalists () {
   var fill = function (id, list) {
-    $(id).innerHTML = asArray(list).map(function (n) { return '<option value="' + esc(n) + '"></option>' }).join('')
+    var el = $(id)
+    // 页面可能是**旧缓存**（index.html 里还没有新加的 datalist）→ 取不到就跳过，
+    // 绝不因为少一个候选项就把整个 init 抛异常（那会连带心跳都不发、服务 20s 后自杀）
+    if (!el) return
+    el.innerHTML = asArray(list).map(function (n) { return '<option value="' + esc(n) + '"></option>' }).join('')
   }
   fill('dl-weapon', state.index.weapons)
   fill('dl-artifact', state.index.artifacts)
@@ -2153,6 +2157,33 @@ function moveMemberAt (team, from, to) {
   return true
 }
 
+/**
+ * 天赋三格：把输入框里的数字写回模型（**只填数字就生效**，不需要点皇冠）。
+ *
+ * ⚠ 曾经这里是 `var slot = getPath(model, 'v2.talents.0.slots.0.level')` ——
+ *   路径以 `.level` 结尾，`getPath` 返回的是**那个字符串值**而不是格子对象，
+ *   于是 `typeof slot === 'object'` 永远为假、赋值被跳过：**打字完全没反应，
+ *   只有点皇冠（走对象路径）才生效**。这里改为先去掉 `.level` 再取对象。
+ * @param {object} model
+ * @param {string} lvPath 形如 `v2.talents.0.slots.1.level`
+ * @param {string|number} rawValue 输入框里的原始值
+ * @returns {boolean} 是否写进了模型
+ */
+function setTalentSlotLevel (model, lvPath, rawValue) {
+  var path = str(lvPath)
+  var text = String(rawValue == null ? '' : rawValue).trim()
+  var row = getPath(model, path.replace(/\.slots\.\d+\.level$/, ''))
+  var slot = getPath(model, path.replace(/\.level$/, ''))
+  var n = Number(text)
+  if (!text) n = 1
+  if (!(n >= 1 && n <= 10)) n = 1
+  if (!slot || typeof slot !== 'object') return false
+  slot.level = String(n)
+  slot.crown = n === 10
+  if (row && row.kind === 'priority') row.raw = ''
+  return true
+}
+
 /* ============================================================ 事件绑定 */
 
 function formEvents () {
@@ -2163,17 +2194,7 @@ function formEvents () {
     if (!el || !el.getAttribute) return
     // 天赋等级输入框：1–10；写 10 = 皇冠，写 1–9 = 取消皇冠；留空按 1
     if (el.getAttribute('data-level')) {
-      var lvPath = el.getAttribute('data-path')
-      var row = getPath(state.model, lvPath.replace(/\.slots\.\d+\.level$/, ''))
-      var slot = getPath(state.model, lvPath)
-      var n = Number(String(el.value).trim())
-      if (!el.value.trim()) n = 1
-      if (!(n >= 1 && n <= 10)) n = 1
-      if (slot && typeof slot === 'object') {
-        slot.level = String(n)
-        slot.crown = n === 10
-      }
-      if (row && row.kind === 'priority') row.raw = ''
+      setTalentSlotLevel(state.model, el.getAttribute('data-path'), el.value)
       markDirty(true)
       return
     }
@@ -2531,18 +2552,29 @@ var serverClosed = false
 /**
  * 每 5 秒给服务端一次心跳，让它知道「页面还开着」。
  * 服务端只有带 --exit-on-idle 时才真的用这个信号（否则只是 200 no-op，命令行用户行为不变）。
- * 标签页切到后台（visibilityState=hidden）时暂停心跳 —— 关窗口靠 pagehide 的 /api/close，
- * 这样「人离开了」也能在阈值内把后台服务收掉。
+ *
+ * ⚠ **切到后台也照发**（以前这里遇到 visibilityState === 'hidden' 就 `return`，于是
+ *   "切到别的窗口看一会儿" 会被服务端当成"人走了"，20 秒后把服务杀掉，切回来就是
+ *   「预览失败 / 保存失败：Failed to fetch」）。现在隐藏时也发，并在心跳体里带 `hidden: true`，
+ *   服务端据此把阈值放宽（浏览器会给后台标签页的定时器降频，不能只靠这里的 5 秒定时器）。
+ *   真正关窗口仍由 pagehide 的 `/api/close` 负责，服务端 5 秒后收掉。
  */
 function startHeartbeat () {
   if (heartbeatTimer) return
   var beat = function () {
     if (serverClosed) return
-    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
-    api('POST', '/api/heartbeat', {}).catch(function () { /* 服务已经关了，静默 */ })
+    var hidden = (typeof document !== 'undefined' && document.visibilityState === 'hidden')
+    api('POST', '/api/heartbeat', { hidden: hidden }).catch(function () { /* 服务已经关了，静默 */ })
   }
   beat()
   heartbeatTimer = setInterval(beat, HEARTBEAT_MS)
+  // 切前台 / 切后台的瞬间各补一次：立刻把最新的 hidden 状态告诉服务端
+  if (typeof document !== 'undefined' && document.addEventListener) {
+    document.addEventListener('visibilitychange', beat)
+  }
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('focus', beat)
+  }
 }
 
 /** 问一次服务端：有没有开空闲自动退出？有就提示用户 */
@@ -2993,6 +3025,7 @@ window.__editor = {
   // 纯函数（供自动化检查：天赋三格 / 候选并格 / 落盘形状）
   talentSlots: talentSlots,
   talentLevelText: talentLevelText,
+  setTalentSlotLevel: setTalentSlotLevel,
   foldCrownRows: foldCrownRows,
   rowVisible: rowVisible,
   multiValue: multiValue,

@@ -65,6 +65,8 @@ const MAX_PORT_TRIES = 10
 const MAX_BODY = 8 * 1024 * 1024
 /** 收到关闭信号后的宽限期（毫秒）：给刷新页面 / 马上重开留余地 */
 const CLOSE_GRACE_MS = 5000
+/** 后台标签页的心跳宽限：Chrome 把隐藏页定时器降频到 ≈1 次/分钟，所以阈值至少放宽到 180s */
+const HIDDEN_GRACE_MS = 180000
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -877,9 +879,13 @@ function undoBatchReplace (stamp) {
  * 背景：桌面快捷方式用 powershell -WindowStyle Hidden 后台起服务，窗口一关，
  * 服务就成了「任务管理器里才找得到的幽灵进程」。开启这个开关后改用**心跳**判断页面还在不在：
  *
- *   · 打开页面后前端每 5 秒 POST /api/heartbeat
+ *   · 打开页面后前端每 5 秒 POST /api/heartbeat（**标签页切到后台也照发**，见下面的"隐藏页宽限"）
  *   · 页面 pagehide / beforeunload 时 navigator.sendBeacon('/api/close') 发关闭信号
  *   · 「连续 idleSeconds 秒没有任何心跳」→ 自动退出（覆盖关窗口、崩溃、断网等一切情况）
+ *   · **隐藏页宽限**：浏览器会把后台标签页的定时器降频（Chrome 隐藏 5 分钟后 ≈ 每分钟一次），
+ *     所以最后一次心跳带着 `hidden: true` 时，阈值放宽到 HIDDEN_GRACE_MS（180s）——
+ *     否则「只是切到别的窗口看了会儿」就会被误判成"人走了"，20 秒后服务被杀掉，
+ *     用户切回来就是「预览失败 / 保存失败：Failed to fetch」。真正关窗口仍由 `/api/close` 立刻收掉。
  *   · 收到关闭信号后再等 CLOSE_GRACE_MS（5 秒）退出 —— 给「刷新页面」「关掉再马上开」留余地：
  *     这 5 秒内只要又来一次心跳，就取消这次退出
  *   · 多标签页天然正确：只记「最近一次心跳时间」，任一标签还在心跳就不会超时
@@ -890,20 +896,25 @@ function undoBatchReplace (stamp) {
  */
 export function createIdleWatcher (idleSeconds, onExit = () => process.exit(0)) {  const idleMs = Math.max(1, Number(idleSeconds) || 20) * 1000
   let lastBeat = Date.now()
+  let lastHidden = false
   let closeRequested = false
   let closeAt = 0
   let fired = false
   const log = (msg) => console.log(`[idle] ${msg}`)
 
-  const heartbeat = () => {
+  /** 后台标签页的宽限阈值：取「配置阈值」与 HIDDEN_GRACE_MS 的较大者 */
+  const limitMs = () => (lastHidden ? Math.max(idleMs, HIDDEN_GRACE_MS) : idleMs)
+
+  const heartbeat = (opts = {}) => {
     lastBeat = Date.now()
+    lastHidden = opts.hidden === true
     if (closeRequested) {
       // 关闭信号后又来心跳（刷新 / 快速重开）→ 取消这次退出
       closeRequested = false
       closeAt = 0
       log('收到心跳，取消本次退出')
     }
-    return { ok: true, idleSeconds: idleMs / 1000 }
+    return { ok: true, idleSeconds: idleMs / 1000, hidden: lastHidden }
   }
 
   const requestClose = () => {
@@ -927,9 +938,10 @@ export function createIdleWatcher (idleSeconds, onExit = () => process.exit(0)) 
       return
     }
     const silent = now - lastBeat
-    if (silent >= idleMs) {
+    const limit = limitMs()
+    if (silent >= limit) {
       fired = true
-      log(`无心跳 ${Math.round(silent / 1000)}s（阈值 ${idleMs / 1000}s），自动退出`)
+      log(`无心跳 ${Math.round(silent / 1000)}s（阈值 ${Math.round(limit / 1000)}s${lastHidden ? '，隐藏页宽限' : ''}），自动退出`)
       onExit()
     }
   }
@@ -2258,9 +2270,15 @@ async function route (req, res) {
     if (pathname === '/api/publish' && method === 'POST') return await apiPublish(req, res)
     if (pathname === '/api/preview' && method === 'POST') return await apiPreview(req, res)
     // 心跳 / 关闭信号：只在开了 --exit-on-idle 时才有实际作用（否则仅回 200，纯 no-op）
+    // 心跳体可带 `{ hidden: true }`：页面切到后台时浏览器会把定时器降频，服务端据此放宽阈值
     if (pathname === '/api/heartbeat') {
-      if (idleWatcher) idleWatcher.heartbeat()
-      return sendJson(res, 200, { ok: true, exitOnIdle: !!idleWatcher, idleSeconds: idleSeconds || null, at: new Date().toISOString() })
+      let hidden = false
+      try {
+        const body = await readJsonBody(req)
+        hidden = !!(body && body.hidden === true)
+      } catch { hidden = false }
+      if (idleWatcher) idleWatcher.heartbeat({ hidden })
+      return sendJson(res, 200, { ok: true, exitOnIdle: !!idleWatcher, idleSeconds: idleSeconds || null, hidden, at: new Date().toISOString() })
     }
     if (pathname === '/api/close') {
       // navigator.sendBeacon 会带 text/plain，不能按 JSON 解析；不读 body，直接响应
