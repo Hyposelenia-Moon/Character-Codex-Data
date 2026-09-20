@@ -279,6 +279,20 @@ console.log('\n================ 词条写法 ================')
   push('圣遗物：`+` 组合仍在一个 chip 内', rowText(mk({ artifacts: [{ kind: 'preferred', label: '首选', sep: ' + ', sets: [{ name: '2生命' }, { name: '2充能' }] }] }), '圣遗物'), '2生命+2充能')
   // 件数简写**不参与同名去重**（真套装名才去重）：`2精通 + 2精通` 要两个都留着
   push('圣遗物：`2精通 + 2精通` 不去重', rowText(mk({ artifacts: [{ kind: 'transition', label: '过渡', sep: ' + ', sets: [{ name: '2精通' }, { name: '2精通' }] }] }), '圣遗物'), '2精通+2精通')
+  // ③h **`+` 只在两侧都是件数简写时才算「同一组合」**（2+2 才凑满 4 件）；
+  //     全套装名之间的 `+` 其实是**同级选项** → 显示 `/`（用户定稿 2026-09-20）
+  const fullPlus = mk({ artifacts: [{ kind: 'preferred', label: '首选', sep: ' + ', sets: [{ name: '如雷的盛怒' }, { name: '昔日宗室之仪' }] }] })
+  push('圣遗物：全套装名之间的 `+` 显示 `/`（同级）', rowText(fullPlus, '圣遗物'), '如雷的盛怒/昔日宗室之仪')
+  push('圣遗物：文档层仍保留 `+` 原写法（往返不动）', (fullPlus.sections.find(s => /圣遗物/.test(s.title))?.lines ?? [])[0], '首选：如雷的盛怒 + 昔日宗室之仪')
+  push('圣遗物：`2X + 2X` 仍是同一 chip，全名是同级', rowText(mk({ artifacts: [{ kind: 'preferred', label: '首选', sep: ' / + ', sets: [{ name: '昔日宗室之仪' }, { name: '2生命' }, { name: '2充能' }, { name: '角斗士的终幕礼' }] }] }), '圣遗物'), '昔日宗室之仪/2生命+2充能/角斗士的终幕礼')
+  // ③i 主词条 / 副词条值末尾的括注 → 条目的 `note`（小字），两条链路同款（用户定稿 2026-09-20）
+  {
+    const rowOf = (v2, kw) => (characterSections(mk(v2)).find(s => s.title === '圣遗物')?.rows ?? []).find(r => new RegExp(kw).test(String(r.label)))
+    const withNote = (r) => (r?.items ?? []).map(it => it.text + (it.note ? `⟨${it.note}⟩` : '') + (it.sepAfter || '')).join(' | ')
+    push('主词条：值里的括注拆成 note', withNote(rowOf({ artifacts: [{ kind: 'main', stats: { 时之沙: ['防御力'], 空之杯: ['防御力'], 理之冠: ['暴击率', '防御力（特殊）'] } }] }, '主词条')), '时之沙：防御力 | 空之杯：防御力 | 理之冠：暴击率/防御力⟨特殊⟩')
+    push('副词条：值里的括注拆成 note', withNote(rowOf({ artifacts: [{ kind: 'sub', stats: ['暴击（西风）', '大防御'], sep: ' > ' }] }, '副词条')), '暴击率⟨西风⟩＞ | 大防御')
+    push('副词条：带括注的暴击对仍算同级（先拆括注再判分隔符）', rowText(mk({ artifacts: [{ kind: 'sub', stats: ['暴击率（西风）', '暴击伤害'], sep: ' > ' }] }), '圣遗物'), '暴击率=暴击伤害')
+  }
   push('圣遗物：真套装名仍去重（A + A → A）', rowText(mk({ artifacts: [{ kind: 'transition', label: '过渡', sep: ' + ', sets: [{ name: '千岩牢固' }, { name: '千岩牢固' }] }] }), '圣遗物'), '千岩牢固')
   push('圣遗物：文档层保留原写法（旧数据里若仍有件数，往返不丢）', renderArtifactRow(pieceRow)[0], '首选：翠绿之影 / 角斗士的终幕礼（2件套）')
 
@@ -314,6 +328,51 @@ console.log('\n================ 词条写法 ================')
     { label: null, k: '攻击力', v: '2000' },
     { label: null, k: '元素精通', v: '800' }
   ]), '暴击率：70% ｜ 暴击伤害：140% ｜ 攻击力：2000 ｜ 元素精通：800')
+  // ③c **空标签的键值行跟随上一个标签**（用户 2026-09-20 指出的现象：梦见月瑞希的三条被拆成两行）
+  //     源文档写法就是「主c：攻击力：2200+」后面跟裸行「暴击率：70%+」「暴击伤害：200%+」
+  push('面板：裸数值行跟随上一行的标签（梦见月瑞希）', panelText([
+    { label: '辅助', text: '精通：1000+' },
+    { label: '辅助', text: '暴击率：65%' },
+    { label: null, text: '暴击伤害：120%' }
+  ]), '辅助：元素精通：1000+\u3000暴击率：65%\u3000暴击伤害：120%')
+  push('面板：裸数值行跟随上一行的标签（温迪：主c 三条一行 + 辅助一行）', panelText([
+    { label: '主c', text: '攻击力：2200+' },
+    { label: null, text: '暴击率：70%' },
+    { label: null, text: '暴击伤害：200%' },
+    { label: '辅助', text: '元素充能效率：240%' }
+  ]), '主c：攻击力：2200+\u3000暴击率：70%\u3000暴击伤害：200% ｜ 辅助：元素充能效率：240%')
+  {
+    const { normalizePanelRows } = await import(pathToFileURL(path.join(root, 'scripts/lib/guide-display.mjs')).href)
+    const norm = normalizePanelRows([
+      { label: '主c', items: [{ text: '攻击力：2200+', sepAfter: '' }] },
+      { label: '', items: [{ text: '暴击率：70%+', sepAfter: '' }] },
+      { label: '', items: [{ text: '暴击伤害：200%+', sepAfter: '' }] }
+    ])
+    push('面板：渲染模型形状同样跟随标签（合并成一行）', norm.map(r => (r.label ? r.label + '：' : '') + r.items.map(i => i.text + (i.sepAfter || '')).join('')).join(' ｜ '), '主c：攻击力：2200+\u3000暴击率：70%+\u3000暴击伤害：200%+')
+    // >3 条分行时，键值行**照旧不带标签**（只借标签分组，不改「键值对行首留空」的约定）
+    const norm2 = normalizePanelRows([
+      { label: '主c', items: [{ text: '攻击力：2200+', sepAfter: '' }] },
+      { label: '', items: [{ text: '暴击率：70%+', sepAfter: '' }] },
+      { label: '', items: [{ text: '暴击伤害：200%+', sepAfter: '' }] },
+      { label: '', items: [{ text: '元素精通：100+', sepAfter: '' }] }
+    ])
+    push('面板：>3 条分行时键值行仍不带标签', norm2.map(r => r.label || '(空)').join(','), '主c,(空),(空),(空)')
+  }
+  // ③e 配队成员的**括注**：网页版必须与面板同口径 —— 拆成 `note`，成本备注（`二命`）提到**行尾**
+  //     （曾经网页版把括注当名字的一部分 → `希诺宁（二命）` 行内括注 vs 面板行尾备注，audit 报漂移）
+  {
+    const d = {
+      schema: 2,
+      name: '自检',
+      game: 'gi',
+      meta: {},
+      v2: { teams: [] },
+      sections: [{ title: '6. 配队推荐', lines: ['二命进月结晶：兹白 + 哥伦比娅 + 莉奈娅 + 希诺宁（二命）'] }]
+    }
+    const team = characterSections(d).find(s => s.kind === 'teams')?.teams?.[0] ?? {}
+    push('配队：成员括注拆成备注（成员名不带括注）', (team.members ?? []).map(m => m.name + (m.note ? `（${m.note}）` : '')).join(' + '), '兹白 + 哥伦比娅 + 莉奈娅 + 希诺宁')
+    push('配队：成本备注（二命）提到行尾并加「注：」', team.notePrefix === true ? `注：${team.note}` : String(team.note ?? ''), '注：二命')
+  }
 
   // ④ 天赋行的行首标签是**显示词 `推荐`**（文档里仍写 `天赋：…`）
   const tal = mk({ talents: [{ kind: 'priority', raw: 'A1 E10 Q10', order: [{ name: 'A', level: 1 }, { name: 'E', level: 10, crown: true }, { name: 'Q', level: 10, crown: true }] }] })

@@ -584,8 +584,19 @@ function teamsFromLines (lines) {
     const members = []
     if (/\s*[+＋＆&]\s*/.test(membersPart)) {
       for (const piece of membersPart.split(/\s*[+＋＆&]\s*/)) {
-        const name = piece.replace(/\s*[/／]\s*/g, ' / ').trim()
-        if (name) members.push({ name, ref: '', plain: name })
+        const merged = piece.replace(/\s*[/／]\s*/g, ' / ').trim()
+        if (!merged) continue
+        // 成员**末尾的括注**要拆成 note（`希诺宁（二命）` → name `希诺宁` + note `二命`）：
+        // 判据与 parse-docx 的 splitNameNote / NAME_NOTE_RE 一致（只认末尾那一层括号）。
+        // 拆出来之后，共享的 `normalizeTeams` 才会把「X命 / 高金」这类**成本备注**提到**行尾小字**
+        // （`… + 希诺宁　注：二命`，与面板 codex.html 同款）；其余括注（`精五` 之类）留在成员上，
+        // 两端都渲染成成员名后的行内括注。
+        // ⚠ 以前这里不拆，括注被当成**名字的一部分**（`希诺宁（二命）`），于是网页版画的是
+        //   行内括注、面板画的是行尾备注 —— audit-web-vs-panel 会报这一处漂移。
+        const hit = merged.match(/^(.*?)\s*[（(]([^（()）]+)[）)]\s*$/)
+        const name = (hit ? hit[1] : merged).trim()
+        const note = hit ? hit[2].trim() : ''
+        if (name) members.push({ name, note, ref: '', plain: name })
       }
     } else if (membersPart) {
       // 没有 `+`：整段是说明文字（`自由选择 / 减抗位` 这类，**不当成员**，`/` 原样留在说明里）
@@ -604,7 +615,12 @@ function renderItems (row) {
   const items = row.items ?? []
   if (!items.length) return ''
   if (row.kind === 'note') return `<span class="row-note">${inline(items[0]?.text ?? '')}</span>`
-  if (items.length === 1) return `<span class="row-value">${inline(items[0].text)}${crownBadge(items[0])}${levelBadge(items[0])}</span>`
+  // 单条目的行也要画备注（主词条只有一槽、副词条只写一条时很容易踩到）：
+  // 面板侧 codex.html 是画 `row.items[0].note` 的，这里漏了就会「网页版没有括注、面板有」。
+  if (items.length === 1) {
+    const note = items[0].note ? `<span class="rank-note">（${inline(items[0].note)}）</span>` : ''
+    return `<span class="row-value">${inline(items[0].text)}${note}${crownBadge(items[0])}${levelBadge(items[0])}</span>`
+  }
   const isTalent = row.kind === 'talents' || /天赋/.test(String(row.label))
   const isMain = items.some(it => it.slot)
   // 命座：行上有 ref（`constellation:N`）时带 `data-icon-ref`，面板侧据此挂命座图标
