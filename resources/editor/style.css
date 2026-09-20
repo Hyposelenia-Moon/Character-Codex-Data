@@ -758,7 +758,10 @@ textarea { resize: vertical; min-height: 54px; }
 .guide-preview .row-label { flex: 0 0 auto; min-width: 52px; padding: 0 6px; border-radius: 4px; background: rgba(110, 110, 110, .11); color: #2f2f2f; font-weight: 700; text-align: center; }
 .guide-preview .row-value { min-width: 0; }
 .guide-preview .rank-item { display: inline-block; padding: 0 7px; border: 1px solid #e3e9f2; border-radius: 6px; background: #f5f8fc; color: #2d3748; }
-.guide-preview .rank-note, .guide-preview .row-note { color: #8a8378; font-size: 11.5px; font-style: italic; }
+/* 括弧备注一律「灰色 + 斜体」，与面板 codex.css 的 .rank-note / .team-member-note 同款。
+   `.team-note-inline` = 配队成员后面的括注（`叶洛亚 / 希诺宁（二命）`）—— 以前漏了这一条，
+   预览里它跟正文一样黑，和上面的条目备注（`（精5）`）看着不一致。 */
+.guide-preview .rank-note, .guide-preview .row-note, .guide-preview .team-note-inline { color: #8a8378; font-size: 11.5px; font-style: italic; }
 .guide-preview .sep { color: #a9b4c4; font-weight: 700; padding: 0 3px; }
 .guide-preview .team-member { color: #2d3748; }
 .guide-preview .team-plus { color: #a9b4c4; padding: 0 4px; }
