@@ -956,9 +956,14 @@ function renderPanels () {
   var s = state.model.v2
   var body = rowList('v2.panels', s.panels, function (row, i, p, rowId) {
     var isText = !hasText(row.k)
+    // 面板是「键：值」结构：**只填一半保存时会被丢掉**，必须当场说清楚（曾经是静默丢弃）
+    var warn = ''
+    if (!isText && !hasText(row.v)) warn = '<span class="warn-chip" title="面板行是「键：值」结构，只有键没有值时写不出合法文档行，保存时会丢掉这一行">⚠ 缺值 v</span>'
+    if (isText && hasText(row.v)) warn = '<span class="warn-chip" title="只有「值」没有「键」时文档行没有冒号、解析不回来，保存时会丢掉这一行；要么补上键，要么用「改成纯文本」">⚠ 缺键 k</span>'
     var head = '<div class="box-head">' +
       '<span class="box-title">行 ' + (i + 1) + '</span>' +
       '<input type="text" class="w-sm" data-path="' + p + '.label" value="' + esc(row.label) + '" placeholder="标签（可空，如 辅助向）">' +
+      warn +
       '<span class="spacer"></span>' +
       actBtn('panel-to-text', p, isText ? '改成 键+值' : '改成纯文本', 'btn mini') +
       actBtn('move-row-up', 'v2.panels', '↑', 'btn mini', '上移', i) +
@@ -966,7 +971,7 @@ function renderPanels () {
       actBtn('del-row', 'v2.panels', '删除行', 'btn mini danger', '删除这一行', i) +
       '</div>'
     var body2 = isText
-      ? '<input type="text" data-path="' + p + '.text" value="' + esc(row.text) + '" placeholder="纯文本">'
+      ? '<input type="text" data-path="' + p + '.text" value="' + esc(row.text) + '" placeholder="纯文本（说明行，如 暴击率70% / 暴伤220%+）">'
       : '<div style="display:flex;gap:10px;flex-wrap:wrap">' +
         '<label class="field" style="flex:0 0 220px"><span>键 k</span>' + plainInput(p + '.k', row.k, '', '如 暴击率') + '</label>' +
         '<label class="field" style="flex:1 1 260px"><span>值 v</span>' + plainInput(p + '.v', row.v, '', '如 70%+') + '</label>' +
@@ -980,10 +985,13 @@ function renderConstellations () {
   var s = state.model.v2
   var body = rowList('v2.constellations', s.constellations, function (row, i, p, rowId) {
     var idx = constellationIndex(row.name)
+    // 命座名是必填（它决定 `命之座N` 与命座图标）：只有说明时文档行写成 `——说明`，解析不回来
+    var nameWarn = hasText(row.name) ? '' : '<span class="warn-chip" title="命座名必填（决定「命之座N」与命座图标）；只填说明保存时会被丢掉">⚠ 缺命座名</span>'
     return '<div class="box"' + rowAttr(rowId) + '><div class="box-head">' +
       '<span class="box-title">行 ' + (i + 1) + '</span>' +
       constellationField(row.name, p + '.name') +
       (idx ? '<span class="muted" style="font-size:12px">序号 ' + idx + '</span>' : '') +
+      nameWarn +
       '<span class="spacer"></span>' +
       actBtn('move-row-up', 'v2.constellations', '↑', 'btn mini', '上移', i) +
       actBtn('move-row-down', 'v2.constellations', '↓', 'btn mini', '下移', i) +

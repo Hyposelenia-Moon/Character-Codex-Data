@@ -531,6 +531,27 @@ export function characterSections (data) {
       if (noteText) teams.push({ tag: '', members: [], text: '', note: noteText, notePrefix: false })
       return { title, badge, type: 'teams', kind, rows: [], teams }
     }
+    // 面板段：**与面板侧 parse.js 的 v2PanelRows 同源**。只有 v2 分得清「键值对」和「说明行」
+    // （文档行 `暴击率：70%+` 与 `辅助向：暴击率70% / 暴伤220%` 形状一样），
+    // 键值对统一成「label 留空 + `k：v` 进 item」，同组 ≤3 条才能在共享归一里合并成一行。
+    if (title === '面板' && (data?.v2?.panels ?? []).length) {
+      const panelRows = (data.v2.panels ?? []).map(r => {
+        const key = String(r?.k ?? '').trim()
+        if (key) {
+          const value = String(r?.v ?? '').trim()
+          return value ? { label: '', ref: '', items: [{ text: displayText(`${key}：${value}`), sepAfter: '' }] } : null
+        }
+        const text = String(r?.text ?? '').trim()
+        if (!text) return null
+        const parts = text.split(/\s*[/／]\s*/).filter(Boolean)
+        return {
+          label: displayText(String(r?.label ?? '')),
+          ref: '',
+          items: parts.map((p, i) => ({ text: displayText(p), sepAfter: i < parts.length - 1 ? '/' : '' }))
+        }
+      }).filter(Boolean)
+      return { title, badge, type: 'stats', kind, rows: panelRows }
+    }
     const rows = linesToModelRows(lines, title === '武器' ? weaponHints : [], title === '天赋' ? crownHint : null, title === '天赋' ? levelHints : null,
       title === '圣遗物' ? (data?.v2?.artifacts ?? []) : [],
       title === '武器' ? (data?.v2?.weapons ?? []) : [])

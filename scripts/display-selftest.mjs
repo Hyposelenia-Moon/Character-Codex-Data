@@ -276,6 +276,39 @@ console.log('\n================ 词条写法 ================')
   push('圣遗物：真套装名仍去重（A + A → A）', rowText(mk({ artifacts: [{ kind: 'transition', label: '过渡', sep: ' + ', sets: [{ name: '千岩牢固' }, { name: '千岩牢固' }] }] }), '圣遗物'), '千岩牢固')
   push('圣遗物：文档层保留原写法（旧数据里若仍有件数，往返不丢）', renderArtifactRow(pieceRow)[0], '首选：翠绿之影 / 角斗士的终幕礼（2件套）')
 
+  // ③b **面板模块**（曾经整段渲染不出来：normalizePanelRows 只认 v2 的 `{k,v}`，
+  //     而两条链路传的是 `{label, items}` → 每一行都被当空行丢掉 → 永远「暂无」）
+  const panelSec = (v2) => {
+    const d = mk({ panels: v2 })
+    return characterSections(d).find(s => s.title === '面板') ?? { empty: true, rows: [] }
+  }
+  const panelText = (v2) => {
+    const sec = panelSec(v2)
+    return sec.empty ? '暂无' : sec.rows.map(r => (r.label ? r.label + '：' : '') + r.items.map(i => i.text + (i.sepAfter || '')).join('')).join(' ｜ ')
+  }
+  push('面板：v2 键值对 + 说明行都能渲染', panelText([
+    { label: null, k: '暴击率', v: '70%+' },
+    { label: null, k: '暴击伤害', v: '220%+' },
+    { label: null, k: '攻击力', v: '2200+' },
+    { label: '辅助向', text: '暴击率70% / 暴伤220%+' }
+  ]), '暴击率：70%+\u3000暴击伤害：220%+\u3000攻击力：2200+ ｜ 辅助向：暴击率70%/暴击伤害220%+')
+  // 渲染模型形状（另一条链路传进来的就是 `{label, items}`）：直接测归一函数
+  {
+    const { normalizePanelRows } = await import(pathToFileURL(path.join(root, 'scripts/lib/guide-display.mjs')).href)
+    const norm = normalizePanelRows([
+      { label: '', items: [{ text: '暴击率：70%+', sepAfter: '' }] },
+      { label: '', items: [{ text: '暴击伤害：220%+', sepAfter: '' }] }
+    ])
+    push('面板：渲染模型形状（label + items）也认', norm.map(r => (r.label ? r.label + '：' : '') + r.items.map(i => i.text + (i.sepAfter || '')).join('')).join(' ｜ '), '暴击率：70%+\u3000暴击伤害：220%+')
+  }
+  push('面板：只有键没值 → 不渲染（不打「暴击率：」这种空行）', panelText([{ label: null, k: '暴击率', v: '' }]), '暂无')
+  push('面板：>3 条不合并（保持分行）', panelText([
+    { label: null, k: '暴击率', v: '70%' },
+    { label: null, k: '暴击伤害', v: '140%' },
+    { label: null, k: '攻击力', v: '2000' },
+    { label: null, k: '元素精通', v: '800' }
+  ]), '暴击率：70% ｜ 暴击伤害：140% ｜ 攻击力：2000 ｜ 元素精通：800')
+
   // ④ 天赋行的行首标签是**显示词 `推荐`**（文档里仍写 `天赋：…`）
   const tal = mk({ talents: [{ kind: 'priority', raw: 'A1 E10 Q10', order: [{ name: 'A', level: 1 }, { name: 'E', level: 10, crown: true }, { name: 'Q', level: 10, crown: true }] }] })
   const talRow = characterSections(tal).find(s => s.title === '天赋')?.rows?.[0]

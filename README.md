@@ -320,6 +320,7 @@ node scripts/build-doc.mjs       # 文档版 guide.md（Word 用可再打包 doc
 |---|---|---|
 | 圣遗物 | **同级套装两个 chip 紧挨着**（不画 `＞`）；2+2 仍在一个 chip 内用 `+` | `guide-display.mjs` 的 `SET_LEVEL_SEP` / `gapSepOf` ＋ `parse.js` 的 `resolveArtifactSetItems` |
 | 天赋 | 行首标签显示 **`推荐`**（不是 `天赋`）；三格 A/E/Q + 图标正下方等级数字（10 叠皇冠） | `build-html.mjs` 与 `parse.js` 的行模型（`label: '推荐', kind: 'talents'`） |
+| **面板** | **键值对**（`{k,v}`）→ 行首标签留空、把 `暴击率：70%+` 放进条目；**说明行**（`辅助向：暴击率70% / 暴伤220%+`）→ 标签就是 `辅助向`、值按 `/` 拆成多个 chip；**同一标签 ≤3 条合并成一行**（行间用全角空格 `　`，行内 `/` 保留）、>3 条维持分行 | 两条链路都按这个约定产出行：`parse.js` 的 `v2PanelRows`（面板）与 `build-html.mjs` 的面板段（网页版，读 `v2.panels`）；合并由 `guide-display.mjs` 的 `normalizePanelRows` 完成 |
 | 命座 | **图标在 `命之座N` 之前**：`[图标] [命之座2] [说明]`；命座图标是**白色线稿**，浅底上必须反相成深色（`rank-icon-line`）否则看不清 | `codex.html` 的 `.grow-icon`（行首渲染，**带 `rank-icon-line`**）＋ `codex.css` 的 `.grow-constellation` 三列网格 / `.rank-icon.rank-icon-line { filter: invert(1) brightness(.9) }` |
 | 配队 | **头像之间 `+`**（槽位之间）；**同一槽位的可替换角色之间 `/`，且这些候选头像要并列横排**（不要上下堆叠） | `codex.html` 的 `.team-plus` / `.team-alts` / `.team-slash`；候选头像由插件 `icons.js` 的 `attachTeamIcons` 逐个解析（`member.candidates`） |
 | Hero | 文字对比度：遮罩 0.52 + 近黑字 + 四向白色描边 | `resources/common/hero.css` 的 `.hero-bg` / `.hero-title` / `.hero-game` |
@@ -517,6 +518,8 @@ node scripts/editor.mjs [--port 8787] [--no-open] [--exit-on-idle[=<秒>]]
 | 圣遗物行 | 档位下拉与标签联动（`label` 就是文档原词，`kind` 跟着走）；**件数不再提供输入** |
 | 主词条 / 副词条 | 每个 chip 是**可编辑输入框**（点「＋」加一项后能直接打字，或点「▾」从候选表选）；主词条候选不带「百分比」，副词条候选是 `大X` / `小X` 两套；副词条**只有暴击率↔暴击伤害是同级**（编辑器不提供分隔符编辑，改动走文档层） |
 | 天赋 | 固定三格 A / E / Q，**数字就是等级**（1–10，留空按 1）；数字本身就会生效，皇冠只是把这一格抬到 10 |
+| 面板行 | 是**「键：值」结构**：只填一半（缺 `v` 或缺 `k`）写不出合法文档行、保存时会被丢掉 —— 这两种情况表单会打 ⚠ 提示，别以为是"没激活" |
+| 命座行 | **命座名必填**（决定 `命之座N` 与命座图标）：只填说明会被丢掉，表单打 ⚠ 提示 |
 | 配队 | 「＋ 成员」打开**槽位**选择器：点名字加进**当前格**，一格可多选（格内 ` / ` = 可替换），「＋ 新槽位」再开一格；`＋ 配队行` 加出来的空行**立刻可见可编辑** |
 | 任何栏目 | 「＋ 新增一行」加出来的空行用界面标记 `_new` 保证可见，**保存时不会落盘**（空行不写进 JSON） |
 
