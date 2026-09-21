@@ -719,7 +719,9 @@ function modal (opts) {
       else if (e.key === 'Enter' && opts.input) { e.preventDefault(); ok() }
     }
     mask.addEventListener('click', function (e) {
-      var act = e.target && e.target.getAttribute && e.target.getAttribute('data-act')
+      // 同样往上找 `[data-act]`：按钮里以后加图标/子元素时点上去才不会失灵
+      var hit = (e.target && e.target.closest) ? e.target.closest('[data-act]') : null
+      var act = hit ? hit.getAttribute('data-act') : (e.target && e.target.getAttribute && e.target.getAttribute('data-act'))
       if (act === 'ok') ok()
       else if (act === 'cancel' || e.target === mask) done(null)
     })
@@ -2928,12 +2930,16 @@ function formEvents () {
       openRefPickerFor(pickBtn.getAttribute('data-pick'), pickBtn.getAttribute('data-path'))
       return
     }
-    var act = el.getAttribute('data-act')
+    // ⚠ 必须往上找 `[data-act]`，不能直接读 `e.target`：行尾的删除按钮里是**内联 SVG**，
+    // 点在图标上时 target 是 `<path>` / `<svg>`（它们没有 data-act）→ 整个点击被丢掉，
+    // 表现就是「点了删除没反应」（用户报：编辑器无法删除面板的某行）。
+    var actEl = (el.closest ? el.closest('[data-act]') : null) || el
+    var act = actEl.getAttribute && actEl.getAttribute('data-act')
     if (!act) return
     e.preventDefault()
-    var path = el.getAttribute('data-path')
-    var i = el.hasAttribute('data-i') ? Number(el.getAttribute('data-i')) : -1
-    handleAction(act, path, i, el)
+    var path = actEl.getAttribute('data-path')
+    var i = actEl.hasAttribute('data-i') ? Number(actEl.getAttribute('data-i')) : -1
+    handleAction(act, path, i, actEl)
   })
 
   // 关系选择器（武器行 / 副词条行共用）：写回行的 `sep`，重绘让预览同步

@@ -19,7 +19,7 @@
 | 3 | **标记版 docx**（`out\…(标记版).docx` + `D:\…\…(标记版).docx`） | 由 `build-docx --write-main` 一并产出，无需手改 | 标记版 sha1 + "去标记后逐字一致：是" |
 | 4 | `guide.html` | `node scripts/build-html.mjs` | 卡片数 129 + `audit-guide-html` 通过 |
 | 5 | `guide.md` | `node scripts/build-doc.mjs`（**选 A 口径**：只过滤占位符，**文档词汇不变**） | `___`=0 + 文档词汇计数 + 新旧字节/行数 |
-| 6 | **编辑器**（表单文案 + `/api/preview` 预览） | `resources/editor/app.js`（文案 / 下拉 / **标签与档位联动** / **删行墓碑** / **面板一行两个控件** / **chip 宽度自适应与「放得下几把」**）＋ `scripts/editor.mjs`（保存协议：删行墓碑、清空＝显式 `null`）；**改完必须重启编辑器进程**（长驻进程会缓存旧模块） | `/api/preview` html 与 `guide.html` **逐字节一致** ＋ `scripts/editor-selftest.mjs` 130/130 ＋ `.dsh/verify-editor-rt.mjs`（129 角色「打开→原样保存」逐字节不变 + 预览逐字节一致）＋ `.dsh/verify-panel-editor.mjs`（面板行新增 / 带标签 / 删行 / 说明行，端到端）＋ `.dsh/probe-editor-ui.mjs`（离线表单：占位截断 / 字号 / 溢出）＋ `.dsh/probe-editor-live.mjs` / `.dsh/audit-editor-ui-live.mjs`（**真实编辑器**里量同一批指标 + 武器行提示，`--zoom=2` 出放大截图） |
+| 6 | **编辑器**（表单文案 + `/api/preview` 预览） | `resources/editor/app.js`（文案 / 下拉 / **标签与档位联动** / **删行墓碑** / **面板一行两个控件** / **chip 宽度自适应与「放得下几把」**）＋ `scripts/editor.mjs`（保存协议：删行墓碑、清空＝显式 `null`；**写请求带跨站防护**）；**改完必须重启编辑器进程**（长驻进程会缓存旧模块） | `/api/preview` html 与 `guide.html` **逐字节一致** ＋ `scripts/editor-selftest.mjs` 143/143 ＋ `.dsh/verify-editor-rt.mjs`（129 角色「打开→原样保存」逐字节不变 + 预览逐字节一致）＋ `.dsh/verify-editor-click.mjs`（行尾图标按钮：点按钮 / `<svg>` / `<path>` 三种点法都要能删行）＋ `.dsh/verify-panel-editor.mjs`（面板行新增 / 带标签 / 删行 / 说明行，端到端）＋ `.dsh/probe-editor-ui.mjs`（离线表单：占位截断 / 字号 / 溢出）＋ `.dsh/probe-editor-live.mjs` / `.dsh/audit-editor-ui-live.mjs`（**真实编辑器**里量同一批指标 + 武器行提示，`--zoom=2` 出放大截图） |
 | 7 | **插件面板** | `model/codexIndex/display.js`（**与 `scripts/lib/guide-display.mjs` 逐字节一致**）、`parse.js`、`resources/atlas/codex.html`、`codex.css` | `node scripts/check-display-sync.mjs` + `audit-web-vs-panel` |
 | 8 | `README` 与 `templates/` | 改受影响的说明、词汇表、符号语义、期望值 | 本节表格与预期计数 |
 | 9 | **审计脚本的期望值** | `audit-*` / `display-*` / `check-display-sync` 的断言与合法集 | 每个审计 `exit=0` |
@@ -624,7 +624,7 @@ node scripts/editor.mjs [--port 8787] [--no-open] [--exit-on-idle[=<秒>]]
 
 | 栏目 | 规则 |
 |---|---|
-| 文字排版（全表单） | 控件（输入框 / 下拉 / 文本域）**统一 13px**、说明文字 12px；提示文字（placeholder）**一律不许被截断**（提示词写短，长解释放 `title`）；行尾按钮只留图标（`↑` / `↓` / 垃圾桶），文案在 `title` 里 |
+| 文字排版（全表单） | 控件（输入框 / 下拉 / 文本域）**统一 13px**、说明文字 12px；提示文字（placeholder）**一律不许被截断**（提示词写短，长解释放 `title`）；行尾按钮只留图标（`↑` / `↓` / 垃圾桶），文案在 `title` 里。⚠ 事件委托必须用 `closest('[data-act]')` **往上找**：图标按钮里是内联 SVG，点上去 `e.target` 是 `<path>`（没有 `data-act`），直接读 `e.target` 会让整个点击失灵（用户报过「编辑器无法删除面板的某行」）—— 回归脚本 `.dsh/verify-editor-click.mjs` 会分别点按钮本身 / `<svg>` / `<path>` 各一遍 |
 | 角色目录（左栏） | 每行 = 角色名 + 右侧「**未填：武 圣**」（单个汉字：武 / 圣 / 天 / 面 / 命 / 配 = 六模块，顺序即文档顺序；全填的角色不显示）。判据在服务端 `filledModules()`（**空占位行不算填**：`首选：` 后面没东西、主词条三槽全空都不算）；鼠标悬停给完整模块名。行距压到 4px/2px 内边距，长名字省略号截断（`.nm` 的 `min-width: 0`）——同屏能多放几个名字 |
 | 武器行 | 「自定义标签」与「档位」**二选一**：填了自定义词（如 `建议`）自动清空档位下拉，反之亦然；行首实时显示「显示为：X」 |
 | 武器 / 圣遗物行的 chip | 徽标**只留图标**（完整类型名在 `title` 里）、名字框**按内容自适应宽度**（`field-sizing: content`，不支持的浏览器由 `autoSizeInput` 兜底）—— 名字短占得少，一行就能多放一把 |
