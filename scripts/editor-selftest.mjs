@@ -278,6 +278,27 @@ push('配队：候选拆分', fn('memberCandidates')('迪奥娜 / 阿罗夏'), [
   push('副词条：主词条不加关系选择器', (ctx.__editor.multiValue('时之沙', 'v2.artifacts.0.stats.时之沙', ['攻击力', '元素精通'], 'x', '时之沙').match(/mv-sep/g) || []).length, 0)
 }
 
+/* 5d. 武器行：与副词条同一套关系规则（可自定义 `＞/≥/=`，默认 `＞`），条目排成**同一行** */
+{
+  const data = mkData({ weapons: [{ label: '辅助', tier: null, sep: ' ≥ ', items: [{ name: '甲枪', ref: 'weapon:甲枪' }, { name: '乙枪', ref: 'weapon:乙枪' }, { name: '丙枪', ref: 'weapon:丙枪' }] }] })
+  const model = ctx.__editor.internals.normalizeData(data)
+  api.setModelForTest(model)
+  push('武器行：读到逐档 token', ctx.__editor.rowSepTokens('v2.weapons.0', 3), ['≥', '≥'])
+  push('武器行：默认 token 是 `>`', ctx.__editor.normSepToken('随便写的'), '>')
+  push('武器行：把第 2 档改成 `=`', ctx.__editor.setWeaponSep('v2.weapons.0', 1, '='), true)
+  push('武器行：改后 sep 逐档规范化', model.v2.weapons[0].sep, ' ≥ = ')
+  push('武器行：把第 1 档改回优先级', ctx.__editor.setWeaponSep('v2.weapons.0', 0, '>'), true)
+  push('武器行：改后 sep', model.v2.weapons[0].sep, ' > = ')
+  push('武器行：越界的档改不动', ctx.__editor.setWeaponSep('v2.weapons.0', 5, '>'), false)
+  const html = ctx.__editor.internals.renderWeaponsHtml()
+  push('武器行：条目排在同一行（.weapon-line）', /class="mv weapon-line"/.test(html), true)
+  push('武器行：3 个条目 → 2 个关系选择器', (html.match(/class="mv-sep/g) || []).length, 2)
+  push('武器行：界面里没有 flex-wrap:wrap（不换行）', /flex-wrap:\s*wrap/.test(html), false)
+  const out2 = fn('toJson')()
+  push('武器行：落盘带上关系', (out2.v2.weapons[0] || {}).sep, ' > = ')
+  if (process.env.DBG_WEAPON) console.log('[DBG] toJson.v2.weapons = ' + JSON.stringify(out2.v2.weapons) + '\n[DBG] model.v2.weapons = ' + JSON.stringify(model.v2.weapons))
+}
+
 /* 6. 圣遗物行不再有「件数」输入（件数已从文档 / 数据 / 显示全部去掉） */
 {
   const data = mkData({ artifacts: [{ kind: 'preferred', label: '首选', sep: ' > ', sets: [{ name: '千岩牢固', ref: 'artifact:千岩牢固' }] }] })

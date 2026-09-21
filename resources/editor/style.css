@@ -382,7 +382,10 @@ textarea { resize: vertical; min-height: 54px; }
 
 /* ---------------------------------------------------------------- 多值输入 */
 
-.mv { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+/* 多值输入：**一行排开、不换行**（用户定稿 2026-09-21：换行太浪费纵向空间），窄了横向滚动。
+ * 武器行与圣遗物副词条行共用（见 app.js 的 sepSelect / multiValue）。 */
+.mv { display: flex; flex-wrap: nowrap; align-items: center; gap: 4px; overflow-x: auto; padding-bottom: 2px; }
+.weapon-line { margin-top: 2px; }
 
 .mv-chip {
   display: inline-flex;

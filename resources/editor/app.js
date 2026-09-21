@@ -884,19 +884,12 @@ function multiValue (label, path, values, placeholder, statKind) {
   // 唯一真相是行上的 `sep`（逐档 token，文档层符号 `>` / `≥` / `=`），这里按档渲染选择器；
   // 双爆那一档**锁死为 `=`**（编辑器与攻略图都不允许被覆盖）。
   var rowPath = isSub ? String(path).replace(/\.stats$/, '') : ''
-  var tokens = isSub ? subSepTokens(rowPath, list.length) : []
+  var tokens = isSub ? rowSepTokens(rowPath, list.length) : []
   var chips = list.map(function (v, i) {
     var sepCtl = ''
     if (isSub && i < list.length - 1) {
-      var locked = isCritPairValues(v, list[i + 1])
-      var cur = locked ? '=' : (tokens[i] || '>')
-      sepCtl = '<select class="mv-sep' + (locked ? ' mv-sep-locked' : '') + '"' +
-        ' data-sep-row="' + esc(rowPath) + '" data-sep-gap="' + i + '"' +
-        (locked ? ' disabled title="双爆固定为 =（不可修改）"' : ' title="这一格与下一格的优先级关系"') + '>' +
-        ['>', '≥', '='].map(function (t) {
-          return '<option value="' + esc(t) + '"' + (t === cur ? ' selected' : '') + '>' + SEP_GLYPH[t] + '</option>'
-        }).join('') +
-        '</select>'
+      // 双爆那一档锁死 `=`；其余按行上的 `sep` 渲染（默认 `>`＝优先级）
+      sepCtl = sepSelect(rowPath, i, tokens[i], isCritPairValues(v, list[i + 1]))
     }
     return '<span class="mv-chip">' +
       '<input type="text" class="mv-in" data-path="' + esc(path + '.' + i) + '" value="' + esc(v) + '"' +
@@ -933,11 +926,11 @@ function isCritPairValues (left, right) {
 }
 
 /**
- * 把行上的 `sep` 读成**逐档 token**（长度 = 档位数 - 1）。
+ * 把行上的 `sep` 读成**逐档 token**（长度 = 档位数 - 1）。武器行与副词条行同一套。
  * 仓库约定：全同分隔符写成**单个** token（`' > '` / `' / '`），混合写法才写成逐档（`' / > '`）；
  * 不足的档位按最后一个 token 补齐（与显示层的 `sepTokens` 同口径）。
  */
-function subSepTokens (rowPath, count) {
+function rowSepTokens (rowPath, count) {
   var gaps = Math.max(0, count - 1)
   var row = getPath(state.model, rowPath) || {}
   var raw = String(row.sep == null ? '' : row.sep).trim()
@@ -946,6 +939,8 @@ function subSepTokens (rowPath, count) {
   for (var i = 0; i < gaps; i++) out.push(toks[i] || toks[toks.length - 1] || '>')
   return out
 }
+/** 兼容旧名（副词条）：与 `rowSepTokens` 同一个实现 */
+function subSepTokens (rowPath, count) { return rowSepTokens(rowPath, count) }
 
 /** 逐档 token → 行上的 `sep` 字符串（全同 → 单 token，否则逐档拼接，两侧各一个空格） */
 function subSepCanonical (tokens) {
@@ -955,7 +950,30 @@ function subSepCanonical (tokens) {
   return ' ' + (allSame ? [list[0]] : list).join(' ') + ' '
 }
 
-/** 改某一档的优先级关系：写回 `sep`（双爆那一档忽略——它固定 `=`） */
+/** 归一一个 token：只认 `>` / `≥` / `=`（其余按默认 `>`，**默认就是优先级**） */
+function normSepToken (token) {
+  return token === '≥' ? '≥' : (token === '=' ? '=' : '>')
+}
+
+/**
+ * 逐档关系选择器（武器行与副词条行共用）。
+ * @param {string} rowPath 行路径（如 `v2.weapons.0` / `v2.artifacts.1`）
+ * @param {number} gap 第几档（两格之间的序号）
+ * @param {string} token 当前 token
+ * @param {boolean} locked 锁死（副词条的双爆档：固定 `=`，禁用）
+ */
+function sepSelect (rowPath, gap, token, locked) {
+  var cur = locked ? '=' : normSepToken(token)
+  return '<select class="mv-sep' + (locked ? ' mv-sep-locked' : '') + '"' +
+    ' data-sep-row="' + esc(rowPath) + '" data-sep-gap="' + gap + '"' +
+    (locked ? ' disabled title="双爆固定为 =（不可修改）"' : ' title="这一档与下一档的关系（默认 ＞）"') + '>' +
+    ['>', '≥', '='].map(function (t) {
+      return '<option value="' + esc(t) + '"' + (t === cur ? ' selected' : '') + '>' + SEP_GLYPH[t] + '</option>'
+    }).join('') +
+    '</select>'
+}
+
+/** 改某一档的关系：写回 `sep`（双爆那一档忽略——它固定 `=`） */
 function setSubSep (rowPath, gap, token) {
   var row = getPath(state.model, rowPath)
   if (!row) return false
@@ -964,8 +982,21 @@ function setSubSep (rowPath, gap, token) {
   if (gap < 0 || gap >= gaps) return false
   // 双爆固定 `=`：界面上不会改它，这里也挡一道，防止别处误写
   if (isCritPairValues(list[gap], list[gap + 1])) return false
-  var toks = subSepTokens(rowPath, list.length)
-  toks[gap] = token === '≥' ? '≥' : (token === '=' ? '=' : '>')
+  var toks = rowSepTokens(rowPath, list.length)
+  toks[gap] = normSepToken(token)
+  row.sep = subSepCanonical(toks)
+  return true
+}
+
+/** 武器行：改某一档的关系（默认 `>`＝优先级，没有锁死的档） */
+function setWeaponSep (rowPath, gap, token) {
+  var row = getPath(state.model, rowPath)
+  if (!row) return false
+  var list = asArray(row.items)
+  var gaps = Math.max(0, list.length - 1)
+  if (gap < 0 || gap >= gaps) return false
+  var toks = rowSepTokens(rowPath, list.length)
+  toks[gap] = normSepToken(token)
   row.sep = subSepCanonical(toks)
   return true
 }
@@ -1000,15 +1031,20 @@ function renderBasic () {
 function renderWeapons () {
   var s = state.model.v2
   var body = rowList('v2.weapons', s.weapons, function (row, i, p, rowId) {
-    var items = row.items.map(function (it, j) {
+    // 条目**排成同一行**（用户定稿 2026-09-21：一条一行太浪费空间），两两之间给关系选择器
+    // （`＞` 优先级 / `≥` 约等于 / `=` 同级，默认 `＞`；唯一真相是这一行的 `sep`，
+    //  与圣遗物副词条同一套规则）。窄了横向滚动，不换行。
+    var toks = rowSepTokens(p, (row.items || []).length)
+    var items = (row.items || []).map(function (it, j) {
       var q = p + '.items.' + j
       var prev = j > 0 ? row.items[j - 1] : null
-      return '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
+      return (j ? sepSelect(p, j - 1, toks[j - 1], false) : '') +
+        '<span class="mv-chip">' +
         refField('weapon', it.name, q + '.name') +
         '<input type="text" class="w-sm" data-path="' + q + '.note" value="' + esc(it.note) + '" placeholder="备注（如 精5）">' +
-        (prev ? actBtn('copy-prev', q + '.name', '⧉ 上一条', 'btn mini', '复制上一条的武器名' + (prev.name ? '（' + prev.name + '）' : '')) : '') +
+        (prev ? actBtn('copy-prev', q + '.name', '⧉', 'btn mini', '复制上一条的武器名' + (prev.name ? '（' + prev.name + '）' : '')) : '') +
         actBtn('del-item', p + '.items', '×', 'row-del', '删除这个条目', j) +
-        '</div>'
+        '</span>'
     }).join('')
     return '<div class="box"' + rowAttr(rowId) + '>' +
       '<div class="box-head">' +
@@ -1022,8 +1058,8 @@ function renderWeapons () {
       actBtn('move-row-down', 'v2.weapons', '↓', 'btn mini', '下移', i) +
       actBtn('del-row', 'v2.weapons', '删除行', 'btn mini danger', '删除这一行', i) +
       '</div>' +
-      '<div class="sub-list">' + (items || '<div class="muted" style="font-size:12px">还没有条目</div>') + '</div>' +
-      '<div style="margin-top:6px">' + actBtn('add-item', p + '.items', '＋ 条目', 'btn mini') + '</div>' +
+      '<div class="mv weapon-line">' + (items || '<span class="muted" style="font-size:12px">还没有条目</span>') +
+      actBtn('add-item', p + '.items', '＋ 条目', 'mv-add') + '</div>' +
       '</div>'
   }, '武器行')
   return card('武器推荐', s.weapons.length + ' 行', body, true)
@@ -1835,6 +1871,9 @@ function buildBody () {
     // 自定义标签与档位**互斥**：文档一行只有一个标签词（label 非空 → 文档写 `建议：`，
     // 写不进「第N档」）。输入时已联动清空，这里是保存前的兜底，防止手工改过 JSON 的行带进来。
     out.tier = out.label ? null : row.tier
+    // 条目之间的关系（`＞` / `≥` / `=`）**必须显式提交**：唯一真相是行上的 `sep`。
+    // 以前这里不提交，于是编辑器里改了关系也存不下来（用户报：「武器之间存在异常 ≥」改不掉）。
+    out.sep = hasText(row.sep) ? row.sep : ' > '
     out.items = row.items.filter(function (it) { return hasText(it.name) }).map(function (it) {
       // `note` 显式提交（清空就提交 null）：否则「清掉一条备注」会被原文件顶回来
       return { name: it.name.trim(), note: hasText(it.note) ? it.note.trim() : null, ref: 'weapon:' + it.name.trim() }
@@ -2499,17 +2538,20 @@ function formEvents () {
     handleAction(act, path, i, el)
   })
 
-  // 副词条优先级关系（两格之间的 `＞ / ≥ / =`）：写回行的 `sep`，重绘让预览同步
+  // 关系选择器（武器行 / 副词条行共用）：写回行的 `sep`，重绘让预览同步
   form.addEventListener('change', function (e) {
     var el = e.target
     if (!el || !el.getAttribute || el.getAttribute('data-sep-row') == null) return
     var rowPath = el.getAttribute('data-sep-row')
     var gap = Number(el.getAttribute('data-sep-gap'))
-    if (setSubSep(rowPath, gap, el.value)) {
+    var isWeapon = /^v2\.weapons\.\d+$/.test(rowPath)
+    var ok = isWeapon ? setWeaponSep(rowPath, gap, el.value) : setSubSep(rowPath, gap, el.value)
+    if (ok) {
       markDirty(true)
       renderForm()
       var row = getPath(state.model, rowPath) || {}
-      showStatus('已更新副词条关系：' + subSepTokens(rowPath, asArray(row.stats).length)
+      var count = isWeapon ? asArray(row.items).length : asArray(row.stats).length
+      showStatus('已更新关系：' + rowSepTokens(rowPath, count)
         .map(function (t) { return SEP_GLYPH[t] || t }).join(' '), 'ok')
     }
   })
@@ -3295,6 +3337,10 @@ window.__editor = {
   // 副词条优先级关系（供自动化检查：逐档 token 读写、双爆锁死）
   SEP_GLYPH: SEP_GLYPH,
   subSepTokens: subSepTokens,
+  rowSepTokens: rowSepTokens,
+  sepSelect: sepSelect,
+  setWeaponSep: setWeaponSep,
+  normSepToken: normSepToken,
   subSepCanonical: subSepCanonical,
   setSubSep: setSubSep,
   isCritPairValues: isCritPairValues,
@@ -3331,6 +3377,7 @@ window.__editor = {
     renderForm: renderForm,
     renderList: renderList,
     renderTeamsHtml: renderTeamsHtml,
+    renderWeaponsHtml: renderWeapons,
     handleAction: handleAction,
     applyRef: applyRef,
     constellationIndex: constellationIndex,
