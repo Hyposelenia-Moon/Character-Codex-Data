@@ -192,16 +192,19 @@ code {
 
 .list { overflow: auto; flex: 1 1 auto; padding-right: 2px; }
 
+/* 角色目录：一行 = 名字 + 右侧「未填：武 圣」。行距与内边距都压过，同屏能多放几个名字；
+ * `.nm` 必须 `min-width: 0`，否则 flex 里它不肯收缩，长名字会把右侧提示挤出可视区。 */
 .list-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
-  padding: 6px 9px;
-  margin-bottom: 3px;
+  gap: 8px;
+  padding: 4px 8px;
+  margin-bottom: 2px;
   border: 1px solid transparent;
-  border-radius: var(--radius);
+  border-radius: 8px;
   cursor: pointer;
+  line-height: 1.5;
 }
 
 .list-item:hover { background: #f5f7fb; }
@@ -212,8 +215,9 @@ code {
   font-weight: 600;
 }
 
-.list-item .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.list-item .meta { flex: 0 0 auto; font-size: 11px; color: var(--text-soft); }
+.list-item .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list-item .meta { flex: 0 0 auto; font-size: 11px; color: var(--text-soft); white-space: nowrap; }
+.list-item .meta .unfilled { color: var(--text-soft); }
 .list-item .meta .un { color: var(--warn); }
 
 .side-foot { flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding-top: 10px; }
@@ -323,19 +327,31 @@ code {
 .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 
+/* 表单控件统一 13px（正文 14px、提示 12px）：以前面板行自己写 12px，比别的控件小一圈，
+ * 用户报「文字 UI 很乱」。占位提示也按 13px 估算宽度，别让 placeholder 被截断。 */
 input[type="text"], input[type="search"], select, textarea {
   width: 100%;
   padding: 6px 8px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
   font: inherit;
+  font-size: 13px;
   background: #fff;
   color: var(--text);
 }
 
-input.w-sm { max-width: 130px; }
+/* 行首的「标签 / 档位」这类短字段：130px 足够装下现在的短提示（提示文字太长会显示成
+ * 「标签（可空，如 输」这种半截话，所以提示词也一并改短、长解释放 title） */
+input.w-sm, select.w-sm { max-width: 130px; }
+/* 武器条目里的「备注」：只要装得下 `精5` / `满精` 这种两三字（宽了会把一行三件武器挤到滚动） */
+input.w-note { max-width: 88px; }
 input.w-xs { max-width: 82px; }
 textarea { resize: vertical; min-height: 54px; }
+
+/* 图标按钮（行尾删除）：只有图形，文案在 title 里 —— 每行四个文字按钮会把输入框挤窄 */
+.btn .ico { width: 13px; height: 13px; display: block; }
+.btn.ico-only { padding: 3px 5px; line-height: 0; color: var(--text-soft); }
+.btn.ico-only:hover { color: var(--danger); }
 
 /* ------------------------------------------------- 引用输入（带类型徽标） */
 
@@ -357,11 +373,19 @@ textarea { resize: vertical; min-height: 54px; }
 }
 
 .ref-field .badge-icon { font-size: 11px; }
+/* 武器 / 圣遗物行里的 chip：徽标只留图标（`badge-mini`）—— 一排好几个 chip，每个短 20px
+ * 就能多放一把（用户定稿：「下方左边的 chip 缩短」）。完整类型名在 title 里。 */
+.ref-field .badge-mini { width: 24px; padding: 0 3px; }
 .ref-field input {
   border-radius: 0 var(--radius) var(--radius) 0;
   border-left: none;
   min-width: 90px;
 }
+
+/* 武器行「放得下几把」的提示（行头里的小灰字，渲染后由 app.js 的 refreshFitHints 填） */
+.fit-hint { font-size: 12px; color: var(--text-soft); }
+.fit-hint.dim { color: var(--text-dim); }
+.fit-hint.warn { color: var(--warn); }
 
 .ref-field .badge.weapon { background: #c05621; }
 .ref-field .badge.artifact { background: #6b46c1; }
@@ -384,13 +408,16 @@ textarea { resize: vertical; min-height: 54px; }
 
 /* 多值输入：**一行排开、不换行**（用户定稿 2026-09-21：换行太浪费纵向空间），窄了横向滚动。
  * 武器行与圣遗物副词条行共用（见 app.js 的 sepSelect / multiValue）。 */
-.mv { display: flex; flex-wrap: nowrap; align-items: center; gap: 4px; overflow-x: auto; padding-bottom: 2px; }
+.mv { display: flex; flex-wrap: nowrap; align-items: center; gap: 3px; overflow-x: auto; padding-bottom: 2px; }
 .weapon-line { margin-top: 2px; }
 
 .mv-chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  /* 不参与收缩：`.mv` 是 flex，默认 `flex-shrink:1` 会把芯片压到装不下里面的输入框
+   * （实测提示文字被截成「如 双爆 / 大攻」）。窄了就按行滚动，用户定稿要的就是不换行。 */
+  flex: 0 0 auto;
   padding: 2px 4px 2px 8px;
   background: #eef2f9;
   border: 1px solid var(--line);
@@ -420,7 +447,32 @@ textarea { resize: vertical; min-height: 54px; }
 }
 
 .mv-add:hover { border-color: var(--accent); color: var(--accent); }
-.mv input { min-width: 120px; }
+/* 芯片里输入框的宽度必须在**这里**定：全局 `input[type="text"] { width: 100%; padding: 6px 8px;
+ * background: #fff; border: 1px solid }` 的优先级（0,1,1）比 `.mv-in`（0,1,0）高，不覆盖的话
+ * 浏览器按默认 `size=20` 给它们 ~178px（一行三件武器就溢出 143px），左右各多 8px 内边距把
+ * 提示文字挤掉（`如 双爆 / 大攻击` 需要 95px，只剩 86px），芯片里还多出一个白底带框的方块。
+ *
+ * 宽度是**抠着量出来的**：1440px 窗口（表单可用 1048px）下，一行三件武器的芯片 337px × 2 + 307
+ * 会溢出 46px 出横向滚动条；把武器名收到 110px、备注收到 76px 才正好放下。 */
+.mv .mv-in {
+  /* 与武器 / 套装名一样**由浏览器按内容定宽**（`field-sizing: content`）：
+   * 自己用 span 量再写死宽度时，最后总会差一两个字（实测「元素充能效率」被裁成「元素充能效」）。
+   * 上限 150px；下限 56px —— 空 chip 的提示词也按这个下限写短（`双爆` / `攻击力`）。 */
+  field-sizing: content;
+  width: auto;
+  min-width: 56px;
+  max-width: 150px;
+  padding: 1px 0;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+}
+.mv .ref-field input { field-sizing: content; width: auto; min-width: 58px; max-width: 260px; }
+.mv .w-note { field-sizing: content; width: auto; min-width: 46px; max-width: 88px; }
+/* 主词条三槽是 **grid 里的小格子**（每格 ~340px）：一格放 3 个候选就必然放不下，
+ * 让它换行（槽内候选之间没有分隔符，换行不会出现「孤立的 ＞」）。武器行 / 副词条行仍是
+ * 「不换行 + 横向滚动」（用户定稿）。 */
+.mv.mv-wrap { flex-wrap: wrap; overflow-x: visible; row-gap: 4px; }
 
 /* 主词条 / 副词条的**可编辑** chip：输入框 + 「▾」候选 + 「×」
    （以前 chip 只是纯文本，点「＋」加进来根本没法填 / 没法选 —— 用户报过） */
@@ -429,7 +481,8 @@ textarea { resize: vertical; min-height: 54px; }
   background: transparent;
   font: inherit;
   color: inherit;
-  width: 7.5em;
+  /* 8em（≈104px）：装得下「如 双爆 / 大攻击」这个提示，也读得全 `元素充能效率` */
+  width: 8em;
   min-width: 4em;
   padding: 1px 0;
   outline: none;
@@ -443,13 +496,21 @@ textarea { resize: vertical; min-height: 54px; }
 .mv-sep {
   appearance: none;
   -webkit-appearance: none;
+  /* 符号选择器不许被压扁：`.mv` 是 flex，窄的时候会把它们挤成一条缝（实测 8px）。
+   * `width:auto` 也是必须的 —— 全局有 `select { width: 100% }`，配上 `flex:0 0 auto`
+   * 会让每一个选择器都撑满整行（实测一行溢出 2361px）。 */
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: #fff;
+  /* 自带一个小箭头：`appearance:none` 之后它看起来就是个普通小方块，看不出能点 */
+  background: #fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'><path d='M1.2 2.8 4 5.6 6.8 2.8' fill='none' stroke='%236b7686' stroke-width='1.2' stroke-linecap='round'/></svg>") no-repeat right 3px center;
+  background-size: 8px 8px;
   color: #2f2f2f;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1;
-  padding: 2px 4px;
+  padding: 2px 13px 2px 5px;
   cursor: pointer;
 }
 .mv-sep:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
@@ -472,13 +533,13 @@ textarea { resize: vertical; min-height: 54px; }
 .member .ref-field .badge { width: 34px; }
 .member .ref-field input { border: none; background: transparent; padding: 3px 4px; min-width: 84px; }
 .member .member-note {
-  width: 48px;
+  width: 56px;
   min-width: 0;
   border: none;
   border-left: 1px solid var(--line);
   background: transparent;
   padding: 3px 2px 3px 6px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-dim);
 }
 .member .member-note:focus { color: var(--text); outline: none; }
@@ -807,7 +868,7 @@ textarea { resize: vertical; min-height: 54px; }
   color: var(--text-dim);
   font: inherit;
   font-size: 11px;
-  padding: 0 5px;
+  padding: 0 3px;
   cursor: pointer;
 }
 .pick-btn:hover { background: var(--accent-soft); color: var(--accent); }
@@ -908,3 +969,49 @@ textarea { resize: vertical; min-height: 54px; }
 }
 .member .member-name:hover { color: var(--accent); text-decoration: underline; }
 .member { cursor: grab; }
+
+/* 面板模块：一行两个控件（属性下拉 + 数值输入），不换行；百分比属性的数值框用虚线边标出「会自动补 %」。
+ *
+ * ⚠ 顶部全局有 `input[type="text"], input[type="search"], select, textarea { width: 100% }`
+ *   （第 326 行），它是**属性选择器**（0,1,1），比单独的 `.mv-in`（0,1,0）更优先：
+ *   不在这里覆盖回来，两个控件就会各占半行；下拉的 `appearance:none` 还会把箭头吃掉 ——
+ *   用户看到的是一个「看不出是下拉」的长条（实测各 521px / 523px，见 .dsh/probe-panel-module-html.mjs）。 */
+.panel-line .mv-attr {
+  /* 保留原生下拉箭头：属性必须一眼看出是「可选的」 */
+  appearance: auto;
+  -webkit-appearance: auto;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 124px;
+  max-width: 156px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: #fff;
+  color: #2f2f2f;
+  font-size: 13px;
+  line-height: 16px;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+.panel-line .mv-attr:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+/* 数值框：与「攻击力 / 暴击率」下拉差不多长就够（以前 320px，写 `70%` 时右边一大片空白）。
+ * `field-sizing: fixed`：这里**不**按内容自适应（数值框要稳定好点、好对照）。 */
+.panel-line .mv-in {
+  field-sizing: fixed;
+  flex: 0 0 auto;
+  width: 200px;
+  min-width: 140px;
+  max-width: 200px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: #fff;
+  font-size: 13px;
+  line-height: 16px;
+  padding: 4px 8px;
+}
+.panel-line .mv-in:focus { background: #fff; border-radius: 6px; box-shadow: 0 0 0 2px var(--accent-soft); }
+.panel-line .mv-pct { border-style: dashed; }
+
+/* 一行小字提示（多值输入下面）：12px、灰、不抢视线 */
+.mv-hint { font-size: 12px; display: block; margin-top: 3px; }
+.mv-hint code { font-size: 12px; }

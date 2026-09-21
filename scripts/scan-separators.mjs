@@ -32,6 +32,10 @@ const hits = []
 const critHits = []
 /** 名字里含条目分隔符（`/`、`／`、`｜`）的条目 —— 这类名字写回文档后再解析会被切成两条 */
 const nameHits = []
+/** 名字里含反斜杠（`A\B\C`）的条目 —— 不破坏往返（`\` 不是文档分隔符），但面板 / 网页版会把整串
+ *  当成**一个**武器名，图鉴取不到图标。瓦雷莎 / 哥伦比娅 的数据里有这种写法，这里只列出来提醒，
+ *  **不影响退出码**。 */
+const slashNameHits = []
 /**
  * 主词条 / 副词条里**括注没写在值末尾**（`防御力（华馆）x` 这种）。
  * 用户定稿：括注统一写在值里、且只跟在**那个值的末尾**（`防御力（特殊）`）；
@@ -80,12 +84,14 @@ for (const f of files) {
     for (const it of (w.items ?? [])) {
       const nm = String(it?.name ?? '')
       if (/[/／｜]/.test(nm)) nameHits.push(`${name} 武器「${nm}」`)
+      if (nm.includes('\\')) slashNameHits.push(`${name} 武器「${nm}」`)
     }
   }
   for (const a of (d.v2?.artifacts ?? [])) {
     for (const st of (a.sets ?? [])) {
       const nm = String(st?.name ?? '')
       if (/[/／｜]/.test(nm)) nameHits.push(`${name} 套装「${nm}」`)
+      if (nm.includes('\\')) slashNameHits.push(`${name} 套装「${nm}」`)
     }
     // 主词条 / 副词条：括注必须在**值末尾**（`防御力（特殊）`）
     const lists = a.kind === 'main' ? Object.values(a.stats ?? {})
@@ -122,6 +128,11 @@ if (process.argv.includes('--json')) {
   } else {
     console.log(`[!] 名字里含条目分隔符的条目：${nameHits.length} 处（写回文档会被切成两条 → 往返不一致）`)
     for (const h of nameHits.slice(0, 20)) console.log(`  · ${h}`)
+  }
+  if (slashNameHits.length) {
+    console.log(`[!] 名字里有反斜杠的条目：${slashNameHits.length} 处（` +
+      '面板 / 网页版会把整串当成一个名字，图鉴取不到图标；要拆成多条请用 `/` 或 `>`）')
+    for (const h of slashNameHits.slice(0, 10)) console.log(`  · ${h}`)
   }
   if (!parenHits.length) {
     console.log('主词条 / 副词条括注位置（只许在值末尾）：0 处问题 ✅')

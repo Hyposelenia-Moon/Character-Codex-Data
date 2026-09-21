@@ -18,7 +18,12 @@ const tmp = path.join(root, '.tmp', 'diagnose')
 const readJson = (f) => JSON.parse(fs.readFileSync(f, 'utf8').replace(/^\uFEFF/, ''))
 const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b)
 
-/** 找出两个值的第一处不同路径 */
+/**
+ * 找出两个值的第一处不同路径。
+ * ⚠ 调用方传的是 `firstDiff(want, got)`，其中 `want` = **数据 JSON**、`got` = **文档解析结果**
+ * （见文件末尾的 `firstDiff(want[k], got[k], k)`）—— 标签必须与实参方向一致，
+ * 否则报错信息会把「该改文档」说成「该改数据」，正好把修复方向指反。
+ */
 function firstDiff (a, b, pathStr = '') {
   if (eq(a, b)) return null
   const isObj = (x) => x && typeof x === 'object'
@@ -42,7 +47,7 @@ function firstDiff (a, b, pathStr = '') {
     }
     return `${pathStr} 对象键不同`
   }
-  return `${pathStr}: 文档=${JSON.stringify(a).slice(0, 80)} ≠ JSON=${JSON.stringify(b).slice(0, 80)}`
+  return `${pathStr}: 数据=${JSON.stringify(a).slice(0, 80)} ≠ 文档=${JSON.stringify(b).slice(0, 80)}`
 }
 
 console.log(`主文档：${docx}`)

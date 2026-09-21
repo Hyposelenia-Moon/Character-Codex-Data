@@ -149,6 +149,87 @@ var STAT_CANDIDATES = {
 /** 主词条槽位 → datalist id */
 var STAT_LIST_ID = { 时之沙: 'dl-stat-sand', 空之杯: 'dl-stat-goblet', 理之冠: 'dl-stat-circlet', 副词条: 'dl-stat-sub' }
 
+/* ---------------------------------------------------------- 面板模块（毕业面板参考）
+ * 用户定稿 2026-09-21：一行就是**两个控件** —— 属性（下拉）+ 数值（输入，按属性自动补 `%`）。
+ * 属性只认这七种；数值**不带尾部的 `+`**（迁移时统一清掉）。
+ */
+var PANEL_ATTRS = ['攻击力', '防御力', '生命值', '暴击率', '暴击伤害', '元素精通', '元素充能效率']
+/** 百分比属性：数值自动补 `%` */
+var PANEL_PCT_ATTRS = { 暴击率: 1, 暴击伤害: 1, 元素充能效率: 1 }
+/** 历史写法 → 面板属性词（与显示层的 STAT_ALIASES 同口径） */
+var PANEL_ATTR_ALIAS = {
+  充能: '元素充能效率', 充能效率: '元素充能效率', 元素充能: '元素充能效率', 充能沙: '元素充能效率',
+  爆伤: '暴击伤害', 暴伤: '暴击伤害', 精通: '元素精通', 攻击: '攻击力', 生命: '生命值', 防御: '防御力'
+}
+/** 数值候选（datalist，只是输入提示，不校验、不改写） */
+var PANEL_VALUE_HINTS = {
+  攻击力: ['1500', '2000', '2200', '2400', '2600', '3000'],
+  防御力: ['1500', '2000', '2400', '2600', '3000'],
+  生命值: ['20000', '25000', '30000', '35000', '40000'],
+  暴击率: ['50%', '60%', '70%', '80%', '90%'],
+  暴击伤害: ['120%', '150%', '180%', '200%', '220%'],
+  元素精通: ['200', '400', '600', '800', '1000'],
+  元素充能效率: ['120%', '140%', '160%', '180%', '200%', '220%', '240%']
+}
+
+/** 属性名归一：历史写法 → 七种之一；认不出来返回空串 */
+function panelAttrOf (raw) {
+  var t = String(raw == null ? '' : raw).trim()
+  if (!t) return ''
+  if (PANEL_ATTRS.indexOf(t) >= 0) return t
+  return PANEL_ATTR_ALIAS[t] || ''
+}
+/** 这个属性是不是百分比 */
+function isPanelPct (attr) { return !!PANEL_PCT_ATTRS[String(attr || '')] }
+/** 数值归一：去掉尾部 `+`；百分比属性补 `%`（已经有 `%` 就不重复）
+ *
+ * `+` 后面只跟一个括号备注时（`800+（非讨龙）`）那个 `+` 也算「尾部的 +」——
+ * 与 `.dsh/migrate-panels.mjs` 的迁移规则同一口径，否则「打开老数据 → 编辑 → 保存」
+ * 会把已经清掉的 `+` 又留下来。
+ */
+function normPanelValue (attr, raw) {
+  var t = String(raw == null ? '' : raw).trim()
+  var m = t.match(/^(.*?)\s*[+＋]+\s*([（(][^）)]*[）)])\s*$/)
+  if (m) t = m[1] + m[2]
+  t = t.replace(/[+＋]+$/, '').trim()
+  if (!t) return ''
+  if (!isPanelPct(attr)) return t
+  return /%/.test(t) ? t : t + '%'
+}
+/**
+ * 从「属性：数值」形态的文本里认出面板行（老数据与文档层回读都可能长这样）：
+ *   `暴击率：70%` / `充能240%` / `宗室：元素充能效率：160%`（带标签的写法）
+ * @returns {{label: string, k: string, v: string}|null}
+ */
+function parsePanelStat (text) {
+  var t = String(text == null ? '' : text).trim()
+  if (!t) return null
+  var two = t.match(/^([^：:]{1,12})[:：]\s*([^：:]{1,8})[:：]\s*(\d[^：:]*)$/)
+  if (two) {
+    var a2 = panelAttrOf(two[2])
+    if (a2) return { label: two[1].trim(), k: a2, v: normPanelValue(a2, two[3]) }
+  }
+  var one = t.match(/^([^：:0-9]{1,8})\s*[:：]?\s*(\d[^：:]*)$/)
+  if (one) {
+    var a1 = panelAttrOf(one[1])
+    if (a1) return { label: '', k: a1, v: normPanelValue(a1, one[2]) }
+  }
+  return null
+}
+/**
+ * 面板行是不是「说明行」——渲染与「改成说明行 / 属性+数值」按钮**共用同一个判据**。
+ *
+ * 判据：没有属性、但确实写着文本（老数据里的 `标签：说明`），或者用户点过「改成说明行」
+ * （`_text`，界面临时标记，落盘时不带）。反之，**刚加出来的空行（`_new`）没有属性也没有文本
+ * ⇒ 直接按「属性 + 数值」两控件渲染**；以前这里只看「有没有 k」，新行会变成一个文本框，
+ * 用户看到的就是「新增行没按新格式激活」。
+ */
+function panelRowIsText (row) {
+  if (!row || typeof row !== 'object') return false
+  if (row._text === true) return true
+  return !hasText(row.k) && hasText(row.text)
+}
+
 var state = {
   index: { weapons: [], artifacts: [], characters: [], talents: [], constellations: [] },
   order: [],
@@ -370,6 +451,11 @@ function normalizeData (data) {
           row.stats = asArray(r && r.stats).map(str)
         } else if (kind === 'text') {
           row.text = str(r && r.text)
+        } else if (kind === 'note') {
+          // 段末备注行（文档里渲染成 `注：…`）：**只带 text**。
+          // 以前漏了这一档，`note` 掉进下面的档位行分支（只有 sets、没有 text），
+          // 表单里既没有可填的框、保存时 `buildBody` 又把 text 丢掉 —— 静默丢数据。
+          row.text = str(r && r.text)
         } else {
           row.sets = asArray(r && r.sets).map(function (s) { return { name: str(s && s.name), pieces: str(s && s.pieces) } })
         }
@@ -398,8 +484,24 @@ function normalizeData (data) {
         }
       })),
       panels: asArray(v2.panels).map(function (r) {
-        if (r && hasText(str(r.k))) return { label: str(r.label), k: str(r.k), v: str(r.v) }
-        return { label: str(r && r.label), text: str(r && r.text) }
+        // ① 已经是键值对：把「键」归一到面板属性词表，数值也**当场归一**（去尾部 `+`、补 `%`）——
+        //    落盘（buildBody）本来就归一，界面不归一就会「输入框里还是 `240%+`、预览里已是 `240%`」
+        if (r && hasText(str(r.k))) {
+          var kk = panelAttrOf(r.k) || str(r.k)
+          return { label: str(r.label), k: kk, v: normPanelValue(kk, str(r.v)) }
+        }
+        var text = str(r && r.text)
+        // ② 说明行里若写着「属性：数值」（含带标签的两冒号写法），也当成结构化面板行编辑
+        var stat = parsePanelStat(text)
+        if (stat) {
+          return {
+            label: hasText(str(r && r.label)) ? str(r.label) : stat.label,
+            k: stat.k,
+            v: stat.v
+          }
+        }
+        // ③ 认不出来的就是真正的说明行
+        return { label: str(r && r.label), text: text }
       }),
       constellations: asArray(v2.constellations).map(function (r) {
         return { name: str(r && r.name), text: str(r && r.text) }
@@ -453,7 +555,9 @@ function setPath (obj, path, value) {
 /* ============================================================ HTTP */
 
 function api (method, url, body) {
-  var opts = { method: method, headers: {} }
+  // `X-Codex-Editor` 是服务端的**跨站防护**要求：跨站请求设不了自定义头（预检我们一律不回
+  // CORS 头），所以这一行同时挡住了「别的网页打本机端口改数据」。同源请求不会因此触发预检。
+  var opts = { method: method, headers: { 'X-Codex-Editor': '1' } }
   if (body !== undefined) {
     opts.headers['Content-Type'] = 'application/json; charset=utf-8'
     opts.body = JSON.stringify(body)
@@ -631,9 +735,13 @@ function modal (opts) {
  *
  * ⚠ 名字里**不能含 `/`、`／`、`｜`**：这些是文档里的条目分隔符，写回文档后再解析会被
  * 切成两条（`88爆伤/44暴击武器` → `88爆伤` + `44暴击武器`），往返立刻不一致 —— 所以这里打警告。
+ *
+ * `opts.compact`：徽标只留图标（不写「武器」/「圣遗物」两个字）—— 武器 / 圣遗物行里一排
+ * 好几个 chip，徽标每短 20px，一行就能多放一把（用户定稿：「下方左边的 chip 缩短」）。
  */
-function refField (kind, value, path) {
+function refField (kind, value, path, opts) {
   var k = REF_KINDS[kind]
+  var compact = !!(opts && opts.compact)
   var ref = kind + ':' + str(value).trim()
   var issue = state.issueMap[ref]
   var name = str(value).trim()
@@ -645,7 +753,8 @@ function refField (kind, value, path) {
     : '') + sepHit
   return '<span class="ref-wrap">' +
     '<span class="ref-field">' +
-    '<span class="badge ' + kind + '" title="' + esc(k.text) + '"><span class="badge-icon">' + k.icon + '</span>' + esc(k.text) + '</span>' +
+    '<span class="badge ' + kind + (compact ? ' badge-mini' : '') + '" title="' + esc(k.text) + '">' +
+    '<span class="badge-icon">' + k.icon + '</span>' + (compact ? '' : esc(k.text)) + '</span>' +
     '<input type="text" list="' + k.list + '" value="' + esc(value) + '" data-path="' + esc(path) + '" data-ref-kind="' + kind + '">' +
     '</span>' + warn +
     '<button type="button" class="pick-btn" data-pick="' + kind + '" data-path="' + esc(path) + '" title="从名称库选（可搜索 / 拼音首字母）">▾</button>' +
@@ -739,11 +848,144 @@ function selectBox (path, value, options, cls) {
 
 /* 档位标签统一用上面那份 tierLabel（1/2/3 → 推荐/可选/过渡），这里不再重复定义 */
 
-/** 结构按钮：data-act + data-path + data-i 由事件委托处理 */
-function actBtn (act, path, text, cls, title, index) {
+/** 结构按钮：data-act + data-path + data-i 由事件委托处理
+ *  `opts.raw` = text 是**内联 SVG**（图标按钮），不要再转义
+ */
+function actBtn (act, path, text, cls, title, index, opts) {
+  var raw = !!(opts && opts.raw)
   return '<button type="button" class="' + (cls || 'btn mini') + '" data-act="' + act + '" data-path="' + esc(path) + '"' +
     (index === undefined ? '' : ' data-i="' + index + '"') +
-    (title ? ' title="' + esc(title) + '"' : '') + '>' + esc(text) + '</button>'
+    (title ? ' title="' + esc(title) + '"' : '') + '>' + (raw ? text : esc(text)) + '</button>'
+}
+
+/** 垃圾桶图标（与顶栏「删除」同一个图形；界面上不放 emoji，游戏内 webview 渲染不一致） */
+var ICO_TRASH = '<svg class="ico" viewBox="0 0 16 16" aria-hidden="true">' +
+  '<path d="M3.5 4.5h9M6.5 4.5V3h3v1.5M5 4.5l.6 8.2h4.8L11 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>'
+
+/** 行尾「删除这一行」：**图标**（文案只在 title 里）—— 每行挂四个文字按钮会把输入框挤窄 */
+function delRowBtn (path, index) {
+  return actBtn('del-row', path, ICO_TRASH, 'btn mini danger ico-only', '删除这一行', index, { raw: true })
+}
+
+/* ------------------------------------------------- 芯片宽度自适应 / 「放得下几把」 */
+
+/** 输入框按内容自适应时的上下限（px）：武器名、备注、词条 chip
+ *  · 下限就是「放得下两三个字」，上限跟 CSS 的 max-width 对齐（`.w-note` 是 88） */
+var FIT_MIN = { name: 58, note: 46, stat: 56 }
+var FIT_MAX = { name: 260, note: 88, stat: 150 }
+/** 空 chip 的提示词要装得进 `FIT_MIN.stat`（56px ≈ 4 个汉字），所以只写最短的示例 */
+var SLOT_PLACEHOLDER = { 时之沙: '攻击力', 空之杯: '元素伤害', 理之冠: '暴击率' }
+/** 武器行「同级」最多几把（用户定稿 2026-09-21：上限 4 把，名字长了就只放得下 3 把） */
+var WEAPON_ROW_CAP = 4
+
+/** 量文本宽度的隐藏 span（用**控件自己的字体**量真实渲染宽度：canvas 的 font 串一旦不被
+ *  识别就会默默沿用上一次的字体，量出来偏小 → 输入框偏窄、文字被裁） */
+var _measureSpan = null
+function measureTextWidth (el, text) {
+  var s = String(text == null ? '' : text)
+  var d = el && el.ownerDocument
+  if (!d || !d.body) return s.length * 13
+  if (!_measureSpan || _measureSpan.ownerDocument !== d) {
+    _measureSpan = d.createElement('span')
+    _measureSpan.style.cssText = 'position:absolute;left:-9999px;top:-9999px;white-space:pre;visibility:hidden'
+    d.body.appendChild(_measureSpan)
+  }
+  var cs = styleOf(el)
+  if (cs) {
+    _measureSpan.style.font = cs.font || [cs.fontStyle, cs.fontWeight, cs.fontSize, cs.fontFamily].join(' ')
+    _measureSpan.style.letterSpacing = cs.letterSpacing || 'normal'
+  }
+  _measureSpan.textContent = s
+  return _measureSpan.getBoundingClientRect().width
+}
+
+function styleOf (el) {
+  try { return window.getComputedStyle ? window.getComputedStyle(el) : null } catch (e) { return null }
+}
+
+/** 浏览器是否支持 `field-sizing: content`（Chromium 123+）：支持就让**浏览器自己**按内容算宽度，
+ *  比我们用 span 量再写死更准（实测自己算会差几个像素，长武器名的最后一两个字会被裁掉）。 */
+var _fieldSizing = null
+function supportsFieldSizing () {
+  if (_fieldSizing === null) {
+    try {
+      _fieldSizing = !!(window.CSS && window.CSS.supports && window.CSS.supports('field-sizing', 'content'))
+    } catch (e) { _fieldSizing = false }
+  }
+  return _fieldSizing
+}
+
+/**
+ * 让输入框**贴着内容**收缩：短名字占得少，一行就放得下更多把。
+ * 提示文字（placeholder）也算进去 —— 否则框一窄，占位提示就被截成半句话。
+ * 支持 `field-sizing` 的浏览器由 CSS 兜（这里就不写死宽度，免得把自适应顶掉）。
+ */
+function autoSizeInput (el, min, max) {
+  if (!el || !el.style) return 0
+  if (supportsFieldSizing()) return 0   // 交给 CSS 的 `field-sizing: content`（更准）
+  var cs = styleOf(el)
+  var pad = cs ? (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) : 16
+  var val = String(el.value == null ? '' : el.value)
+  // 有内容就按内容算；空的才按提示文字算（填了字的框里看不到 placeholder，不该被它撑宽）
+  var need = val
+    ? measureTextWidth(el, val)
+    : measureTextWidth(el, (el.getAttribute && el.getAttribute('placeholder')) || '')
+  var w = Math.min(max, Math.max(min, Math.ceil(need + pad + 6)))
+  el.style.width = w + 'px'
+  return w
+}
+
+/**
+ * 一行里**放得下几把**（纯计算，自检直接断言这个函数）。
+ *
+ * 行内子元素顺序：`chip [sep chip]… ＋add`，`.mv` 的 gap 每个间隔都算一份。
+ * 提示口径就是用户定稿的那两句：**放得下 4 把 → `可加入 4 把`**、
+ * **放不下 → `仅可加入 N 把`**（名字长了就只放得下 3 把）。
+ * @param {{avail:number, chipWidths:number[], candidateWidth:number, sepWidth:number, addWidth:number, gap:number, cap:number}} m
+ * @returns {{maxFit:number, fitsNext:boolean, over:boolean, hint:string}}
+ */
+function planRowFit (m) {
+  var gap = m.gap == null ? 3 : Number(m.gap)
+  var cap = m.cap == null ? WEAPON_ROW_CAP : Number(m.cap)
+  var widths = asArray(m.chipWidths).map(Number)
+  var n = widths.length
+  var sep = Number(m.sepWidth || 0)
+  var add = Number(m.addWidth || 0)
+  // count 个 chip + (count-1) 个分隔符 + 1 个「＋」按钮，间隔数 = 子元素数 - 1
+  var rowWidthOf = function (list) {
+    var count = list.length
+    var sum = list.reduce(function (a, b) { return a + Number(b || 0) }, 0)
+    var children = count + Math.max(0, count - 1) + 1
+    return sum + Math.max(0, count - 1) * sep + add + Math.max(0, children - 1) * gap
+  }
+  var over = rowWidthOf(widths) > m.avail
+  var probe = widths.slice()
+  var maxFit = n
+  var candW = Number(m.candidateWidth || 0)
+  while (maxFit < cap && rowWidthOf(probe.concat([candW])) <= m.avail) {
+    probe = probe.concat([candW])
+    maxFit++
+  }
+  var fitsNext = maxFit > n
+  var hint = n >= cap
+    ? '已达同级上限（' + cap + ' 把）'
+    : (maxFit >= cap ? '可加入 ' + cap + ' 把' : '仅可加入 ' + maxFit + ' 把')
+  return { maxFit: maxFit, fitsNext: fitsNext, over: over, hint: hint }
+}
+
+/** 行的提示位（行头里的小灰字，渲染后由 `updateFitHints` 填） */
+function fitHintSlot (rowPath) {
+  return '<span class="fit-hint" data-fit-row="' + esc(rowPath) + '"></span>'
+}
+
+/** 打字时不要每敲一下就重量一遍（节流到 250ms） */
+var _fitTimer = null
+function scheduleFitRefresh () {
+  if (_fitTimer) return
+  _fitTimer = setTimeout(function () {
+    _fitTimer = null
+    try { refreshFitHints() } catch (e) { /* 忽略 */ }
+  }, 250)
 }
 
 /**
@@ -862,6 +1104,9 @@ function emptyNote (text) {
   return '<div class="muted" style="padding:6px 2px;font-size:13px">' + esc(text) + '</div>'
 }
 
+/** 面板模块 / 主词条三槽这类**格子里**的多值输入用 `mv-wrap`（换行），其余不换行只看横向滚动 */
+function isSlotStat (statKind) { return MAIN_SLOTS.indexOf(String(statKind || '')) >= 0 }
+
 /**
  * 多值输入：**可编辑**的 chips + 「＋」+ 每格一个「▾」候选选择器。
  *
@@ -875,8 +1120,10 @@ function emptyNote (text) {
  * @param {string[]} values
  * @param {string} [placeholder]
  * @param {string} [statKind] 候选类别：时之沙 / 空之杯 / 理之冠 / 副词条（缺省不给候选）
+ * @param {string} [hint] 一行小字提示（**放在 chips 下面**，而不是塞进字段名里 —— 字段名是一句话的
+ *   时候整行都歪了，用户报过「文字 UI 很乱」）
  */
-function multiValue (label, path, values, placeholder, statKind) {
+function multiValue (label, path, values, placeholder, statKind, hint) {
   var listId = STAT_LIST_ID[statKind] || ''
   var list = asArray(values)
   var isSub = statKind === '副词条'
@@ -900,7 +1147,8 @@ function multiValue (label, path, values, placeholder, statKind) {
       '</span>' + sepCtl
   }).join('')
   return '<div class="field"><span>' + esc(label) + '</span>' +
-    '<div class="mv">' + chips + actBtn('add-item', path, '＋', 'mv-add', '添加一项') + '</div>' +
+    '<div class="mv' + (isSlotStat(statKind) ? ' mv-wrap' : '') + '">' + chips + actBtn('add-item', path, '＋', 'mv-add', '添加一项') + '</div>' +
+    (hint ? '<span class="muted mv-hint">' + hint + '</span>' : '') +
     (placeholder && !list.length ? '<span class="muted" style="font-size:12px">' + esc(placeholder) + '</span>' : '') +
     '</div>'
 }
@@ -1040,8 +1288,8 @@ function renderWeapons () {
       var prev = j > 0 ? row.items[j - 1] : null
       return (j ? sepSelect(p, j - 1, toks[j - 1], false) : '') +
         '<span class="mv-chip">' +
-        refField('weapon', it.name, q + '.name') +
-        '<input type="text" class="w-sm" data-path="' + q + '.note" value="' + esc(it.note) + '" placeholder="备注（如 精5）">' +
+        refField('weapon', it.name, q + '.name', { compact: true }) +
+        '<input type="text" class="w-note" data-path="' + q + '.note" value="' + esc(it.note) + '" placeholder="精5" title="备注（如 精5 / 满精），输出为「名称（备注）」">' +
         (prev ? actBtn('copy-prev', q + '.name', '⧉', 'btn mini', '复制上一条的武器名' + (prev.name ? '（' + prev.name + '）' : '')) : '') +
         actBtn('del-item', p + '.items', '×', 'row-del', '删除这个条目', j) +
         '</span>'
@@ -1049,17 +1297,20 @@ function renderWeapons () {
     return '<div class="box"' + rowAttr(rowId) + '>' +
       '<div class="box-head">' +
       '<span class="box-title">行 ' + (i + 1) + '</span>' +
-      '<input type="text" class="w-sm" data-path="' + p + '.label" value="' + esc(row.label) + '" placeholder="自定义标签（可空，如 建议 / 辅助向）" title="' + esc(LABEL_TIP) + '">' +
+      '<input type="text" class="w-sm" data-path="' + p + '.label" value="' + esc(row.label) + '" placeholder="标签（可空）" title="' + esc(LABEL_TIP) + '">' +
       selectBox(p + '.tier', row.tier === null ? '' : row.tier, [{ value: '', label: '档位：不标' }].concat(TIERS.map(function (t) { return { value: t, label: tierLabel(t) } })), 'w-sm') +
       (Number(row.tier) > 3 ? '<span class="warn-chip" title="数据里出现了第 ' + row.tier + ' 档：面板 / 网页版只认 1~3 档（推荐 / 可选 / 过渡），请确认是否该并档">⚠ 第 ' + row.tier + ' 档</span>' : '') +
       resolvedHint(row) +
+      fitHintSlot(p) +
       '<span class="spacer"></span>' +
       actBtn('move-row-up', 'v2.weapons', '↑', 'btn mini', '上移', i) +
       actBtn('move-row-down', 'v2.weapons', '↓', 'btn mini', '下移', i) +
-      actBtn('del-row', 'v2.weapons', '删除行', 'btn mini danger', '删除这一行', i) +
+      delRowBtn('v2.weapons', i) +
       '</div>' +
-      '<div class="mv weapon-line">' + (items || '<span class="muted" style="font-size:12px">还没有条目</span>') +
-      actBtn('add-item', p + '.items', '＋ 条目', 'mv-add') + '</div>' +
+      '<div class="mv weapon-line" data-mv-row="' + esc(p) + '">' + (items || '<span class="muted" style="font-size:12px">还没有条目</span>') +
+      // 加条目用**文字按钮**：`.mv-add` 是 24px 的圆形按钮，塞进「＋ 条目」会把三个字竖排
+      // （用户报「文字 UI 很乱」就是这么来的）
+      actBtn('add-item', p + '.items', '＋ 条目', 'btn mini', '再加一件武器') + '</div>' +
       '</div>'
   }, '武器行')
   return card('武器推荐', s.weapons.length + ' 行', body, true)
@@ -1071,12 +1322,12 @@ function renderArtifacts () {
     var head = '<div class="box-head">' +
       '<span class="box-title">行 ' + (i + 1) + '</span>' +
       selectBox(p + '.kind', row.kind, ARTIFACT_KINDS, 'w-sm') +
-      (row.kind === 'main' ? '' : '<input type="text" class="w-sm" data-path="' + p + '.label" value="' + esc(row.label) + '" placeholder="自定义标签（可空，如 输出向 / 建议）" title="' + esc(LABEL_TIP) + '">' +
+      (row.kind === 'main' ? '' : '<input type="text" class="w-sm" data-path="' + p + '.label" value="' + esc(row.label) + '" placeholder="标签（可空）" title="' + esc(LABEL_TIP) + '">' +
         resolvedHint(row, artifactKindWord(row.kind))) +
       '<span class="spacer"></span>' +
       actBtn('move-row-up', 'v2.artifacts', '↑', 'btn mini', '上移', i) +
       actBtn('move-row-down', 'v2.artifacts', '↓', 'btn mini', '下移', i) +
-      actBtn('del-row', 'v2.artifacts', '删除行', 'btn mini danger', '删除这一行', i) +
+      delRowBtn('v2.artifacts', i) +
       '</div>'
 
     var body2 = ''
@@ -1087,22 +1338,23 @@ function renderArtifacts () {
         .filter(function (slot) { return asArray(row.stats && row.stats[slot]).length })
         .map(function (slot) { return slot + '：' + asArray(row.stats[slot]).map(function (x) { return str(x).trim() }).filter(Boolean).join(' / ') })
         .join(' ｜ ')
-      body2 = '<div class="muted main-hint">三个槽位是<strong>并列</strong>关系（槽内候选用 <code>/</code>，槽位之间渲染成 <code>｜</code>）。' +
-        '副词条另有口径：<strong>只有 暴击率 ↔ 暴击伤害 是同级</strong>（源文档写 <code>/</code> → 渲染 <code>=</code>），' +
-        '其余相邻词条一律<strong>优先级</strong>（写 <code>&gt;</code> → 渲染 <code>＞</code>）；固定术语 <code>双爆</code> 恒等于 <code>暴击率=暴击伤害</code>。' +
+      body2 = '<div class="muted main-hint">' +
+        '槽位是<strong>并列</strong>：槽内候选用 <code>/</code>、槽位之间渲染成 <code>｜</code>；' +
+        '副词条只有 <strong>暴击率 ↔ 暴击伤害</strong> 同级（渲染 <code>=</code>），其余相邻词条按 <code>＞</code> 优先级。' +
         (nowLine ? '<br>当前渲染：<code>主词条：' + esc(nowLine) + '</code>' : '<br>当前渲染：<code>（空，' + EMPTY_TEXT + '）</code>') +
         '</div>' +
         '<div class="grid-3">' + MAIN_SLOTS.map(function (slot) {
-          return multiValue(slot, p + '.stats.' + slot, row.stats[slot], '如 ' + (STAT_CANDIDATES[slot] || [])[0], slot)
+          return multiValue(slot, p + '.stats.' + slot, row.stats[slot], SLOT_PLACEHOLDER[slot] || '词条', slot)
         }).join('') + '</div>' +
         '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px">' +
         '<span class="muted" style="font-size:12px">主词条括注</span>' +
         '<input type="text" class="w-sm" data-path="' + p + '.note" value="' + esc(row.note) + '" placeholder="可空，如 二命">' +
-        selectBox(p + '.noteSlot', row.noteSlot, [{ value: '', label: '挂在哪个部位？' }].concat(MAIN_SLOTS.map(function (s) { return { value: s, label: '挂在 ' + s } })), 'w-sm') +
-        '<span class="muted" style="font-size:12px">对某个部位的**补充说明**才写这里（整行就是说明时不必写「注：」）</span>' +
+        selectBox(p + '.noteSlot', row.noteSlot, [{ value: '', label: '挂在哪个部位' }].concat(MAIN_SLOTS.map(function (s) { return { value: s, label: '挂在 ' + s } })), 'w-sm') +
+        '<span class="muted" style="font-size:12px" title="只给某个部位写补充说明时才填；整行就是说明时不必写「注：」">只给某个部位写补充说明</span>' +
         '</div>'
     } else if (row.kind === 'sub') {
-      body2 = multiValue('副词条（两格之间的符号可改：`＞` 优先级 / `≥` 约等于 / `=` 同级；**双爆固定为 `=`**，不可修改。百分比写 `大生命`/`大攻击`/`大防御`，固定值写 `小生命`/`小攻击`/`小防御`）', p + '.stats', row.stats, '如 双爆 / 大攻击', '副词条')
+      body2 = multiValue('副词条', p + '.stats', row.stats, '双爆', '副词条',
+        '两格之间的符号可改（双爆固定 <code>=</code>）；百分比写 大生命 / 大攻击 / 大防御，固定值写 小生命 / 小攻击 / 小防御')
     } else if (row.kind === 'note') {
       body2 = '<div class="field"><span>备注（注：）</span>' +
         '<input type="text" data-path="' + p + '.text" value="' + esc(row.text) + '" placeholder="该段落末尾的一行「注：…」，多条用「；」分隔">' +
@@ -1117,8 +1369,8 @@ function renderArtifacts () {
         // 件数（`（2件套）`）**不再显示、也不再提供输入**（用户定稿：圣遗物旁边不要件数；
         // 2+2 直接写 `2精通 + 2精通` 这类简写）。旧数据里的 `pieces` 保存时原样带回，不丢。
         return '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
-          refField('artifact', set.name, q + '.name') +
-          (prev ? actBtn('copy-prev', q + '.name', '⧉ 上一条', 'btn mini', '复制上一条的套装名' + (prev.name ? '（' + prev.name + '）' : '')) : '') +
+          refField('artifact', set.name, q + '.name', { compact: true }) +
+          (prev ? actBtn('copy-prev', q + '.name', '⧉', 'btn mini', '复制上一条的套装名' + (prev.name ? '（' + prev.name + '）' : '')) : '') +
           actBtn('del-item', p + '.sets', '×', 'row-del', '删除这个套装', j) +
           '</div>'
       }).join('')
@@ -1168,30 +1420,50 @@ function renderTalents () {
 function renderPanels () {
   var s = state.model.v2
   var body = rowList('v2.panels', s.panels, function (row, i, p, rowId) {
-    var isText = !hasText(row.k)
-    // 面板是「键：值」结构：**只填一半保存时会被丢掉**，必须当场说清楚（曾经是静默丢弃）
+    // 「说明行」还是「属性 + 数值」：判据见 panelRowIsText —— 关键是**刚加出来的空行
+    // 直接就是两控件**（新增行没按新格式激活，用户报过）
+    var isText = panelRowIsText(row)
+    var attr = panelAttrOf(row.k) || ''
+    var pct = isPanelPct(attr)
+    // 面板是「属性：数值」结构：只填一半保存时写不出合法文档行，必须当场说清楚
     var warn = ''
-    if (!isText && !hasText(row.v)) warn = '<span class="warn-chip" title="面板行是「键：值」结构，只有键没有值时写不出合法文档行，保存时会丢掉这一行">⚠ 缺值 v</span>'
-    if (isText && hasText(row.v)) warn = '<span class="warn-chip" title="只有「值」没有「键」时文档行没有冒号、解析不回来，保存时会丢掉这一行；要么补上键，要么用「改成纯文本」">⚠ 缺键 k</span>'
+    if (!isText && !attr) warn = '<span class="warn-chip">⚠ 属性要在下拉里选</span>'
+    else if (!isText && !hasText(row.v)) warn = '<span class="warn-chip" title="只有属性没有数值，写不出合法文档行，保存时会丢掉这一行">⚠ 缺数值</span>'
     var head = '<div class="box-head">' +
       '<span class="box-title">行 ' + (i + 1) + '</span>' +
-      '<input type="text" class="w-sm" data-path="' + p + '.label" value="' + esc(row.label) + '" placeholder="标签（可空，如 辅助向）">' +
+      '<input type="text" class="w-sm" data-path="' + p + '.label" value="' + esc(row.label) + '" placeholder="标签（可空）">' +
       warn +
       '<span class="spacer"></span>' +
-      actBtn('panel-to-text', p, isText ? '改成 键+值' : '改成纯文本', 'btn mini') +
+      actBtn('panel-to-text', p, isText ? '属性行' : '说明行', 'btn mini',
+        isText ? '这一行现在是说明行：点一下改成「属性 + 数值」' : '这一行现在是属性 + 数值：点一下改成说明行') +
       actBtn('move-row-up', 'v2.panels', '↑', 'btn mini', '上移', i) +
       actBtn('move-row-down', 'v2.panels', '↓', 'btn mini', '下移', i) +
-      actBtn('del-row', 'v2.panels', '删除行', 'btn mini danger', '删除这一行', i) +
+      delRowBtn('v2.panels', i) +
       '</div>'
+    // 结构化行：**一行两个控件**（属性下拉 + 数值），百分比属性自动补 `%`，数值不留尾部的 `+`
     var body2 = isText
-      ? '<input type="text" data-path="' + p + '.text" value="' + esc(row.text) + '" placeholder="纯文本（说明行，如 暴击率70% / 暴伤220%+）">'
-      : '<div style="display:flex;gap:10px;flex-wrap:wrap">' +
-        '<label class="field" style="flex:0 0 220px"><span>键 k</span>' + plainInput(p + '.k', row.k, '', '如 暴击率') + '</label>' +
-        '<label class="field" style="flex:1 1 260px"><span>值 v</span>' + plainInput(p + '.v', row.v, '', '如 70%+') + '</label>' +
+      ? '<input type="text" data-path="' + p + '.text" value="' + esc(row.text) + '" placeholder="说明行（如 各种直伤纯色队）">'
+      : '<div class="mv panel-line">' +
+        '<select class="mv-attr" data-panel-attr="' + esc(p) + '" title="属性（七选一）">' +
+        '<option value=""' + (attr ? '' : ' selected') + '>— 选择属性 —</option>' +
+        PANEL_ATTRS.map(function (a) {
+          return '<option value="' + esc(a) + '"' + (a === attr ? ' selected' : '') + '>' + esc(a) + '</option>'
+        }).join('') +
+        '</select>' +
+        '<input type="text" class="mv-in' + (pct ? ' mv-pct' : '') + '" data-panel-value="' + esc(p) + '"' +
+        ' list="dl-panel-' + esc(attr || 'none') + '" value="' + esc(row.v) + '"' +
+        ' placeholder="' + (pct ? '如 70（自动补 %）' : '如 2200') + '"' +
+        ' title="数值：' + (pct ? '百分比属性，自动补 %；' : '') + '不要写尾部的 `+`">' +
         '</div>'
     return '<div class="box"' + rowAttr(rowId) + '>' + head + body2 + '</div>'
   }, '面板行')
-  return card('毕业面板参考', s.panels.length + ' 行', body, true)
+  // 数值候选表（每个属性一份，datalist 只是输入提示）
+  var lists = PANEL_ATTRS.map(function (a) {
+    return '<datalist id="dl-panel-' + esc(a) + '">' +
+      (PANEL_VALUE_HINTS[a] || []).map(function (v) { return '<option value="' + esc(v) + '"></option>' }).join('') +
+      '</datalist>'
+  }).join('')
+  return card('毕业面板参考', s.panels.length + ' 行', body + lists, true)
 }
 
 function renderConstellations () {
@@ -1208,7 +1480,7 @@ function renderConstellations () {
       '<span class="spacer"></span>' +
       actBtn('move-row-up', 'v2.constellations', '↑', 'btn mini', '上移', i) +
       actBtn('move-row-down', 'v2.constellations', '↓', 'btn mini', '下移', i) +
-      actBtn('del-row', 'v2.constellations', '删除行', 'btn mini danger', '删除这一行', i) +
+      delRowBtn('v2.constellations', i) +
       '</div>' +
       '<input type="text" data-path="' + p + '.text" value="' + esc(row.text) + '" placeholder="说明">' +
       '</div>'
@@ -1227,7 +1499,7 @@ function renderTeams () {
         '<span class="spacer"></span>' +
         actBtn('move-row-up', 'v2.teams', '↑', 'btn mini', '上移', i) +
         actBtn('move-row-down', 'v2.teams', '↓', 'btn mini', '下移', i) +
-        actBtn('del-row', 'v2.teams', '删除行', 'btn mini danger', '删除这一行', i) +
+        delRowBtn('v2.teams', i) +
         '</div><div class="field"><span>备注文本</span>' +
         '<input type="text" data-path="' + p + '.text" value="' + esc(str(row.text)) + '" placeholder="如 建议二命及以上"></div></div>'
     }
@@ -1253,10 +1525,9 @@ function renderTeams () {
       '<span class="spacer"></span>' +
       actBtn('move-row-up', 'v2.teams', '↑', 'btn mini', '上移', i) +
       actBtn('move-row-down', 'v2.teams', '↓', 'btn mini', '下移', i) +
-      actBtn('del-row', 'v2.teams', '删除行', 'btn mini danger', '删除这一行', i) +
+      delRowBtn('v2.teams', i) +
       '</div>' +
-      '<div class="field"><span>成员（点「＋ 成员」：**一格可以放多个名字** = 可替换角色，格内用 <b> / </b> 连接；' +
-      '点某一格把它设为当前格，下一个名字就加进这一格；点名字可只改这一格的候选；拖动可排序）</span>' +
+      '<div class="field"><span>成员<span class="muted" style="font-size:12px" title="点某一格把它设为当前格，下一个名字就加进这一格；点名字可只改这一格的候选；拖动可排序">（一格可放多个名字 = 可替换，格内用 <b> / </b> 连接）</span></span>' +
       '<div class="members" data-members="' + esc(p) + '">' + members +
       '<button type="button" class="btn mini" data-act="open-members" data-path="' + esc(p) + '">＋ 成员</button></div></div>' +
       '<div class="field" style="margin-top:8px"><span>文本' + (asArray(row.members).length ? '（成员之外的补充说明）' : '（没有拆成成员时，整行按文本输出）') + '</span>' +
@@ -1317,6 +1588,8 @@ function renderForm () {
   form.className = 'form'
   form.innerHTML = renderBasic() + renderWeapons() + renderArtifacts() + renderTalents() +
     renderPanels() + renderConstellations() + renderTeams() + renderUnparsed()
+  // 渲染后量一遍宽度：芯片贴合内容 + 武器行「还放得下几把」的提示
+  try { refreshFitHints() } catch (e) { /* 量宽度失败不影响编辑 */ }
   $('current-name').textContent = state.current + (state.model.name !== state.current ? '（文件内 name：' + state.model.name + '）' : '')
   renderIssueBar()
   if (state.pendingFocus) {
@@ -1343,6 +1616,126 @@ function focusRow (rowId) {
   return true
 }
 
+/**
+ * 渲染后的一遍「量宽度」：
+ *   ① 芯片里的输入框按内容收缩（短名字占得少 → 一行能多放一把）；
+ *   ② 武器行算出**实际放得下几把**，把提示填进行头（用户定稿：上限 4 把，
+ *      名字长就只放得下 3 把，让编辑器按实际效果提示）。
+ */
+function refreshFitHints () {
+  // ① 输入框自适应宽度
+  var ins = document.querySelectorAll('#form .mv .ref-field input')
+  for (var i = 0; i < ins.length; i++) autoSizeInput(ins[i], FIT_MIN.name, FIT_MAX.name)
+  var notes = document.querySelectorAll('#form .mv .w-note')
+  for (var j = 0; j < notes.length; j++) autoSizeInput(notes[j], FIT_MIN.note, FIT_MAX.note)
+  var stats = document.querySelectorAll('#form .mv .mv-in')
+  for (var s = 0; s < stats.length; s++) {
+    // 面板模块的数值框是固定宽度（`panel-line .mv-in`），不参与收缩
+    if (stats[s].closest && stats[s].closest('.panel-line')) continue
+    autoSizeInput(stats[s], FIT_MIN.stat, FIT_MAX.stat)
+  }
+
+  // ② 每行武器：还能不能再放一把
+  var slots = document.querySelectorAll('[data-fit-row]')
+  for (var k = 0; k < slots.length; k++) {
+    var slot = slots[k]
+    var rowPath = slot.getAttribute('data-fit-row')
+    var mv = document.querySelector('.mv[data-mv-row="' + attrSelectorValue(rowPath) + '"]')
+    if (!mv) continue
+    var chips = [], sepW = 0, addW = 0
+    for (var c = 0; c < mv.children.length; c++) {
+      var kid = mv.children[c]
+      var cls = String(kid.className || '')
+      if (cls.indexOf('mv-chip') >= 0) chips.push(kid.getBoundingClientRect().width)
+      else if (cls.indexOf('mv-sep') >= 0) sepW = sepW || kid.getBoundingClientRect().width
+      else addW += kid.getBoundingClientRect().width
+    }
+    if (!chips.length) { slot.textContent = ''; slot.className = 'fit-hint'; continue }
+    var cs = styleOf(mv)
+    var gap = cs ? (parseFloat(cs.columnGap) || parseFloat(cs.gap) || 3) : 3
+    var candW = measureCandidateChip(mv, nextWeaponName(rowPath, chips.length))
+    var plan = planRowFit({
+      avail: mv.clientWidth,
+      chipWidths: chips,
+      candidateWidth: candW,
+      sepWidth: sepW || 30,
+      addWidth: addW,
+      gap: gap,
+      cap: WEAPON_ROW_CAP
+    })
+    slot.textContent = plan.over ? plan.hint + '：当前放不下，请先删到放得下' : plan.hint
+    slot.title = '同级上限 ' + WEAPON_ROW_CAP + ' 把：按当前窗口宽度与武器名实际长度实测，' +
+      '本行最多放得下 ' + plan.maxFit + ' 把（名字短就能放 4 把）'
+    slot.className = 'fit-hint' + (plan.over ? ' warn' : (plan.fitsNext ? '' : ' dim'))
+  }
+}
+
+/** 假如下一把要加进来，用**下一档的第一把武器名**量一下 chip 宽度（没有下一档就用本行最长的） */
+function nextWeaponName (rowPath, currentCount) {
+  var rows = (state.model && state.model.v2 && state.model.v2.weapons) || []
+  var idx = Number(String(rowPath).split('.').pop())
+  for (var i = idx + 1; i < rows.length; i++) {
+    var row = rows[i]
+    if (!row || row.__deleted === true) continue
+    var items = asArray(row.items).filter(function (it) { return it && hasText(it.name) })
+    if (items.length) return items[0].name
+  }
+  var self = rows[idx] || {}
+  var names = asArray(self.items).map(function (it) { return str(it && it.name) }).filter(Boolean)
+  names.sort(function (a, b) { return b.length - a.length })
+  return names[0] || ''
+}
+
+/** 克隆本行最后一个 chip、把名字换成候选名，量出「加上它这一行会有多宽」 */
+function measureCandidateChip (mv, name) {
+  var last = mv.querySelector && mv.querySelector('.mv-chip')
+  if (!last) return 0
+  var probe = last.cloneNode(true)
+  probe.style.position = 'absolute'
+  probe.style.left = '-9999px'
+  probe.style.top = '0'
+  probe.style.visibility = 'hidden'
+  var inp = probe.querySelector && probe.querySelector('.ref-field input')
+  if (inp) { inp.value = str(name); autoSizeInput(inp, FIT_MIN.name, FIT_MAX.name) }
+  mv.appendChild(probe)
+  var w = probe.getBoundingClientRect ? probe.getBoundingClientRect().width : 0
+  if (probe.parentNode) probe.parentNode.removeChild(probe)
+  return w
+}
+
+/** 六个模块的短名（目录右侧的「未填：武 圣」用它；顺序 = 文档顺序，用户定稿 2026-09-21）
+ *  服务端的 `/api/characters` 给每个角色一个 `filled` 对象（每个模块有没有真内容）。 */
+var MODULE_SHORT = [
+  ['weapons', '武'], ['artifacts', '圣'], ['talents', '天'],
+  ['panels', '面'], ['constellations', '命'], ['teams', '配']
+]
+var MODULE_FULL = {
+  weapons: '武器推荐', artifacts: '圣遗物推荐', talents: '天赋加点',
+  panels: '毕业面板参考', constellations: '命座推荐', teams: '配队推荐'
+}
+
+/** 角色目录的 HTML（纯函数，自检直接断言「未填：武 圣」这一行文字） */
+function renderListHtml (items) {
+  return asArray(items).map(function (it) {
+    var meta = []
+    // 目录右侧只报「还没填的模块」（以前是「武2 圣3」这种计数，占地方又看不出缺什么）
+    var unfilled = MODULE_SHORT.filter(function (kv) { return it.filled && it.filled[kv[0]] === false })
+    if (unfilled.length) {
+      meta.push('<span class="unfilled" title="还没填的模块：' +
+        unfilled.map(function (kv) { return MODULE_FULL[kv[0]] }).join(' / ') + '">未填：' +
+        unfilled.map(function (kv) { return kv[1] }).join(' ') + '</span>')
+    }
+    if (it.hasUnparsed) meta.push('<span class="un">未识别</span>')
+    if (it.broken) meta.push('<span class="un">读取失败</span>')
+    var tip = it.name + '：' + (unfilled.length
+      ? '未填 ' + unfilled.map(function (kv) { return MODULE_FULL[kv[0]] }).join('、')
+      : '全部模块已填')
+    return '<div class="list-item' + (it.name === state.current ? ' active' : '') + '" data-name="' + esc(it.name) + '" title="' + esc(tip) + '">' +
+      '<span class="nm">' + esc(it.name) + '</span>' +
+      '<span class="meta">' + meta.join(' ') + '</span></div>'
+  }).join('')
+}
+
 function renderList () {
   var box = $('list')
   var kw = state.filter.trim().toLowerCase()
@@ -1351,15 +1744,7 @@ function renderList () {
     box.innerHTML = '<div class="muted" style="padding:8px;font-size:13px">没有匹配的角色</div>'
     return
   }
-  box.innerHTML = items.map(function (it) {
-    var meta = []
-    if (it.weapons) meta.push('武' + it.weapons)
-    if (it.artifacts) meta.push('圣' + it.artifacts)
-    if (it.hasUnparsed) meta.push('<span class="un">未识别</span>')
-    return '<div class="list-item' + (it.name === state.current ? ' active' : '') + '" data-name="' + esc(it.name) + '">' +
-      '<span class="nm" title="' + esc(it.name) + '">' + esc(it.name) + '</span>' +
-      '<span class="meta">' + meta.join(' ') + '</span></div>'
-  }).join('')
+  box.innerHTML = renderListHtml(items)
 }
 
 /** 当前列表里可见的角色名（键盘 ↑↓ 用） */
@@ -1903,6 +2288,8 @@ function buildBody () {
       return o2
     }
     if (row.kind === 'text') return { kind: 'text', label: hasText(row.label) ? row.label : null, text: str(row.text) }
+    // 段末备注行（`注：…`）：**必须显式提交 text**，否则这一行的内容会被下面的档位行分支丢掉
+    if (row.kind === 'note') return { kind: 'note', text: str(row.text).trim() }
     var o3 = cleanRow(row)
     o3.kind = row.kind
     // 圣遗物档位行的 `label` 就是**文档里的原词**（首选 / 过渡 / 可选 / 自定义词）：
@@ -1948,8 +2335,14 @@ function buildBody () {
 
   var panels = mv2.panels.map(function (row) {
     if (row && row.__deleted === true) return { __deleted: true }
-    var label = hasText(row.label) ? row.label : null
-    if (hasText(row.k)) return { label: label, k: row.k.trim(), v: str(row.v).trim() }
+    var label = hasText(row.label) ? row.label.trim() : null
+    if (hasText(row.k)) {
+      var attr = panelAttrOf(row.k) || String(row.k).trim()
+      var val = normPanelValue(attr, row.v)
+      // 有标签的行：文档层只有 `标签：属性：数值` 一种写法，回读是**说明行**
+      // （见 parse-docx 的「一行两个冒号」规则），所以这里就按说明行提交，往返才闭合
+      return label ? { label: label, text: attr + '：' + val } : { k: attr, v: val }
+    }
     return { label: label, text: str(row.text).trim() }
     // 空行不再在这里丢掉（要占下标）；服务器 normalizeV2 会丢弃没有 k / text 的行
   })
@@ -2284,14 +2677,19 @@ function handleAction (act, path, i, el) {
     }
   } else if (act === 'panel-to-text') {
     var row = getPath(model, path)
-    if (hasText(row.k)) {
-      row.text = [row.k, row.v].filter(Boolean).join('：')
+    if (!panelRowIsText(row)) {
+      // 属性+数值 → 说明行：文本可能是空的（此时靠 `_text` 记住用户的选择，否则会立刻弹回结构化）
+      row.text = hasText(row.k) ? [row.k, normPanelValue(row.k, row.v)].filter(Boolean).join('：') : str(row.text)
       delete row.k
       delete row.v
+      row._text = true
     } else {
-      row.k = str(row.text)
-      row.v = ''
+      // 说明行 → 结构化：能认出「属性：数值」就填进两个控件，认不出就原样留在属性里
+      var parsed = parsePanelStat(row.text)
+      row.k = parsed ? parsed.k : panelAttrOf(row.text)
+      row.v = parsed ? parsed.v : ''
       delete row.text
+      delete row._text
     }
   } else {
     changed = false
@@ -2554,6 +2952,52 @@ function formEvents () {
       showStatus('已更新关系：' + rowSepTokens(rowPath, count)
         .map(function (t) { return SEP_GLYPH[t] || t }).join(' '), 'ok')
     }
+  })
+
+  // 面板模块：属性下拉（换属性 → 数值按百分比规则补 `%`）与数值输入（去尾部 `+`、补 `%`）
+  form.addEventListener('change', function (e) {
+    var el = e.target
+    if (!el || !el.getAttribute) return
+    var attrPath = el.getAttribute('data-panel-attr')
+    if (attrPath != null) {
+      var prow = getPath(state.model, attrPath)
+      if (!prow) return
+      var attr = panelAttrOf(el.value)
+      if (attr) {
+        prow.k = attr
+        prow.v = normPanelValue(attr, prow.v)
+      } else {
+        prow.k = ''
+        prow.v = ''
+      }
+      markDirty(true)
+      renderForm()
+      showStatus(attr ? ('属性：' + attr + (isPanelPct(attr) ? '（百分比，数值自动补 %）' : '')) : '已清空属性', 'ok')
+      return
+    }
+    var valPath = el.getAttribute('data-panel-value')
+    if (valPath != null) {
+      var vrow = getPath(state.model, valPath)
+      if (!vrow) return
+      var next = normPanelValue(vrow.k, el.value)
+      vrow.v = next
+      markDirty(true)
+      if (next !== el.value) renderForm()
+    }
+  })
+
+  // 数值边打边同步到模型（不重绘，避免丢焦点）；武器名字这类会影响 chip 宽度 → 顺手重算提示
+  form.addEventListener('input', function (e) {
+    var el = e.target
+    if (!el || !el.getAttribute) return
+    var path = el.getAttribute('data-panel-value')
+    if (path != null) {
+      var row = getPath(state.model, path)
+      if (row) { row.v = el.value; markDirty(true) }
+      return
+    }
+    var dpath = el.getAttribute('data-path')
+    if (dpath && /^v2\.(weapons|artifacts)\./.test(dpath)) scheduleFitRefresh()
   })
 
   // 成员备注：只更新模型，不重绘（避免输入时丢焦点）
@@ -3345,6 +3789,22 @@ window.__editor = {
   setSubSep: setSubSep,
   isCritPairValues: isCritPairValues,
   statKindOfPath: statKindOfPath,
+  // 面板模块（供自动化检查：属性归一 / 百分比补 `%` / 说明行判据）
+  PANEL_ATTRS: PANEL_ATTRS,
+  panelAttrOf: panelAttrOf,
+  isPanelPct: isPanelPct,
+  normPanelValue: normPanelValue,
+  parsePanelStat: parsePanelStat,
+  panelRowIsText: panelRowIsText,
+  // 武器行「放得下几把」的纯计算 + 宽度相关的常量（供自检断言）
+  planRowFit: planRowFit,
+  WEAPON_ROW_CAP: WEAPON_ROW_CAP,
+  renderListHtml: renderListHtml,
+  MODULE_SHORT: MODULE_SHORT,
+  MODULE_FULL: MODULE_FULL,
+  FIT_MIN: FIT_MIN,
+  FIT_MAX: FIT_MAX,
+  measureTextWidth: measureTextWidth,
   memberCandidates: memberCandidates,
   joinCandidates: joinCandidates,
   STAT_CANDIDATES: STAT_CANDIDATES,
@@ -3375,9 +3835,24 @@ window.__editor = {
     normalizeData: normalizeData,
     buildBody: buildBody,
     renderForm: renderForm,
+    /** 整个表单的 HTML（供离线/真浏览器界面检查：文字排版、占位是否被截断、控件宽度） */
+    renderFormHtml: function () {
+      if (!state.model) return ''
+      return renderBasic() + renderWeapons() + renderArtifacts() + renderTalents() +
+        renderPanels() + renderConstellations() + renderTeams() + renderUnparsed()
+    },
+    /** 候选表（与 index.html 里的 `<datalist>` 同一批 id，供离线界面检查时补上） */
+    renderDatalistsHtml: function () {
+      return Object.keys(STAT_LIST_ID).map(function (kind) {
+        return '<datalist id="' + esc(STAT_LIST_ID[kind]) + '">' +
+          asArray(STAT_CANDIDATES[kind]).map(function (n) { return '<option value="' + esc(n) + '"></option>' }).join('') +
+          '</datalist>'
+      }).join('')
+    },
     renderList: renderList,
     renderTeamsHtml: renderTeamsHtml,
     renderWeaponsHtml: renderWeapons,
+    renderPanelsHtml: renderPanels,
     handleAction: handleAction,
     applyRef: applyRef,
     constellationIndex: constellationIndex,

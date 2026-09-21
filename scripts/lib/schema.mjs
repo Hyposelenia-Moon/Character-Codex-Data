@@ -96,9 +96,16 @@ export function collectNotes (rows) {
   return parts.join(NOTE_SEP)
 }
 
-/** 数组 → 「A > B > C」 */
+/**
+ * 数组 → 「A > B > C」。
+ *
+ * ⚠ `sep` 是**逐档**分隔符（`' / + '` ＝ 第一档 `/`、第二档 `+`），必须逐档展开；
+ * 直接 `items.join(sep)` 会把整串 sep 塞进每个间隔 —— `' > = '` 拼出 `A > = B > = C`，
+ * 解析回来空档被丢掉、只剩 `' > '`，`docx → data` 与数据不一致，每日回写就会因往返校验
+ * 失败而**放弃写主文档**（用户 2026-09-21 在瓦雷莎的武器行踩到）。
+ */
 export function joinItems (items, sep = ' > ') {
-  return (items ?? []).map(x => (typeof x === 'string' ? x : itemText(x))).filter(Boolean).join(sep)
+  return joinWithSep(items, sep, ' > ')
 }
 
 /** 单个条目 → 文本（名称 +（备注）） */

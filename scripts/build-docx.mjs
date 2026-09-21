@@ -174,7 +174,11 @@ export function characterLines (data) {
  * @returns {string[]}
  */
 export function documentLines (bundle) {
-  const out = [...HEAD_LINES]
+  // 抬头的角色数**按本次数据算**：以前写死「共 129 名角色」，增删角色后文档会写一句假话。
+  // 当前 data/gi 正好 129 个，所以生成的文本与以前逐字一致。
+  const total = bundle.names.length
+  const out = HEAD_LINES.map(line =>
+    /^共 \d+ 名角色/.test(line) ? `共 ${total} 名角色：${total} 名均已填入内容。` : line)
   bundle.names.forEach((name, i) => {
     if (i > 0) out.push(SEPARATOR)
     out.push(...characterLines(bundle.docs[i]))
@@ -404,6 +408,19 @@ export function freezeGiDir (bundle) {
   if (process.env.DSH_GI_DIR && fs.existsSync(process.env.DSH_GI_DIR)) {
     return { dir: path.resolve(process.env.DSH_GI_DIR), files: bundle.names.length, reused: true }
   }
+  // 快照目录按 pid 命名（并发构建各用各的，互不覆盖），但**建之前先扫掉旧的**：
+  // 以前从不清理，实测攒下 105 个目录 / 50 MB（每次「保存并发布」都留一份）。
+  // 只删 mtime 超过 10 分钟的，避免误删另一个正在跑的构建的快照。
+  const tmpRoot = path.join(root, '.tmp')
+  try {
+    for (const ent of fs.readdirSync(tmpRoot, { withFileTypes: true })) {
+      if (!ent.isDirectory() || !ent.name.startsWith('frozen-gi-')) continue
+      const full = path.join(tmpRoot, ent.name)
+      try {
+        if (Date.now() - fs.statSync(full).mtimeMs > 10 * 60 * 1000) fs.rmSync(full, { recursive: true, force: true })
+      } catch { /* 单个删不掉不影响构建 */ }
+    }
+  } catch { /* .tmp 不存在也无所谓 */ }
   const dir = path.join(root, '.tmp', `frozen-gi-${process.pid}`)
   fs.rmSync(dir, { recursive: true, force: true })
   fs.mkdirSync(dir, { recursive: true })

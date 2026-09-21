@@ -281,7 +281,10 @@ function linesToModelRows (lines, labelHints = [], crownHint = null, levelHints 
         return { text: name, sepAfter: '', level: Number.isInteger(lv) ? lv : 1, crown: lv === 10 }
       })
       // 行首标签用**显示词汇** `推荐`（与武器 / 圣遗物行一致；文档里仍写 `天赋：…`，面板同口径）
-      out.push({ label: '推荐', kind: 'talents', raw: value, items: fixed })
+      // 行首**不写标签**（用户定稿 2026-09-21：天赋那行的「推荐」chip 去掉）——
+      // 天赋只有 A / E / Q 三格，图标本身已经说明一切，标签是噪声。
+      // 空标签 ⇒ 卡片给这一行 `row-nolabel`，值列占满整行（面板侧 codex.html 同口径）。
+      out.push({ label: '', kind: 'talents', raw: value, items: fixed })
       return
     }
     const tokens = splitRankParts(value, '／')
@@ -855,7 +858,8 @@ export function renderDisplaySection (section, indent, dir) {
 export function renderCard (character) {
   const { name, data, dir } = character
   const out = []
-  out.push(`<!-- ================= ${name} ================= -->`)
+  // 注释里的名字也要转义：名字若含 `-->` 就能从注释里逃出来（下一行已经转义，这行以前漏了）
+  out.push(`<!-- ================= ${escapeHtml(name)} ================= -->`)
   out.push(`<div class="guide-card" data-name="${escapeHtml(name)}">`)
   out.push('    <div class="char-header">')
   out.push(`        <div class="char-name">${escapeHtml(name)}</div>`)

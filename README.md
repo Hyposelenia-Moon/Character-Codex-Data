@@ -19,11 +19,11 @@
 | 3 | **标记版 docx**（`out\…(标记版).docx` + `D:\…\…(标记版).docx`） | 由 `build-docx --write-main` 一并产出，无需手改 | 标记版 sha1 + "去标记后逐字一致：是" |
 | 4 | `guide.html` | `node scripts/build-html.mjs` | 卡片数 129 + `audit-guide-html` 通过 |
 | 5 | `guide.md` | `node scripts/build-doc.mjs`（**选 A 口径**：只过滤占位符，**文档词汇不变**） | `___`=0 + 文档词汇计数 + 新旧字节/行数 |
-| 6 | **编辑器**（表单文案 + `/api/preview` 预览） | `resources/editor/app.js`（文案 / 下拉 / **标签与档位联动** / **删行墓碑**）＋ `scripts/editor.mjs`（保存协议：删行墓碑、清空＝显式 `null`）；**改完必须重启编辑器进程**（长驻进程会缓存旧模块） | `/api/preview` html 与 `guide.html` **逐字节一致** ＋ `scripts/editor-selftest.mjs` 42/42 ＋ `.dsh/verify-editor-delete.mjs`（含 129 角色原样保存逐字节不变）＋ `.dsh/verify-editor-e2e.mjs` |
+| 6 | **编辑器**（表单文案 + `/api/preview` 预览） | `resources/editor/app.js`（文案 / 下拉 / **标签与档位联动** / **删行墓碑** / **面板一行两个控件** / **chip 宽度自适应与「放得下几把」**）＋ `scripts/editor.mjs`（保存协议：删行墓碑、清空＝显式 `null`）；**改完必须重启编辑器进程**（长驻进程会缓存旧模块） | `/api/preview` html 与 `guide.html` **逐字节一致** ＋ `scripts/editor-selftest.mjs` 130/130 ＋ `.dsh/verify-editor-rt.mjs`（129 角色「打开→原样保存」逐字节不变 + 预览逐字节一致）＋ `.dsh/verify-panel-editor.mjs`（面板行新增 / 带标签 / 删行 / 说明行，端到端）＋ `.dsh/probe-editor-ui.mjs`（离线表单：占位截断 / 字号 / 溢出）＋ `.dsh/probe-editor-live.mjs` / `.dsh/audit-editor-ui-live.mjs`（**真实编辑器**里量同一批指标 + 武器行提示，`--zoom=2` 出放大截图） |
 | 7 | **插件面板** | `model/codexIndex/display.js`（**与 `scripts/lib/guide-display.mjs` 逐字节一致**）、`parse.js`、`resources/atlas/codex.html`、`codex.css` | `node scripts/check-display-sync.mjs` + `audit-web-vs-panel` |
 | 8 | `README` 与 `templates/` | 改受影响的说明、词汇表、符号语义、期望值 | 本节表格与预期计数 |
 | 9 | **审计脚本的期望值** | `audit-*` / `display-*` / `check-display-sync` 的断言与合法集 | 每个审计 `exit=0` |
-| 10 | 离线脚手架 | `.dsh/` 下的脚手架**不得再读陈旧副本**，统一用 `CODEX_DIR` 环境变量、缺省读**主仓库** | 离线渲染输出能反映主仓库最新数据 |
+| 10 | 离线脚手架 | `.dsh/` 下的脚手架**不得再读陈旧副本**：优先用 `CODEX_DIR` / `CODEX_DOCX` 环境变量、缺省读**主仓库**（现状：仍有不少 `.dsh/*.mjs` 写死绝对路径，逐个换成环境变量即可） | 离线渲染输出能反映主仓库最新数据 |
 
 ### B. 固定验收集（十四条全绿才算完成）
 
@@ -35,8 +35,8 @@ node scripts/audit-web-vs-panel.mjs               # 真实角色 0 + 自定义�
 node scripts/audit-dup-items.mjs                  # 重复名 0/0、序列不一致 0
 node scripts/check-display-sync.mjs               # 两份显示级归一逐字节一致
 node scripts/scan-separators.mjs                  # 悬挂 0 + 副词条非法同级对 0（`/` 只许出现在暴击对之间）
-node scripts/display-selftest.mjs <角色>           # 自定义档位词 7/7 + 词条写法 7/7
-node scripts/editor-selftest.mjs                  # 编辑器规则 42/42（天赋等级 / 新增行 / 多值输入 / 标签互斥 / 配队槽位）
+node scripts/display-selftest.mjs <角色>           # 词条写法 49/49（含天赋行无标签、副词条 `=`/`≥`、面板两控件）
+node scripts/editor-selftest.mjs                  # 编辑器规则 143/143（天赋等级 / 新增行 / 多值输入 / 标签互斥 / 配队槽位 / 面板两控件 / 武器行放得下几把 / 目录未填模块）
 node scripts/build-html.mjs && node scripts/build-doc.mjs   # 产物刷新
 # 编辑器 129 角色「打开→原样保存」逐字节不变 + /api/preview 与 guide.html 逐字节一致
 #   （需先 node scripts/editor.mjs --port <p> --no-open 起服务；改过共享层务必重启）
@@ -131,7 +131,7 @@ guide.md                         生成的文档版文本，请勿手改
 { "title": "固有天赋", "items": [{ "name": "天赋名", "desc": "说明" }] }
 ```
 ```json
-{ "title": "毕业面板", "fields": [{ "label": "暴击率", "value": "70%+" }] }
+{ "title": "毕业面板", "fields": [{ "label": "暴击率", "value": "70%" }] }
 ```
 
 - `lines`：文本行，一行一个数组元素（**不要**在字符串里写 `\n` 或 `<br>`）
@@ -276,11 +276,12 @@ node scripts/daily-docx-sync.mjs --dry                            # 只报告，
 |---|---|---|
 | 档位 | `第一档` / `第二档` / `第三档`、`首选` / `次选` / `可选` / `过渡` / `套装`；**`label` 非空 = 自定义档位词**（如 `建议`，见下节） | `推荐` / `可选` / `过渡`（**三档**，第三档为空时整行不渲染） |
 | 命座 | `二命——说明` | `命之座2` |
-| 天赋行标签 | `天赋：A1 E10 Q10`（文档里的行首词） | **`推荐`**（与武器 / 圣遗物行的行首标签同形；网页版与面板都改过，判行要用 `kind === 'talents'`，别按文字判） |
+| 天赋行标签 | `天赋：A1 E10 Q10`（文档里的行首词） | **没有行首标签**（`label: ''`，用户定稿 2026-09-21 去掉「推荐」chip；天赋只有 A/E/Q 三格，图标已自明。判行要用 `kind === 'talents'`，别按文字判；空标签的行两端都按「无标签行」铺满整行） |
 | 段落标题 | `1. 武器推荐` / `4. 毕业面板参考` / `5. 命座推荐` / `6. 配队推荐` | `武器` / `圣遗物` / `天赋` / `面板` / `命座` / `配队` |
 | **主词条** | `攻击力` / `生命值` / `防御力` / `元素精通` / `元素充能效率` / `暴击率` / `暴击伤害` / 各元素伤害加成 —— **不写「百分比」**（主词条默认就是百分比；旧写法 `攻击力百分比` 已全部改掉） | 原样（主词条不做简写） |
 | **副词条** | 百分比 = `大生命` / `大攻击` / `大防御`；固定值 = `小生命` / `小攻击` / `小防御`（旧写法 `生命值百分比` / `攻击力` 已全部改掉） | **`大X` / `小X` 本身就是显示形态**（不再展开成 `生命值`/`攻击力`/`防御力` —— 那是"固定值"语义，会弄错） |
 | 圣遗物件数 | **不写** `（2件套）`（旧写法已全部改掉）；2+2 写**属性词简写**：`2精通 + 2精通`、`翠绿之影 / 2攻击`、`昔日宗室之仪 / 2生命 + 2充能 + 角斗士的终幕礼` | 件数**不渲染**（网页版 / 面板都不画；`parseSetItem` 仍容错读取，旧数据往返不丢）；`2X` 里的词条**不再展开**（`2充能` 保持 `2充能`，不会变成 `2元素充能效率`） |
+| **毕业面板** | `属性：数值` 一行一条；有标签时写 `标签：属性：数值`（一行两个冒号 ⇒ 回读是说明行）。属性只用七种规范词（`充能效率` / `充能` / `暴伤` 这些历史写法已全部改掉）；数值**不带尾部的 `+`**，百分比属性带 `%`（`暴击率：70%`、`攻击力：2200`） | 属性行原样；同标签 ≤3 条合并成一行（行间全角空格），面板 / 网页版 / 编辑器三处同口径 |
 | 其它简写 | `充能` / `精通` / `暴伤` / `爆伤` / `大公鸡` … | `元素充能效率` / `元素精通` / `暴击伤害` / `攻击力` … |
 | 固定术语 | `双爆` | `暴击率=暴击伤害`（**同级**，恒等；只作词条时才展开，散文里原样） |
 | 出现位置 | 主文档 docx、`data/gi/*.json` 的 `v2.*.label` 与 `sections[].*`、`guide.md` | `guide.html`、插件面板、编辑器预览 |
@@ -384,10 +385,10 @@ node scripts/daily-docx-sync.mjs --dry                            # 只报告，
 `建议：第一档：西风剑` —— `parse-docx` 认不出（往返立刻不再 129/129）。
 
 断言（改动显示层 / 文档层 / 编辑器标签时都要跑）：
-`scripts/display-selftest.mjs <角色>`（自定义档位词 7 条 + 词条写法 42 条）、
+`scripts/display-selftest.mjs <角色>`（49 条：词条写法 / 天赋行标签 / 副词条同级对 / 面板两控件）、
 `scripts/audit-web-vs-panel.mjs` 的合成样例（3 条）、
-`scripts/editor-selftest.mjs`（编辑器规则 42 条：天赋等级 / 新增行可见 / 多值输入 / 标签互斥 /
-配队槽位 / 界面标记不落盘 / **删行墓碑** / **清空字段提交 null**）。
+`scripts/editor-selftest.mjs`（143 条：天赋等级 / 新增行可见 / 多值输入 / 标签互斥 /
+配队槽位 / 界面标记不落盘 / **删行墓碑** / **清空字段提交 null** / **面板两控件** / **武器行放得下几把** / **目录未填模块**）。
 
 **编辑器的保存协议（删行 / 清空 / 空占位行，用户 2026-09-20 定稿）**
 
@@ -427,14 +428,15 @@ node .dsh/verify-editor-e2e.mjs      # 端到端：用真实的 buildBody 出 pa
 | 圣遗物 | **同级套装（源文档 `/`）画字面 `/`**（`教官/勇者`）；**全套装名之间的 `+` 也是同级 → `/`**；只有 `2X + 2X`（2+2）留在一个 chip 内用 `+` | `guide-display.mjs` 的 `SET_LEVEL_SEP`/`gapSepOf`/`isPieceShorthand`/`resolveSetItems` ＋ `parse.js` 的 `resolveArtifactSetItems` |
 | 主词条 / 副词条 | 值末尾的**括注 → `note`（小字）**，对所有角色一致（值里写 `（特殊）` 与数据字段 `note`/`noteSlot` 两条路径收敛到同一个效果）；括注要在**判分隔符之前**拆 | `guide-display.mjs` 的 `normalizeArtifactRows`（两条链路共用）；网页版模板 `.rank-note`、面板 `codex.html` 的 `it.note` |
 | 武器 | 武器档位是**优先级链**：源文档写 `/` 或 `>` **都显示 `＞`** | `guide-display.mjs` 的 `weaponSep`（武器行的唯一分隔符口径） |
-| 天赋 | 行首标签显示 **`推荐`**（不是 `天赋`）；三格 A/E/Q + 图标正下方等级数字（10 叠皇冠） | `build-html.mjs` 与 `parse.js` 的行模型（`label: '推荐', kind: 'talents'`） |
-| **面板** | **键值对**（`{k,v}`）→ 行首标签留空、把 `暴击率：70%+` 放进条目；**说明行**（`辅助向：暴击率70% / 暴伤220%+`）→ 标签就是 `辅助向`、值按 `/` 拆成多个 chip；**同一标签 ≤3 条合并成一行**（行间用全角空格 `　`，行内 `/` 保留）、>3 条维持分行 | 两条链路都按这个约定产出行：`parse.js` 的 `v2PanelRows`（面板）与 `build-html.mjs` 的面板段（网页版，读 `v2.panels`）；合并由 `guide-display.mjs` 的 `normalizePanelRows` 完成 |
+| 天赋 | **行首没有标签**（`label: ''`，用户定稿 2026-09-21 去掉「推荐」chip —— 天赋只有 A/E/Q 三格，图标已自明）；三格 A/E/Q + 图标正下方等级数字（10 叠皇冠） | `build-html.mjs` 与 `parse.js` 的行模型（`label: '', kind: 'talents'`）；空标签 ⇒ `row-nolabel` / `grow-nolabel`（值列铺满整行） |
+| 面板 | **键值对**（`{k,v}`）→ 行首标签留空、把 `暴击率：70%` 放进条目；**说明行**（`辅助向：元素充能效率：240%`）→ 标签就是 `辅助向`、值按 `/` 拆成多个 chip；**同一标签 ≤3 条合并成一行**（行间用全角空格 `　`，行内 `/` 保留）、>3 条维持分行 | 两条链路都按这个约定产出行：`parse.js` 的 `v2PanelRows`（面板）与 `build-html.mjs` 的面板段（网页版，读 `v2.panels`）；合并由 `guide-display.mjs` 的 `normalizePanelRows` 完成 |
 | 命座 | **图标在 `命之座N` 之前**：`[图标] [命之座2] [说明]`；命座图标是**白色线稿**，浅底上必须反相成深色（`rank-icon-line`）否则看不清 | `codex.html` 的 `.grow-icon`（行首渲染，**带 `rank-icon-line`**）＋ `codex.css` 的 `.grow-constellation` 三列网格 / `.rank-icon.rank-icon-line { filter: invert(1) brightness(.9) }` |
 | 配队 | **头像之间 `+`**（槽位之间）；**同一槽位的可替换角色之间 `/`，且这些候选头像要并列横排**（不要上下堆叠）；**成员括注用行内全角括弧**（`叶洛亚 / 希诺宁（二命）`，与圣遗物 `千岩牢固（四件套）` 同款）；**`注：` 只给段末那条纯文字行**（`注：建议二命及以上；高金配置`），带档位词、整行就是内容的不加（`可选：自由选择`） | `codex.html` 的 `.team-plus` / `.team-alts` / `.team-slash` / `.team-member-note`；候选头像由插件 `icons.js` 的 `attachTeamIcons` 逐个解析（`member.candidates`）；`注：` 前缀由 `guide-display.mjs` 的 `normalizeTeams` 的 `notePrefix` 决定（两链路口径一致，`audit-web-vs-panel` 会逐字比前缀） |
 | Hero | 文字对比度：遮罩 0.52 + 近黑字 + 四向白色描边 | `resources/common/hero.css` 的 `.hero-bg` / `.hero-title` / `.hero-game` |
 
-面板离线核对（维护者侧，`.dsh/` 不入库）：`node .dsh/explore/codex/render.mjs <角色>`
-（`FAKE_ICONS=1` 塞占位图标、`FAKE_HERO=<图片路径>` 塞名刺背景，用 Edge 无头截图看排版）。
+面板离线核对（维护者侧，`.dsh/` 不入库）：在**插件仓库**里跑 `node .dsh/explore/codex/render.mjs <角色>`
+（`FAKE_ICONS=1` 塞占位图标、`FAKE_HERO=<图片路径>` 塞名刺背景，用 Edge 无头截图看排版）；
+编辑器的界面体检在本仓库：`.dsh/probe-editor-live.mjs`（真实编辑器里量 + 截图）、`.dsh/audit-editor-ui-live.mjs`（批量清扫）。
 
 ---
 
@@ -484,9 +486,9 @@ node .dsh/verify-editor-e2e.mjs      # 端到端：用真实的 buildBody 出 pa
       { "kind": "priority", "order": [ { "name": "Q", "ref": "talent:Q" } ], "raw": "Q > E > A" },
       { "kind": "crown",    "items": [ { "name": "E", "level": "建议", "ref": "talent:E" } ] }
     ],
-    "panels": [                            // 毕业面板参考，二选一
-      { "label": "辅助向", "k": "暴击率", "v": "70%+" },
-      { "label": "辅助向", "text": "暴击率70%+ / 充能240%+" }
+    "panels": [                            // 毕业面板参考，规范化后只有这两种形状
+      { "label": null, "k": "暴击率", "v": "70%" },              // 无标签 → 文档写「暴击率：70%」
+      { "label": "辅助向", "text": "元素充能效率：240%" }         // 有标签 → 文档写「辅助向：元素充能效率：240%」
     ],
     "constellations": [                    // 命座推荐，index 由 name 推导（二命 → 2）
       { "name": "二命", "index": 2, "text": "加快增伤叠层速度" }
@@ -603,7 +605,7 @@ node scripts/build-index.mjs [图鉴后端目录]
 - **`data/_index.json` 是生成物，但照样入库**：没有图鉴后端的机器跑不出索引，所以仓库里留一份最新的；
   数据变动后（编辑、重命名、删除、批量替换）编辑器会自动重建它，手工重建就用 `node scripts/build-index.mjs`
 - `data/_parse-report.json`、`out/`、`data/_trash/`、`data/_backup/`、`.tmp/` 都是本地中间产物，已在 `.gitignore` 里**不入库**
-- 当前规模：武器 291 / 角色 138 / 圣遗物套装 69（写这段时实测值）
+- 当前规模：武器 284 / 角色 131 / 圣遗物套装 65（写这段时实测值；以 `data/_index.json` 为准）
 
 ### 3. 图形化编辑器：`node scripts/editor.mjs`
 
@@ -615,18 +617,22 @@ node scripts/editor.mjs [--port 8787] [--no-open] [--exit-on-idle[=<秒>]]
 浏览器打开终端提示的地址（默认 `http://127.0.0.1:8787`；端口被占用会自动 +1 重试，最多 10 次）。
 界面中文、零依赖、无 CDN：左边搜角色 / 新增 / 排序 / 重命名 / 删除（软删除到 `data/_trash/`），
 右边按区块折叠编辑；保存用「保存」按钮或 `Ctrl+S` / `⌘+S`；
-「保存并发布」或 `Ctrl+Shift+S` 走全链路（写 JSON → 重建索引 → 写回 Word 主文档 → 生成 `guide.html` → 三方一致性校验 → **自动提交，不推送**）；
+「保存并发布」或 `Ctrl+Shift+S` 走全链路（写 JSON → 重建索引 → 写回 Word 主文档 → 生成 `guide.html` / `guide.md` → 三方一致性校验 → 生成提交摘要）；**不会自动提交**，提交与推送都由人工执行；
 「发布」按钮只把**已保存的**数据重新生成 `guide.html` 与 Word 主文档，不写入正在编辑的表单。
 
 **表单里的几条硬规则**（都是用户报过问题后定稿的，改动前先看 `scripts/editor-selftest.mjs`）：
 
 | 栏目 | 规则 |
 |---|---|
+| 文字排版（全表单） | 控件（输入框 / 下拉 / 文本域）**统一 13px**、说明文字 12px；提示文字（placeholder）**一律不许被截断**（提示词写短，长解释放 `title`）；行尾按钮只留图标（`↑` / `↓` / 垃圾桶），文案在 `title` 里 |
+| 角色目录（左栏） | 每行 = 角色名 + 右侧「**未填：武 圣**」（单个汉字：武 / 圣 / 天 / 面 / 命 / 配 = 六模块，顺序即文档顺序；全填的角色不显示）。判据在服务端 `filledModules()`（**空占位行不算填**：`首选：` 后面没东西、主词条三槽全空都不算）；鼠标悬停给完整模块名。行距压到 4px/2px 内边距，长名字省略号截断（`.nm` 的 `min-width: 0`）——同屏能多放几个名字 |
 | 武器行 | 「自定义标签」与「档位」**二选一**：填了自定义词（如 `建议`）自动清空档位下拉，反之亦然；行首实时显示「显示为：X」 |
+| 武器 / 圣遗物行的 chip | 徽标**只留图标**（完整类型名在 `title` 里）、名字框**按内容自适应宽度**（`field-sizing: content`，不支持的浏览器由 `autoSizeInput` 兜底）—— 名字短占得少，一行就能多放一把 |
+| 武器行的「放得下几把」 | **同级上限 4 把**（`WEAPON_ROW_CAP`）。渲染后按**实际量出来的 chip 宽度**算：放得下 → 行首提示 `可加入 4 把`；名字长放不下 → `仅可加入 N 把`；已经 4 把 → `已达同级上限（4 把）`；当前这行就放不下 → 追一句「当前放不下，请先删到放得下」。算法是纯函数 `planRowFit`（自检直接断言），DOM 那一遍在 `refreshFitHints` |
 | 圣遗物行 | 档位下拉与标签联动（`label` 就是文档原词，`kind` 跟着走）；**件数不再提供输入** |
-| 主词条 / 副词条 | 每个 chip 是**可编辑输入框**（点「＋」加一项后能直接打字，或点「▾」从候选表选）；主词条候选不带「百分比」，副词条候选是 `大X` / `小X` 两套；副词条**只有暴击率↔暴击伤害是同级**（编辑器不提供分隔符编辑，改动走文档层） |
+| 主词条 / 副词条 | 每个 chip 是**可编辑输入框**（点「＋」加一项后能直接打字，或点「▾」从候选表选）；主词条候选不带「百分比」，副词条候选是 `大X` / `小X` 两套；副词条**只有暴击率↔暴击伤害是同级**（编辑器不提供分隔符编辑，改动走文档层）；主词条三槽是 grid 里的小格子，**放不下时折行**（`.mv-wrap`），武器 / 副词条行仍然不换行、窄了横向滚动 |
 | 天赋 | 固定三格 A / E / Q，**数字就是等级**（1–10，留空按 1）；数字本身就会生效，皇冠只是把这一格抬到 10 |
-| 面板行 | 是**「键：值」结构**：只填一半（缺 `v` 或缺 `k`）写不出合法文档行、保存时会被丢掉 —— 这两种情况表单会打 ⚠ 提示，别以为是"没激活" |
+| 面板行 | **一行两个控件**：属性下拉（只有 `攻击力 / 防御力 / 生命值 / 暴击率 / 暴击伤害 / 元素精通 / 元素充能效率` 七种，124px、带原生箭头）+ 数值输入（**固定 200px**，`field-sizing: fixed`）。数值**自动补 `%`**（暴击率 / 暴击伤害 / 元素充能效率）、**不留尾部的 `+`**（`2200+` → `2200`、`800+（非讨龙）` → `800（非讨龙）`）；数值框带 datalist 候选（只是提示，不校验）。只填一半（缺属性或缺数值）写不出合法文档行、保存时会被丢掉 —— 表单会打 ⚠ 提示。「说明行 / 属性行」按钮可整行切换（带标签的结构化行落盘成 `{label, text:'k：v'}`，文档层就是 `标签：k：v` 一行两个冒号） |
 | 命座行 | **命座名必填**（决定 `命之座N` 与命座图标）：只填说明会被丢掉，表单打 ⚠ 提示 |
 | 配队 | 「＋ 成员」打开**槽位**选择器：点名字加进**当前格**，一格可多选（格内 ` / ` = 可替换），「＋ 新槽位」再开一格；`＋ 配队行` 加出来的空行**立刻可见可编辑** |
 | 任何栏目 | 「＋ 新增一行」加出来的空行用界面标记 `_new` 保证可见，**保存时不会落盘**（空行不写进 JSON） |
@@ -654,7 +660,8 @@ PowerShell 的隐藏命令，而不是直接指向 `node.exe`：
 - 「起始位置」：仓库目录；「运行方式」：最小化（窗口样式 7）
 - 效果：无窗口后台启动、输出追加到 `out/editor.log`（`out/` 已在 `.gitignore` 里）、关掉网页约 20 秒后服务自己结束
 
-仓库内**不提供** `.cmd` / `.lnk` 之类的启动脚本：启动脚本与快捷方式都属于个人环境配置，不入库，避免污染仓库。
+**例外**：`scripts/daily-docx-sync.cmd` 是唯一入库的 `.cmd` —— 计划任务不接受带引号的 `/TR` 参数，
+只能用一个 `.cmd` 包一层（见上面「每天自动把数据回写进主文档」）。其余启动脚本与快捷方式都属于个人环境配置，不入库。
 
 ### 4. 保存即发布：`POST /api/publish`
 
@@ -666,8 +673,9 @@ PowerShell 的隐藏命令，而不是直接指向 `node.exe`：
             →  三方一致性校验（全过才继续）  →  git add + git commit（**绝不 push**）
 ```
 
-**保存并发布 = 保存 + 发布 + 多方校验 + 自动提交；推送（`git push`）由人工执行** ——
-全链路只做 `git add` / `git commit`，**不执行任何 `git push`，也不设置远端**。
+**保存并发布 = 保存 + 发布 + 多方校验 + 提交摘要；提交与推送（`git push`）都由人工执行** ——
+发布链路**不执行** `git add` / `git commit` / `git push`，也不会碰远端；
+`/api/commit` 是显式接口（界面默认不触发），它只 `add` 本次指定的路径、绝不 `add -A`。
 
 「一致」指：**数据库（`data/gi`）× 主文档（干净可读版）× 标记版文档 × 网页版（`guide.html`）** 内容等价。
 提交前逐项校验，**任一项不过就跳过提交**（已生成的文档 / 网页保持可用，不回滚）：
@@ -681,7 +689,7 @@ PowerShell 的隐藏命令，而不是直接指向 `node.exe`：
 | e. 标记版文档 | 标记版本次刷新；`parse-docx` 读回与 `data/gi` **129/129 深度相等**；与主文档**去标记后逐字一致** | 全过 |
 
 任一项不过时返回 `{ok:false, step:'verify', detail:'…', commitExecuted:false}`，
-`detail` 里写明**哪一项没过、哪几个角色不一致**，摘要也会标注「已跳过自动提交」。
+`detail` 里写明**哪一项没过、哪几个角色不一致**（发布本来就不提交，所以失败也不会留下半个提交）。
 
 ### 两份文档的分工（主文档=可读版，标记版=转换用）
 
@@ -718,7 +726,7 @@ PowerShell 的隐藏命令，而不是直接指向 `node.exe`：
 **提交摘要**（界面右下角 toast 里显示同样内容，带「复制提交信息」按钮）包含四段：
 
 1. **建议提交信息** —— 单行标题 + 正文要点（单角色 `docs: 更新 <角色名>（<字段>）`，批量 `docs: 批量更新 <n> 个角色`），
-   自动提交用的就是它（首行标题 + 正文要点）
+   提交时直接用它（首行标题 + 正文要点）
 2. **变更文件** —— 新增 / 修改 / 删除 + 行数（新增文件给 `+行数`）
 3. **按角色变化** —— 武器 / 圣遗物 / 天赋 / 面板 / 命座 / 配队 各「增 / 删 / 改」几条
 4. **未跟踪文件** —— `git status` 里的 `??` 文件提醒
@@ -801,8 +809,9 @@ node scripts/build-docx.mjs [--out 目标docx] [--template 模板docx] [--no-mar
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
+| （所有写请求） | —— | **跨站防护**：`Host` 必须是 `127.0.0.1` / `localhost`；写请求必须带自定义头 `X-Codex-Editor: 1`（页面里的 `api()` 自动带；外部脚本自己加），带 `Origin` 时 Origin 也必须是本机。否则 `403`。心跳 / 关闭（`sendBeacon`）只校验 Host 与 Origin |
 | GET | `/api/index` | `data/_index.json`（不存在时返回 `{weapons:[],artifacts:[],characters:[]}`） |
-| GET | `/api/characters` | `{ order, items: [{name, weapons, artifacts, hasUnparsed}], missing }`；`weapons`/`artifacts` 是 v2 行数 |
+| GET | `/api/characters` | `{ order, items: [{name, weapons, artifacts, filled, hasUnparsed, broken}], missing }`；`weapons`/`artifacts` 是 v2 行数，`filled` 是六模块各自「有没有真内容」（目录右侧的「未填：武 圣」用它） |
 | GET | `/api/character?name=X` | 角色 JSON，附带 `issues: validate(data, index)` |
 | PUT | `/api/character?name=X` | body 为完整 JSON；保存并返回 `{ok:true, issues:[...]}`；`X` 不在 `_order.json` 时追加 |
 | POST | `/api/character` | body `{name}`，新建空白 v2 模板（meta 三项空、v2 六数组空）；已存在返回 409 |
@@ -817,8 +826,8 @@ node scripts/build-docx.mjs [--out 目标docx] [--template 模板docx] [--no-mar
 | GET | `/api/name-usage` | 名称库使用统计：`{weapons,artifacts,characters}`，每项 `{name,total,characters:[{name,count}]}`（未出现的名字即「未使用」） |
 | POST | `/api/batch-replace` | body `{type,from,to,dry?}`。`dry:true` 只预览（返回 `total` / `files` / `perCharacter` / `hits` / `warnings`）；否则执行替换，返回 `{stamp,files,perCharacter,changed,remaining,warnings}`，并在 `data/_backup/<stamp>/` 留副本 |
 | POST | `/api/batch-replace/undo` | body `{stamp}`，用备份逐字节还原并删除该备份目录 |
-| POST | `/api/publish` | 保存并发布全链路：写角色 JSON（body 带 `name` 才写）→ 重建 `data/_index.json` → `build-docx.mjs --write-main` 写回 Word 主文档（自动备份）→ `build-html.mjs` 生成 `guide.html` → 提交摘要 `out/_commit-summary.md`（+ 最近 5 份时间戳副本）→ **三方一致性校验**（diagnose 不一致 0 / 往返 129-129 / guide.html 本次生成 / 悬挂分隔符 0）→ `git add` + `git commit`。返回 `{ok, steps, verify, summary, docx, html, summaryFile, summaryStampFile, commit:'<短hash>', commitExecuted, pushed:false}`；校验不过时 `{ok:false, step:'verify', detail, commitExecuted:false}` 且**不提交**；提交失败/无改动时 `{ok:true, commitExecuted:false, commitError|commitSkipped}` 且**不回滚**。**永不 push**（详见「保存即发布」一节） |
-| POST | `/api/commit` | 幂等的手动提交入口（界面无入口）：body `{message?, paths?, stageAll?}`，不传 message 则取摘要里的建议标题；`git add` + `git commit`，返回 `{ok, commit:'<短hash>', commitExecuted, commitError?, commitSkipped?, pushed:false}`；**无改动不报错**，同样不 push |
+| POST | `/api/publish` | 保存并发布全链路：写角色 JSON（body 带 `name` 才写）→ 重建 `data/_index.json` → `build-docx.mjs --write-main` 写回 Word 主文档（自动备份）→ `build-html.mjs` 生成 `guide.html` → `build-doc.mjs` 生成 `guide.md` → 提交摘要 `out/_commit-summary.md`（+ 最近 5 份时间戳副本）→ **三方一致性校验**（diagnose 不一致 0 / 往返 129-129 / guide.html 本次生成 / 悬挂分隔符 0）。返回 `{ok, steps, verify, summary, docx, html, summaryFile, summaryStampFile, commit:null, commitExecuted:false, pushed:false}`；校验不过时 `{ok:false, step:'verify', detail}`。**不执行 git add / commit / push**：提交与推送永远由人工做（详见「保存即发布」一节） |
+| POST | `/api/commit` | 手动提交入口（界面无入口）：body `{message?, paths?}`，不传 message 则取摘要里的建议标题；只 `git add -- <paths>`（**没有 paths 就不提交，绝不 `add -A`**）+ `git commit`，返回 `{ok, commit:'<短hash>', commitExecuted, commitError?, commitSkipped?, pushed:false}`；**无改动不报错**，同样不 push |
 | GET/POST | `/api/heartbeat` | 页面心跳（前端每 5 秒一次）：返回 `{ok, exitOnIdle, idleSeconds, at}`；`--exit-on-idle` 未开启时 `exitOnIdle:false`（空操作，不影响命令行用法） |
 | POST | `/api/close` | 页面关闭信号：返回 `{ok, exitOnIdle, graceMs}`。开启空闲退出时，**5 秒宽限期**后退出；期间再来一次心跳就取消退出（刷新页面不会误杀服务）。未开启时是空操作。前端用 `navigator.sendBeacon('/api/close')` 在 `pagehide` / `beforeunload` 时发出 |
 

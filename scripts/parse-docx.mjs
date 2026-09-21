@@ -186,6 +186,30 @@ function parseWeaponItem (token, index) {
   return { name, ...(note ? { note } : {}), ref: makeRef('weapon', name) }
 }
 
+/**
+ * 武器行的分隔符 → v2 的 token 口径：`>` / `≥` / `=` **原样保留**，其余（`/` `／` `｜` `，` `、` `,`）
+ * 一律算「并列」`/`。
+ *
+ * ⚠ 以前武器行走的是 `splitItems()`：它只认「整行一个 token」，所以**混合写法会丢**——
+ * `溢彩心念 > A = B` 会被读回 `sep: ' > '`（`=` 那一档没了），`docx → data` 与 data 不一致，
+ * 每日回写因此**直接放弃写主文档**（往返校验挡下）。现在与副词条走同一套逐档机制
+ * （`splitStatsFull` + `gapSepOf`），编辑器里武器行的三个选项（＞ / ≥ / =）才真的闭合。
+ */
+function weaponSepToken (rawSep) {
+  const c = String(rawSep ?? '').trim()
+  if (c === '>' || c === '＞') return '>'
+  if (c === '≥') return '≥'
+  if (c === '=' || c === '＝') return '='
+  return '/'
+}
+
+/** 武器行：逐档拆条目 + 逐档记分隔符（混合写法如 `> =` 也能逐字回来） */
+function splitWeaponItems (text) {
+  const full = splitStatsFull(text).filter(x => x.text)
+  const toks = full.map(x => ({ text: x.text, sep: weaponSepToken(x.sep) }))
+  return { items: full.map(x => x.text), sep: gapSepOf(toks, text) }
+}
+
 /** 圣遗物套装 token（可能带件数说明或 [[a:..]]） */
 function parseSetItem (token) {
   const marks = extractMarks(token)
@@ -509,14 +533,14 @@ function parseBlock (lines, index) {
     if (section === '武器推荐') {
       const tier = line.match(/^第([一二三四五六1-6])[档挡][:：]\s*(.*)$/)
       if (tier) {
-        const { items, sep } = splitItems(tier[2])
+        const { items, sep } = splitWeaponItems(tier[2])
         if (!items.length) continue
         data.v2.weapons.push({ label: null, tier: CN_TIER[tier[1]] ?? null, sep, items: items.map(t => parseWeaponItem(t, index)) })
         continue
       }
       const labeled = line.match(/^([^：:]{1,12})[:：]\s*(.*)$/)
       if (labeled && labeled[2].trim()) {
-        const { items, sep } = splitItems(labeled[2])
+        const { items, sep } = splitWeaponItems(labeled[2])
         if (items.length) {
           data.v2.weapons.push({ label: labeled[1].trim(), tier: null, sep, items: items.map(t => parseWeaponItem(t, index)) })
           continue
@@ -722,7 +746,9 @@ function main () {
     if (!lines.length) continue
     setWarnContext(String(lines[0] ?? '').split('——')[0].trim())
     const parsed = parseBlock(lines, index)
-    if (!parsed.name || parsed.name.includes('共 129') || parsed.name.startsWith('原神 ·')) continue
+    // 跳过抬头段：只认「原神 · 角色攻略」这一句（以前还硬编码了 `共 129 名角色`，
+    // 角色数一变这个判据就失效；抬头第一行不变，够了）
+    if (!parsed.name || parsed.name.startsWith('原神 ·')) continue
     const prevFile = path.join(giDir, `${parsed.name}.json`)
     let prev = {}
     if (fs.existsSync(prevFile)) { try { prev = readJson(prevFile) } catch { prev = {} } }

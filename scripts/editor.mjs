@@ -10,7 +10,8 @@
  * 页面与静态资源：resources/editor/（`/` → index.html）
  * API（全部 JSON、UTF-8 无 BOM）：
  *   GET    /api/index                  → data/_index.json（不存在时返回空清单）
- *   GET    /api/characters             → { order, items:[{name,weapons,artifacts,hasUnparsed}], missing }
+ *   GET    /api/characters             → { order, items:[{name,weapons,artifacts,filled,hasUnparsed,broken}], missing }
+ *                                        `filled` = 六个模块各自有没有真内容（目录右侧显示「未填：武 圣」用）
  *   GET    /api/character?name=X       → 角色 JSON + issues（validate 结果）
  *   PUT    /api/character?name=X       → 保存（body 为完整 JSON；强制 schema:2，tags/sections 由服务器重建）
  *                                        保存后自动重建 data/_index.json，响应带 indexRefreshed / indexWarning
@@ -1064,6 +1065,31 @@ function apiIndex (res) {
   sendJson(res, 200, readIndex())
 }
 
+/**
+ * 六个模块「有没有真内容」——目录里显示的是**还没填的模块**（用户定稿 2026-09-21）。
+ * 口径：空占位行不算填（`首选：` 后面没东西、主词条三槽全空、只有 label 没有值）。
+ * @param {object} v2
+ * @returns {{weapons:boolean, artifacts:boolean, talents:boolean, panels:boolean, constellations:boolean, teams:boolean}}
+ */
+export function filledModules (v2) {
+  const v = v2 ?? {}
+  const anyNamed = (rows, key) => asArray(rows).some(r => asArray(r?.[key]).some(x => hasText(x?.name)))
+  const statsFilled = (rows) => asArray(rows).some(r => {
+    if (r?.kind === 'main') {
+      return ['时之沙', '空之杯', '理之冠'].some(slot => asArray(r?.stats?.[slot]).some(hasText))
+    }
+    return asArray(r?.stats).some(hasText)
+  })
+  return {
+    weapons: anyNamed(v.weapons, 'items'),
+    artifacts: anyNamed(v.artifacts, 'sets') || statsFilled(v.artifacts),
+    talents: asArray(v.talents).some(r => asArray(r?.order).length > 0 || asArray(r?.items).length > 0 || hasText(r?.text)),
+    panels: asArray(v.panels).some(r => hasText(r?.k) || hasText(r?.text)),
+    constellations: asArray(v.constellations).some(r => hasText(r?.name)),
+    teams: anyNamed(v.teams, 'members') || asArray(v.teams).some(r => hasText(r?.text))
+  }
+}
+
 function apiCharacters (res) {
   const order = readOrder()
   const names = listCharacterNames()
@@ -1073,15 +1099,17 @@ function apiCharacters (res) {
     try {
       data = readJson(characterFile(name))
     } catch {
-      items.push({ name, weapons: 0, artifacts: 0, hasUnparsed: false, broken: true })
+      items.push({ name, weapons: 0, artifacts: 0, filled: null, hasUnparsed: false, broken: true })
       continue
     }
     const v2 = data?.v2 ?? {}
     const unparsed = data?.unparsed ?? {}
     items.push({
       name,
+      // 旧的计数（「打开第一个有内容的角色」还在用），目录里不再显示
       weapons: asArray(v2.weapons).length,
       artifacts: asArray(v2.artifacts).length,
+      filled: filledModules(v2),
       hasUnparsed: Object.values(unparsed).some(lines => asArray(lines).length > 0)
     })
   }
@@ -1642,6 +1670,15 @@ async function apiPublish (req, res) {
     mark('生成 guide.html', false, `build-html 失败：${String(e?.message ?? e)}`)
   }
 
+  // ④b 生成 guide.md：仓库里 guide.html 与 guide.md 是一对产物（README 的验收要求两个一起刷），
+  //     以前发布只刷 html，md 会一直落后到下次手动跑脚本；md 也在发布的快照/摘要清单里。
+  try {
+    await runNodeScript(path.join(here, 'build-doc.mjs'), [])
+    mark('生成 guide.md', true, `${fs.statSync(path.join(root, 'guide.md')).size} 字节`)
+  } catch (e) {
+    mark('生成 guide.md', false, `build-doc 失败：${String(e?.message ?? e)}`)
+  }
+
   const after = snapshotFiles()
   const relJson = name ? path.posix.join('data', 'gi', `${name}.json`) : null
   const curJson = name ? readJsonSafe(path.join(root, relJson)) : null
@@ -1653,8 +1690,8 @@ async function apiPublish (req, res) {
     concurrent: name ? before.get(relJson) !== after.get(relJson) : false
   }
   const summary = buildCommitSummary({ before, after, name, docx, html, wroteJson, steps, perChar, baseline: baselineInfo })
-  // 摘要里先写「会由本流程提交」（此时还没提交，拿不到 hash）；提交失败会重写这一段
-  summary.commitNote = '> 本摘要由「保存并发布」生成；保存并发布会自动提交（**不含 push**，推送请人工执行）。'
+  // 摘要里如实写明「不会自动提交」（用户定稿：提交由人工做）
+  summary.commitNote = '> 本摘要由「保存并发布」生成；发布**不会**自动 git add / commit，提交与推送请人工执行。'
   summary.markdown = renderSummaryMarkdown(summary)
   let summaryFiles = null
   try {
@@ -1703,27 +1740,18 @@ async function apiPublish (req, res) {
     return
   }
 
-  // ⑤ 自动提交（**绝不 push**）：只提交本次发布真正动过的路径，不把仓库里别人的在途改动卷进来。
-  //    失败不报错、不回滚 —— 保存与生成都已经成功了，提交失败只提示用户手动提交。
-  const commitResult = await commitChanges({
-    subject: summary.suggestedMessage,
-    bullets: summary.bullets,
-    paths: [...summary.changedFiles.map(c => c.path), summaryFile, summaryFiles?.stampFile].filter(Boolean),
-    stageAll: body?.stageAll === true
-  })
+  // ⑤ **不自动提交**：发布只负责「写 JSON → 重建索引 → 回写主文档 → 重建 guide.html / guide.md →
+  //    生成提交摘要」。提交与推送永远由人来做（用户定稿：提交自己提交；文件头 27-28 行也是这么写的）。
+  //    `/api/commit` 仍是显式接口，但界面默认不触发它。
   summary.commit = {
-    executed: commitResult.executed,
-    hash: commitResult.hash ?? null,
-    error: commitResult.error ?? null,
-    skipped: commitResult.skipped ?? null,
-    scope: commitResult.paths ?? null,
+    executed: false,
+    hash: null,
+    error: null,
+    skipped: '发布不会自动提交：摘要已生成，请自行 git add / git commit',
+    scope: null,
     pushed: false
   }
-  summary.commitNote = commitResult.executed
-    ? `> 已自动提交 \`${commitResult.hash}\`（**未 push**；推送请人工执行 \`git push\`）。`
-    : (commitResult.error
-        ? `> ⚠ 自动提交失败：${commitResult.error}　→ 请手动 \`git add && git commit\`（保存与生成已完成，未回滚）。`
-        : `> ${commitResult.skipped || '无改动可提交'}　→ 无需提交。`)
+  summary.commitNote = '> 未自动提交（按约定由人工提交）：摘要在 `out/_commit-summary.md`，本次改动见 `summary.changedFiles`。'
   summary.markdown = renderSummaryMarkdown(summary)
   if (summaryFiles) {
     try { summaryFiles = writeSummaryFiles(summary.markdown) } catch { /* 摘要二次写入失败不影响主流程 */ }
@@ -1733,11 +1761,11 @@ async function apiPublish (req, res) {
     ok: true,
     steps,
     verify,
-    commit: commitResult.hash,
-    commitExecuted: commitResult.executed,
-    commitError: commitResult.error ?? null,
-    commitSkipped: commitResult.skipped ?? null,
-    commitScope: commitResult.paths ?? null,
+    commit: null,
+    commitExecuted: false,
+    commitError: null,
+    commitSkipped: summary.commit.skipped,
+    commitScope: null,
     pushed: false,
     summary,
     summaryFile,
@@ -1780,10 +1808,11 @@ async function commitChanges (opts = {}) {
     if ((await gitRun(['check-ignore', '--quiet', '--', rel])).code === 0) continue
     if (fs.existsSync(abs) || (await gitRun(['ls-files', '--error-unmatch', '--', rel])).code === 0) paths.push(rel)
   }
-  // 本次发布动过的路径都被忽略时，退回整仓 add -A（此时工作区里只有别人的在途改动，提交信息仍用本次摘要）
+  // 没给出具体路径就**不提交**：以前这里退回整仓 `git add -A`，会把工作区里别人的在途改动
+  // 一起卷进这次提交（与上面注释的既定意图正好相反，用户明确要求「提交由我自己提交」）。
   const unique = [...new Set(paths)]
-  const addArgs = opts.stageAll || !unique.length ? ['add', '-A'] : ['add', '--', ...unique]
-  const add = await gitRun(addArgs)
+  if (!unique.length) return { executed: false, hash: null, skipped: '没有指定要提交的路径（不做整仓 add）' }
+  const add = await gitRun(['add', '--', ...unique])
   if (add.code !== 0) return { executed: false, hash: null, error: `git add 失败：${(add.stderr || add.stdout).trim().slice(0, 300)}` }
 
   const staged = await gitRun(['diff', '--cached', '--name-only'])
@@ -2301,10 +2330,42 @@ function serveStatic (res, urlPath) {
 
 /* ------------------------------------------------------------------- 服务器 */
 
+/* --------------------------------------------------------------- 跨站防护
+ *
+ * 这个服务只监听 127.0.0.1，但**本机端口对浏览器里的任何网页都可达**：
+ * 恶意页面可以用 `fetch(..., {mode:'no-cors'})` 发「简单请求」直接打写接口
+ * （PUT/POST 改 JSON、发布、甚至 git commit），DNS 重绑定还能读数据。
+ * 三道闸（都不改数据格式，也不影响正常使用）：
+ *   ① `Host` 必须是本机（挡 DNS rebinding）；
+ *   ② 写操作带 `Origin` 时，Origin 必须是本机（挡跨站 fetch / sendBeacon）；
+ *   ③ 写操作必须带自定义头 `x-codex-editor: 1` —— 跨站请求设不了自定义头，
+ *      而跨站预检我们一律不回 CORS 头，所以浏览器不会替它发出去。
+ *      （心跳 / 关闭走 `navigator.sendBeacon`，设不了头，只靠 ① ② 兜。）
+ */
+const LOCAL_HOST_RE = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i
+const isLocalHost = (h) => !h || LOCAL_HOST_RE.test(String(h))
+const isLocalOrigin = (o) => {
+  try { return LOCAL_HOST_RE.test(new URL(o).host) } catch { return false }
+}
+/** 这两个走 sendBeacon（浏览器不允许设自定义头），只校验 Origin */
+const BEACON_PATHS = new Set(['/api/heartbeat', '/api/close'])
+
+function crossSiteBlocked (req, pathname, method) {
+  if (!isLocalHost(req.headers.host)) return 'Host 不是本机地址'
+  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return null
+  const origin = req.headers.origin
+  if (origin && !isLocalOrigin(origin)) return '跨站来源被拒绝'
+  if (BEACON_PATHS.has(pathname)) return null
+  if (req.headers['x-codex-editor'] !== '1') return '缺少编辑器请求头（跨站防护）'
+  return null
+}
+
 async function route (req, res) {
   const url = new URL(req.url, 'http://127.0.0.1')
   const { pathname } = url
   const method = req.method ?? 'GET'
+  const blocked = crossSiteBlocked(req, pathname, method)
+  if (blocked) return sendError(res, 403, blocked)
 
   if (pathname.startsWith('/api/')) {
     if (pathname === '/api/index' && method === 'GET') return apiIndex(res)

@@ -11,6 +11,10 @@
  *   5. 配队：一格可以放多个名字（` / ` 可替换），落盘仍是**一格一个 name**。
  *   5b. 配队：新增一行后**只加了成员、还没填标签**必须生效 → `rowVisible` / 服务端 `isEmptyRow`
  *      都要认具名成员（用户报：「新增配队行后不激活」）。
+ *   5c. 副词条两两优先级关系（`＞` / `≥` / `=`）写进行的 `sep`，双爆固定 `=`。
+ *   5d. 武器行同一套关系规则（默认 `＞`），条目排成同一行（不换行）。
+ *   5e. 面板（毕业面板参考）改版：**一行两个控件**（属性下拉 + 数值输入），百分比属性自动补 `%`、
+ *      数值不留尾部 `+`；**空模块里新增的行直接就是这两个控件**（用户报：「新增行没按新格式激活」）。
  *   6. 界面上的临时标记（`_new`）**不许落盘**。
  *
  * 用法：node scripts/editor-selftest.mjs        # 全绿则 exit 0
@@ -246,9 +250,17 @@ push('配队：候选拆分', fn('memberCandidates')('迪奥娜 / 阿罗夏'), [
 }
 
 {
-  const { isEmptyRow } = await import(pathToFileURL(path.join(root, 'scripts', 'editor.mjs')).href)
+  const { isEmptyRow, filledModules } = await import(pathToFileURL(path.join(root, 'scripts', 'editor.mjs')).href)
   push('服务端 isEmptyRow：只有成员的配队行不算空行', isEmptyRow({ label: null, members: [{ name: '阿贝多', ref: 'character:阿贝多' }], text: '' }), false)
   push('服务端 isEmptyRow：只有空名字成员仍算空行', isEmptyRow({ label: null, members: [{ name: '', ref: 'character:' }], text: '' }), true)
+  // 目录里的「未填」判据：**有真内容才算填**（空占位行不算）
+  push('filledModules：只有标签没有条目 → 武器未填', filledModules({ weapons: [{ label: '首选', items: [] }] }).weapons, false)
+  push('filledModules：有具名武器 → 武器已填', filledModules({ weapons: [{ items: [{ name: '西风剑' }] }] }).weapons, true)
+  push('filledModules：主词条三槽全空 → 圣遗物未填', filledModules({ artifacts: [{ kind: 'main', stats: { 时之沙: [], 空之杯: [], 理之冠: [] } }] }).artifacts, false)
+  push('filledModules：副词条有词条 → 圣遗物已填', filledModules({ artifacts: [{ kind: 'sub', stats: ['暴击率'] }] }).artifacts, true)
+  push('filledModules：配队只有空成员 → 配队未填', filledModules({ teams: [{ members: [{ name: '' }], text: '' }] }).teams, false)
+  push('filledModules：整行备注算配队有内容', filledModules({ teams: [{ kind: 'note', text: '二命' }] }).teams, true)
+  push('filledModules：六个键都在', Object.keys(filledModules({})).join(','), 'weapons,artifacts,talents,panels,constellations,teams')
 }
 
 /* 5c. 副词条两两关系可改（用户定稿 2026-09-21）：`＞` / `≥` / `=` 写进行的 `sep`；
@@ -297,6 +309,127 @@ push('配队：候选拆分', fn('memberCandidates')('迪奥娜 / 阿罗夏'), [
   const out2 = fn('toJson')()
   push('武器行：落盘带上关系', (out2.v2.weapons[0] || {}).sep, ' > = ')
   if (process.env.DBG_WEAPON) console.log('[DBG] toJson.v2.weapons = ' + JSON.stringify(out2.v2.weapons) + '\n[DBG] model.v2.weapons = ' + JSON.stringify(model.v2.weapons))
+}
+
+/* 5e. 面板模块改版（用户定稿 2026-09-21）：**一行两个控件** —— 属性下拉 + 数值输入；
+ *     百分比属性（暴击率 / 暴击伤害 / 元素充能效率）自动补 `%`，数值不留尾部 `+`；
+ *     **空模块里「＋ 面板行」加出来的行直接就是这两个控件**（用户报：「新增行没按新格式激活」）。
+ */
+{
+  // ① 属性词表与归一
+  push('面板：属性词表就是七种', ctx.__editor.PANEL_ATTRS,
+    ['攻击力', '防御力', '生命值', '暴击率', '暴击伤害', '元素精通', '元素充能效率'])
+  push('面板：历史写法「充能」→ 元素充能效率', ctx.__editor.panelAttrOf('充能'), '元素充能效率')
+  push('面板：历史写法「暴伤」→ 暴击伤害', ctx.__editor.panelAttrOf('暴伤'), '暴击伤害')
+  push('面板：认不出的写法返回空串', ctx.__editor.panelAttrOf('双爆'), '')
+  push('面板：百分比属性判据', ['暴击率', '暴击伤害', '元素充能效率', '攻击力'].map(a => ctx.__editor.isPanelPct(a)),
+    [true, true, true, false])
+  const nv = ctx.__editor.normPanelValue
+  push('面板：百分比属性自动补 %', nv('暴击率', '70'), '70%')
+  push('面板：已经有 % 就不重复', nv('暴击率', '70%'), '70%')
+  push('面板：数值去掉尾部 +', nv('攻击力', '2200+'), '2200')
+  push('面板：充能 240+ → 240%', nv('元素充能效率', '240+'), '240%')
+  push('面板：非百分比属性不补 %', nv('元素精通', '800'), '800')
+  push('面板：`+` 后面只跟括号备注时也算尾部 `+`', nv('元素精通', '800+（非讨龙）'), '800（非讨龙）')
+
+  // ② 打开老数据：键值行归一；说明行里写着「属性：数值」也认成结构化行
+  const model = ctx.__editor.internals.normalizeData(mkData({
+    panels: [
+      { label: null, k: '充能', v: '240%+' },
+      { label: '输出向', text: '暴伤220%+' },
+      { label: null, k: '元素精通', v: '800+' },
+      { label: '辅助', text: '各种直伤纯色队' }
+    ]
+  }))
+  api.setModelForTest(model)
+  push('面板：打开时属性归一 + 去尾部 `+`', [model.v2.panels[0].k, model.v2.panels[0].v], ['元素充能效率', '240%'])
+  push('面板：打开时补 `%`（和落盘同一口径）', [model.v2.panels[2].k, model.v2.panels[2].v], ['元素精通', '800'])
+  push('面板：带标签的说明行认出「属性：数值」',
+    [model.v2.panels[1].label, model.v2.panels[1].k, model.v2.panels[1].v], ['输出向', '暴击伤害', '220%'])
+  push('面板：认不出的是真正的说明行',
+    [ctx.__editor.panelRowIsText(model.v2.panels[3]), model.v2.panels[3].text], [true, '各种直伤纯色队'])
+
+  // ③ 界面：一行两个控件（属性下拉 + 数值输入）
+  const html = ctx.__editor.internals.renderPanelsHtml()
+  push('面板界面：三行结构化行', (html.match(/class="mv panel-line"/g) || []).length, 3)
+  push('面板界面：每行一个属性下拉', (html.match(/<select class="mv-attr" data-panel-attr=/g) || []).length, 3)
+  push('面板界面：每个下拉列出七种属性', (html.match(/<option value="(攻击力|防御力|生命值|暴击率|暴击伤害|元素精通|元素充能效率)"/g) || []).length, 21)
+  push('面板界面：每行一个数值输入', (html.match(/data-panel-value="v2\.panels\./g) || []).length, 3)
+  push('面板界面：百分比属性的数值框带 mv-pct', (html.match(/class="mv-in mv-pct"/g) || []).length, 2)
+  push('面板界面：非百分比属性不带 mv-pct', /class="mv-in" data-panel-value="v2\.panels\.2"/.test(html), true)
+  push('面板界面：按属性给数值候选（datalist 七份）', (html.match(/<datalist id="dl-panel-/g) || []).length, 7)
+  push('面板界面：数值框挂上对应属性的候选表', /list="dl-panel-元素充能效率"/.test(html), true)
+  push('面板界面：说明行仍是文本框', /data-path="v2\.panels\.3\.text"/.test(html), true)
+  push('面板界面：整行不换行（没有 flex-wrap:wrap）', /flex-wrap:\s*wrap/.test(html), false)
+
+  // ④ 落盘形状：无标签 → `{k,v}`；有标签 → 说明行 `{label, text:'k：v'}`（往返闭合的那两种）
+  const out = fn('toJson')()
+  push('面板落盘：无标签行 → {k,v}', out.v2.panels[0], { k: '元素充能效率', v: '240%' })
+  push('面板落盘：有标签行 → {label, text:"k：v"}', out.v2.panels[1], { label: '输出向', text: '暴击伤害：220%' })
+  push('面板落盘：说明行原样留着', out.v2.panels[3], { label: '辅助', text: '各种直伤纯色队' })
+  push('面板落盘：界面标记不落盘', JSON.stringify(out).includes('_new') || JSON.stringify(out).includes('_text'), false)
+
+  // ⑤ 空模块里新增一行：直接激活成「属性 + 数值」
+  const m2 = ctx.__editor.internals.normalizeData(mkData({ panels: [] }))
+  api.setModelForTest(m2)
+  fn('handleAction')('add-row', 'v2.panels', undefined, null)
+  push('新增面板行：不是说明行（直接给两个控件）', ctx.__editor.panelRowIsText(m2.v2.panels[0]), false)
+  const html2 = ctx.__editor.internals.renderPanelsHtml()
+  push('新增面板行：表单里出现属性下拉', /data-panel-attr="v2\.panels\.0"/.test(html2), true)
+  push('新增面板行：表单里出现数值输入', /data-panel-value="v2\.panels\.0"/.test(html2), true)
+  push('新增面板行：还没选属性时给出提示', /属性要在下拉里选/.test(html2), true)
+  m2.v2.panels[0].k = '元素充能效率'
+  m2.v2.panels[0].v = ctx.__editor.normPanelValue('元素充能效率', '240+')
+  push('新增面板行：落盘补 % 去 +', fn('toJson')().v2.panels[0], { k: '元素充能效率', v: '240%' })
+
+  // ⑥ 「改成说明行 / 改成属性+数值」来回切不丢内容
+  const m3 = ctx.__editor.internals.normalizeData(mkData({ panels: [{ label: '输出向', text: '暴击率：70%' }] }))
+  api.setModelForTest(m3)
+  push('面板：说明行打开时折成结构化', [m3.v2.panels[0].k, m3.v2.panels[0].v], ['暴击率', '70%'])
+  fn('handleAction')('panel-to-text', 'v2.panels.0', undefined, null)
+  push('面板：结构化 → 说明行', [m3.v2.panels[0].text, !!m3.v2.panels[0].k], ['暴击率：70%', false])
+  push('面板：切回说明行后按说明行渲染', ctx.__editor.panelRowIsText(m3.v2.panels[0]), true)
+  fn('handleAction')('panel-to-text', 'v2.panels.0', undefined, null)
+  push('面板：再切回结构化', [m3.v2.panels[0].k, m3.v2.panels[0].v], ['暴击率', '70%'])
+}
+
+/* 5f. 武器行「放得下几把」（用户定稿 2026-09-21）：**同级上限 4 把**，名字短就放得下 4 把、
+ *     名字长就只放得下 3 把；编辑器按**实际量出来的宽度**给提示。
+ *     宽度公式（与 app.js 的 planRowFit 同一套）：n 个 chip + (n-1) 个分隔符 + 1 个「＋」按钮，
+ *     间隔 = 子元素数 - 1 个 gap。
+ */
+{
+  const fit = fn('planRowFit')
+  const base = { avail: 1000, sepWidth: 30, addWidth: 24, gap: 3, cap: 4 }
+  const m = (extra) => Object.assign({}, base, extra)
+  // 4 把短名（150/把）：4*150 + 3*30 + 24 + 7*3 = 735
+  push('武器行：放得下 4 把 → 提示「可加入 4 把」', fit(m({ chipWidths: [150, 150, 150], candidateWidth: 150 })).hint, '可加入 4 把')
+  push('武器行：上限常量 = 4', ctx.__editor.WEAPON_ROW_CAP, 4)
+  // 4 把长名（300/把）：4*300 + 3*30 + 24 + 21 = 1341 > 1000
+  push('武器行：名字长只放得下 3 把 → 提示「仅可加入 3 把」',
+    fit(m({ chipWidths: [300, 300, 300], candidateWidth: 300 })).hint, '仅可加入 3 把')
+  push('武器行：刚好 735px 放得下 4 把', fit(m({ avail: 735, chipWidths: [150, 150, 150], candidateWidth: 150 })).hint, '可加入 4 把')
+  push('武器行：734px 就差 1px → 仅可加入 3 把', fit(m({ avail: 734, chipWidths: [150, 150, 150], candidateWidth: 150 })).hint, '仅可加入 3 把')
+  push('武器行：已经 4 把 → 已达同级上限', fit(m({ chipWidths: [100, 100, 100, 100], candidateWidth: 100 })).hint, '已达同级上限（4 把）')
+  push('武器行：2 把短名可以加满 4 把', fit(m({ chipWidths: [100, 100], candidateWidth: 100 })).maxFit, 4)
+  push('武器行：当前就放不下时 over = true', fit(m({ chipWidths: [400, 400, 400], candidateWidth: 400 })).over, true)
+  push('武器行：放得下时 over = false', fit(m({ chipWidths: [150, 150, 150], candidateWidth: 150 })).over, false)
+}
+
+/* 5g. 角色目录右侧：只报「还没填的模块」（用户定稿 2026-09-21：不再显示「武2 圣3」计数） */
+{
+  const html = ctx.__editor.renderListHtml([
+    { name: '甲', filled: { weapons: false, artifacts: false, talents: true, panels: true, constellations: true, teams: true } },
+    { name: '乙', filled: { weapons: true, artifacts: true, talents: true, panels: true, constellations: true, teams: true } },
+    { name: '丙', filled: { weapons: true, artifacts: true, talents: false, panels: false, constellations: false, teams: false }, hasUnparsed: true },
+    { name: '丁', filled: null, broken: true }
+  ])
+  push('目录：未填模块写成「未填：武 圣」', /未填：武 圣/.test(html), true)
+  push('目录：全部模块已填的行不出现「未填」', /乙[\s\S]*?<\/div>/.test(html) && !/乙[\s\S]*?未填/.test(html.split('丙')[0]), true)
+  push('目录：模块顺序按文档顺序（天 面 命 配）', /未填：天 面 命 配/.test(html), true)
+  push('目录：未识别单独标记', /未识别/.test(html), true)
+  push('目录：坏文件标「读取失败」且不误报未填', /读取失败/.test(html) && !/丁[\s\S]*?未填/.test(html), true)
+  push('目录：六个模块短名齐全', ctx.__editor.MODULE_SHORT.map(function (kv) { return kv[1] }).join(''), '武圣天面命配')
 }
 
 /* 6. 圣遗物行不再有「件数」输入（件数已从文档 / 数据 / 显示全部去掉） */

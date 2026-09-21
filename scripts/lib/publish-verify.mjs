@@ -178,13 +178,17 @@ export async function verifyThreeWay (ctx = {}) {
   })
 
   // d3. guide.html 与去标记后的文档内容等价：网页版由同一份 data/gi 生成
+  //     ⚠ 以前这里判的是 `ctx.docxRoundTripOk !== false`，而**没有任何调用方传这个键**
+  //     （undefined !== false 恒真）→ 这一项等于空校验。改用调用方真正会传的两样东西：
+  //     本轮确实重建过 guide.html，且标记版往返校验的原始输出里写着「完全相等」。
   const guideFile = ctx.guidePath ?? path.join(root, 'guide.html')
+  const guideRoundTripOk = /完全相等|往返[^\n]*ok|结论：通过/.test(String(ctx.docxRoundTripRaw ?? ''))
   checks.push({
     key: 'guide-equivalent',
     name: '网页版 ↔ 数据（guide.html 与去标记文档同源）',
-    ok: fs.existsSync(guideFile) && ctx.html?.builtWithinRun === true && ctx.docxRoundTripOk !== false,
+    ok: fs.existsSync(guideFile) && ctx.html?.builtWithinRun === true && guideRoundTripOk,
     detail: fs.existsSync(guideFile)
-      ? `guide.html 由本次 build-html 生成（${fs.statSync(guideFile).size} 字节），与文档/数据库同一份 data/gi`
+      ? `guide.html 由本次 build-html 生成（${fs.statSync(guideFile).size} 字节），与文档/数据库同一份 data/gi；标记版往返：${guideRoundTripOk ? '通过' : '未通过'}`
       : 'guide.html 不存在'
   })
 

@@ -400,10 +400,10 @@ console.log('\n================ 词条写法 ================')
     push('配队：`可选：自由选择`（整行就是内容）不加「注：」', freeChoice.notePrefix === true ? `注：${freeChoice.note}` : String(freeChoice.note ?? ''), '自由选择')
   }
 
-  // ④ 天赋行的行首标签是**显示词 `推荐`**（文档里仍写 `天赋：…`）
+  // ④ 天赋行**没有行首标签**（用户定稿 2026-09-21：去掉「推荐」chip；文档里仍写 `天赋：…`）
   const tal = mk({ talents: [{ kind: 'priority', raw: 'A1 E10 Q10', order: [{ name: 'A', level: 1 }, { name: 'E', level: 10, crown: true }, { name: 'Q', level: 10, crown: true }] }] })
   const talRow = characterSections(tal).find(s => s.title === '天赋')?.rows?.[0]
-  push('天赋行标签是「推荐」', talRow?.label, '推荐')
+  push('天赋行没有行首标签（「推荐」chip 已去掉）', talRow?.label, '')
   push('天赋行仍带 kind=talents（判行不能只看标签）', talRow?.kind, 'talents')
   push('天赋行文档层仍写「天赋：」', (tal.sections.find(s => /天赋/.test(s.title))?.lines ?? [])[0], '天赋：A1 E10 Q10')
 

@@ -58,8 +58,9 @@ const itemSig = (i, withLevel) => {
   const noteText = i.note && !noteIsLevel ? `（${String(i.note).replace(/^[（(]|[）)]$/g, '')}）` : ''
   return canon(clean(i.text) + clean(noteText) + (level === null ? '' : `（${level}）`) + '|' + clean(i.sepAfter || ''))
 }
-// 天赋行靠 `kind === 'talents'` 认（**不能只按 label 认**：行首标签现在是显示词 `推荐`，
-// 与武器 / 圣遗物行的标签同形，只按文字判会把它们混在一起）
+// 天赋行靠 `kind === 'talents'` 认（**不能只按 label 认**：行首标签是显示词，会与武器 /
+// 圣遗物行的标签同形；而且 2026-09-21 起天赋行**不再写标签**（去掉「推荐」chip），
+// 只剩 `kind` 这一个判据了）
 const isTalentRow = row => row.kind === 'talents' || /天赋/.test(String(row.label || ''))
 const rowSig = row => canon((row.items || []).map(it => itemSig(it, isTalentRow(row))).join(' '))
 /**

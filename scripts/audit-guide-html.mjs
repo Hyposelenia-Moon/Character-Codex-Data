@@ -9,11 +9,24 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const file = path.join(path.resolve(here, '..'), 'guide.html')
+const root = path.resolve(here, '..')
+const file = path.join(root, 'guide.html')
 const html = fs.readFileSync(file, 'utf8')
+
+// ① 卡片数**必须**等于 data/gi 里的角色数（以前只打印不判定：丢卡片也能「体检通过」）
+const giDir = path.join(root, 'data', 'gi')
+const expectCards = fs.readdirSync(giDir).filter(f => f.endsWith('.json') && !f.startsWith('_')).length
+
+// ② 与**现算**的一份比对：上一次数据改动忘了重建 guide.html 时，这里必须报出来
+//    （只查结构与旧写法的旧版审不出来，README 却拿它当 guide.html 的验收证据）
+let fresh = null
+try {
+  const mod = await import(pathToFileURL(path.join(here, 'build-html.mjs')).href)
+  fresh = typeof mod.buildHtml === 'function' ? mod.buildHtml() : null
+} catch { /* 拿不到现算结果就跳过这一项 */ }
 
 const cards = [...html.matchAll(/<div class="guide-card" data-name="([^"]+)">([\s\S]*?)(?=<div class="guide-card"|<\/body>)/g)]
 /**
@@ -48,8 +61,20 @@ for (const [, name, body] of cards) {
 }
 const leftTotal = Object.values(leftover).reduce((a, b) => a + b, 0)
 
-console.log(`guide.html：${cards.length} 张卡片，暂无占位 ${emptyTotal} 个`)
+// ③ 卡片数 = data/gi 的角色数
+if (cards.length !== expectCards) {
+  problems.push(`卡片数 ${cards.length} ≠ data/gi 角色数 ${expectCards}（有角色没进 guide.html？）`)
+}
+
+console.log(`guide.html：${cards.length} 张卡片（data/gi ${expectCards} 个），暂无占位 ${emptyTotal} 个`)
 console.log(`残留旧写法：${JSON.stringify(leftover)}（合计 ${leftTotal}）`)
+if (fresh) {
+  const same = fresh === html
+  console.log(`与现算结果逐字节一致：${same ? '是 ✅' : '否 ❌（guide.html 落后于数据，跑 node scripts/build-html.mjs）'}`)
+  if (!same) problems.push('guide.html 与内存里现算的结果不一致（陈旧）')
+} else {
+  console.log('与现算结果比对：跳过（build-html 没有导出 buildHtml）')
+}
 console.log(`文件大小 ${fs.statSync(file).size} 字节`)
 if (problems.length) {
   console.log(`\n问题 ${problems.length} 条：`)
@@ -59,5 +84,5 @@ if (problems.length) {
   console.log('\n存在旧写法残留')
   process.exitCode = 1
 } else {
-  console.log('\n体检通过：六模块齐全、暂无占位正常、无旧写法残留')
+  console.log('\n体检通过：六模块齐全、暂无占位正常、无旧写法残留、与数据同步')
 }
