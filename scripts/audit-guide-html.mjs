@@ -36,7 +36,10 @@ for (const [, name, body] of cards) {
   leftover.档位词 += count(/<span class="row-label[^"]*">第[一二三四五六]档</g)
   leftover.皇冠行 += count(/<span class="row-label[^"]*">皇冠</g)
   leftover.首选标签 += count(/<span class="row-label[^"]*">(?:首选|其他|次选)</g)
-  leftover.中文序命座 += count(/<span class="row-label[^"]*">[一二三四五六]命</g)
+  // 中文序命座标签**只检查命座小节**：`一命` 也可能是圣遗物行的**自定义档位词**
+  // （莉奈娅：`零命：晨星与月的晓歌` / `一命：华馆梦醒形骸记`，文档里就是这么写的，合法）
+  const consSection = (body.match(/<span class="section-badge">5<\/span>[\s\S]*?(?=<span class="section-badge">6<\/span>|$)/) || [''])[0]
+  leftover.中文序命座 += (consSection.match(/<span class="row-label[^"]*">[一二三四五六]命</g) || []).length
   // 半角 `/` 只检查**该用 ＞ 的地方**（副词条行）；
   // 命座说明里的「提升攻击力 / 精通」是正文内容，不是档位分隔符，不算残留
   for (const m of body.matchAll(/<div class="row[^"]*"><span class="row-label[^"]*">副词条<\/span>([\s\S]*?)<\/div>/g)) {
