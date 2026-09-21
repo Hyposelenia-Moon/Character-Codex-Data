@@ -9,6 +9,8 @@
  *   3. 主词条 / 副词条加进来**没法填、没法选** → `multiValue` 现在渲染输入框 + 候选项。
  *   4. 自定义标签与档位**只能留一个**（文档一行只有一个标签词）。
  *   5. 配队：一格可以放多个名字（` / ` 可替换），落盘仍是**一格一个 name**。
+ *   5b. 配队：新增一行后**只加了成员、还没填标签**必须生效 → `rowVisible` / 服务端 `isEmptyRow`
+ *      都要认具名成员（用户报：「新增配队行后不激活」）。
  *   6. 界面上的临时标记（`_new`）**不许落盘**。
  *
  * 用法：node scripts/editor-selftest.mjs        # 全绿则 exit 0
@@ -16,7 +18,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '..')
@@ -221,6 +223,33 @@ push('空行判定：rowVisible 为假（是否渲染由下面的「空占位行
   push('配队：备注跟着这一格', out.v2.teams[0].members[0].note, '二命')
 }
 push('配队：候选拆分', fn('memberCandidates')('迪奥娜 / 阿罗夏'), ['迪奥娜', '阿罗夏'])
+
+/* 5b. 新增配队行 + 只加了成员（还没填标签）必须「生效」（用户报：「新增配队行后不激活」）
+ *     · 客户端：`rowVisible` 认具名成员（否则这一行在表单里被整行隐藏）
+ *     · 服务端：`isEmptyRow` 认具名成员（否则保存 / 预览时被判成空行丢掉）
+ *     · 显示层：配队段优先按 `v2.teams` 渲染（按文档行猜会把**一个成员**的队伍误判成备注）
+ */
+{
+  const data = mkData({ teams: [] })
+  const model = ctx.__editor.internals.normalizeData(data)
+  api.setModelForTest(model)
+  fn('handleAction')('add-row', 'v2.teams', undefined, null)
+  const row = model.v2.teams[0]
+  push('新增配队行：members 是数组', Array.isArray(row.members), true)
+  row.members.push({ name: '阿贝多', note: '', ref: 'character:阿贝多' })
+  delete row._new   // 模拟「保存后再打开」：界面标记已经没了
+  push('客户端 rowVisible：只有成员的配队行可见', ctx.__editor.rowVisible(row), true)
+  push('客户端 visibleRows：这一行在列表里', ctx.__editor.visibleRows(model.v2.teams).length, 1)
+  const out = fn('toJson')()
+  push('落盘：这一行保留', (out.v2.teams || []).length, 1)
+  push('落盘：成员名保留', ((out.v2.teams || [])[0] || {}).members.map(m => m.name), ['阿贝多'])
+}
+
+{
+  const { isEmptyRow } = await import(pathToFileURL(path.join(root, 'scripts', 'editor.mjs')).href)
+  push('服务端 isEmptyRow：只有成员的配队行不算空行', isEmptyRow({ label: null, members: [{ name: '阿贝多', ref: 'character:阿贝多' }], text: '' }), false)
+  push('服务端 isEmptyRow：只有空名字成员仍算空行', isEmptyRow({ label: null, members: [{ name: '', ref: 'character:' }], text: '' }), true)
+}
 
 /* 6. 圣遗物行不再有「件数」输入（件数已从文档 / 数据 / 显示全部去掉） */
 {

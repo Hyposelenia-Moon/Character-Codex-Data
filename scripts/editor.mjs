@@ -238,7 +238,7 @@ function refreshIndexFile () {
  * @param {object} row
  * @returns {boolean}
  */
-function isEmptyRow (row) {
+export function isEmptyRow (row) {
   if (!row || typeof row !== 'object') return true
   switch (row.kind) {
     case 'priority': return asArray(row.order).length === 0
@@ -249,6 +249,9 @@ function isEmptyRow (row) {
     default: break
   }
   if (asArray(row.items).length || asArray(row.sets).length) return false
+  // 配队行：**有具名成员就不算空行**（用户报：「新增配队行后加成员不激活」——
+  // 只加了成员、还没填标签时，这一行曾被判成空行丢掉）。空成员（只有 name:'' 的占位）不算内容。
+  if (asArray(row.members).some(m => hasText(m && m.name))) return false
   if (hasText(row.text)) return false
   if (hasText(row.label) || hasText(row.name) || hasText(row.k) || hasText(row.v)) return false
   return true

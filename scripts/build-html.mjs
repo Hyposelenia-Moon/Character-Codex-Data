@@ -520,11 +520,32 @@ export function characterSections (data) {
     if (!src) return { title, badge, type: kind, kind, rows: [], teams: [] }
     const lines = displayLines(src.lines ?? [])
     if (kind === 'teams') {
-      // 段末备注行 `注：…`：**整行备注**，是这一段的**最下方那条文字行** ——
-      // 用户定稿：**只有它**用 `注：`（成员自带的括注渲染成 `希诺宁（二命）`，不再提到行尾）。
-      // 它总是**独立一行**渲染（与面板侧 parse.js / display.js 的 note 行一致）：
-      // 面板把 `{kind:'note'}` 转成「没有成员、只有 note」的一行，网页版也必须画出来，
-      // 否则网页版会整行丢掉这条备注（曾经就是漏的）。同一段多条备注用 `；` 拼成一行。
+      // 配队段**优先用 `v2.teams`**（与面板 `parse.js` 的 `v2TeamRows` 同口径）：
+      // 只有 v2 分得清「一个成员的队伍」和「整行说明」—— 文档行 `首选：阿贝多` 与 `可选：自由选择`
+      // 形状完全一样，按行猜会把**单成员队伍误判成备注**（用户报：「新增配队后不激活」：
+      // 新增一行、加一个成员，预览里那个成员不生效）。
+      const v2teams = Array.isArray(data?.v2?.teams) ? data.v2.teams : null
+      if (v2teams && v2teams.length) {
+        const teams = []
+        for (const row of v2teams) {
+          const tag = String(row?.label ?? '').trim()
+          const text = String(row?.text ?? '').trim()
+          const members = (Array.isArray(row?.members) ? row.members : [])
+            .map(m => ({
+              // 成员名里的 `/` 是**同一格的可替换项**，并进同一格、格内保留 ` / `
+              name: String(m?.name ?? m ?? '').replace(/\s*[/／]\s*/g, ' / ').trim(),
+              note: String(m?.note ?? '').trim(),
+              ref: '',
+              plain: ''
+            }))
+            .filter(m => m.name)
+          // 没成员、也没说明的行不画（与面板同口径；避免多出一个只有标签的空行）
+          if (!members.length && !text) continue
+          teams.push({ tag, members, text: '', note: text })
+        }
+        return { title, badge, type: 'teams', kind, rows: [], teams }
+      }
+      // 旧数据（没有 v2.teams）→ 退回按文档行解析
       const teamLines = lines.filter(l => !/^注\s*[:：]/.test(l))
       const teams = teamsFromLines(teamLines)
       const noteText = lines.filter(l => /^注\s*[:：]/.test(l))

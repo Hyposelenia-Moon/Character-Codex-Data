@@ -776,6 +776,9 @@ function rowVisible (row) {
       break
   }
   if (asArray(row.items).length || asArray(row.sets).length) return true
+  // 配队行：**有具名成员就可见**（与服务端 isEmptyRow 对齐）。只加了成员、还没填标签的配队行
+  // 曾经被整行隐藏，用户看到的就是「新增配队行后不激活」。
+  if (asArray(row.members).some(function (m) { return hasText(m && m.name) })) return true
   return hasText(row.label) || hasText(row.k) || hasText(row.v) || hasText(row.text) || hasText(row.name)
 }
 
