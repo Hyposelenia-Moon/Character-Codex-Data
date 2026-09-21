@@ -31,6 +31,7 @@
       {
         "label": null,
         "tier": 2,
+        "sep": " > ",
         "items": [
           {
             "name": "纯水流华",
@@ -143,7 +144,8 @@
       },
       {
         "label": null,
-        "text": "暴击伤害：200%"
+        "k": "暴击伤害",
+        "v": "200%"
       }
     ],
     "constellations": [

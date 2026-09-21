@@ -379,6 +379,10 @@ function normalizeV2 (v2) {
         tier: Number.isInteger(row.tier) && row.tier >= 1 && row.tier <= 6 ? row.tier : null
       }
       if (hasText(row.sep)) r.sep = row.sep
+      // 武器行的 `sep` 缺省就是 `' > '`：**只要有条目就写实**（单条目行也一样 —— 全库 43 行里
+      // 42 行都带 sep）。否则解析回读会把它补出来，data → docx → data 就对不上
+      // （用户报过：新增武器行后回写校验失败）。
+      else if (items.length) r.sep = ' > '
       r.items = items
       return r
     })
