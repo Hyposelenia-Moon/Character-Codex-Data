@@ -275,6 +275,32 @@ push('配队：候选拆分', fn('memberCandidates')('迪奥娜 / 阿罗夏'), [
   }
 }
 
+/* 8. 切 kind 后行必须**立刻可用**（用户报：「添加副词条行之后无法点加号添加词条」）
+ *    根因：下拉只改了 kind，行里没有 stats → `＋` 往 undefined 里 push、静默失败。
+ */
+{
+  const data = mkData({ artifacts: [{ kind: 'preferred', label: '首选', sep: ' > ', sets: [{ name: '千岩牢固' }] }] })
+  const model = ctx.__editor.internals.normalizeData(data)
+  api.setModelForTest(model)
+  const row = model.v2.artifacts[0]
+
+  row.kind = 'sub'
+  fn('normalizeArtifactRowShape')(row)
+  push('切成副词条：stats 立刻补成数组', Array.isArray(row.stats), true)
+  fn('handleAction')('add-item', 'v2.artifacts.0.stats', undefined, null)
+  push('副词条点「＋」能加进一条空词条', row.stats.length, 1)
+
+  row.kind = 'main'
+  fn('normalizeArtifactRowShape')(row)
+  push('切成主词条：三个槽位都是数组', ['时之沙', '空之杯', '理之冠'].map(s => Array.isArray(row.stats[s])), [true, true, true])
+  fn('handleAction')('add-item', 'v2.artifacts.0.stats.时之沙', undefined, null)
+  push('主词条点「＋」能加进一条空词条', row.stats['时之沙'].length, 1)
+
+  row.kind = 'preferred'
+  fn('normalizeArtifactRowShape')(row)
+  push('切回档位行：sets 仍在（切来切去不丢数据）', Array.isArray(row.sets) && row.sets.length, 1)
+}
+
 /* ---------------------------------------------------------------- 汇总 */
 let failed = 0
 for (const c of checks) {

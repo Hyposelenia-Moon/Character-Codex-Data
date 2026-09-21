@@ -684,6 +684,37 @@ function rowAttr (rowId) {
   return rowId ? ' data-rowid="' + esc(rowId) + '"' : ''
 }
 
+/**
+ * 圣遗物行按 `kind` **补齐数据形状**（用户报：「添加副词条行之后无法点加号添加词条」）。
+ *
+ * 渲染只按 `kind` 取字段：副词条读 `row.stats`、主词条读 `row.stats[槽位]`、档位行读 `row.sets`。
+ * 一行是「新建的档位行」被下拉切成 `sub` 时，它身上只有 `sets`、没有 `stats` ——
+ * 于是 `＋` 往 `undefined` 里 push，静默什么都不发生（以前这种空行会被自动隐藏，所以没暴露）。
+ * 这里切换 kind 后立刻补出对应字段；**已有的字段不动**（切回去数据还在）。
+ * @param {object} row
+ * @returns {object} 同一个 row（就地补齐）
+ */
+function normalizeArtifactRowShape (row) {
+  if (!row || typeof row !== 'object') return row
+  switch (row.kind) {
+    case 'main':
+      if (!row.stats || typeof row.stats !== 'object' || Array.isArray(row.stats)) row.stats = {}
+      MAIN_SLOTS.forEach(function (slot) { if (!Array.isArray(row.stats[slot])) row.stats[slot] = [] })
+      break
+    case 'sub':
+      if (!Array.isArray(row.stats)) row.stats = []
+      break
+    case 'note':
+    case 'text':
+      if (typeof row.text !== 'string') row.text = ''
+      break
+    default: // preferred / transition / optional
+      if (!Array.isArray(row.sets)) row.sets = []
+      break
+  }
+  return row
+}
+
 /* ============================================================ 渲染：小控件 */
 
 function input (label, path, value, cls, placeholder) {
@@ -2050,6 +2081,14 @@ function handleAction (act, path, i, el) {
   } else if (act === 'move-row-down') {
     changed = moveRow(target, i, 1)
   } else if (act === 'add-item') {
+    // 路径上还没有这个数组（例如刚把圣遗物行切成「副词条 / 主词条」，行里只有 sets）→
+    // 就地补出来再 push。以前直接 target.push(...) 会往 undefined 里塞，**静默失败**
+    // （用户报：「添加副词条行之后无法点加号添加词条」）。
+    if (!Array.isArray(target)) {
+      setPath(model, listPath, [])
+      target = getPath(model, listPath)
+      if (!Array.isArray(target)) return false
+    }
     if (listPath.indexOf('v2.weapons') === 0) target.push({ name: '', note: '' })
     else if (listPath.indexOf('v2.artifacts') === 0) {
       if (/\.sets$/.test(listPath)) target.push({ name: '' })
@@ -2335,9 +2374,12 @@ function formEvents () {
         }
       } else if (/\.kind$/.test(path)) {
         setPath(state.model, path, el.value)
+        var aRow = getPath(state.model, path.replace(/\.kind$/, ''))
+        // 切 kind 后立刻把这一行的**数据形状**补齐（副词条要有 stats、档位行要有 sets…），
+        // 否则新形状的「＋」会往 undefined 里 push（用户报：加了副词条行点 ＋ 没反应）
+        if (aRow) normalizeArtifactRowShape(aRow)
         // 圣遗物：kind 决定文档里的档位词（首选 / 过渡 / 可选），所以 label 要跟着改，
         // 否则「label=输出向 + kind=transition」会让文档只写出 `输出向：…`，解析回来 kind 变 preferred。
-        var aRow = getPath(state.model, path.replace(/\.kind$/, ''))
         var kindWord = ARTIFACT_KIND_WORD[el.value]
         if (aRow && kindWord && str(aRow.label).trim() !== kindWord) {
           var had = str(aRow.label).trim()
@@ -3146,6 +3188,8 @@ window.__editor = {
   foldCrownRows: foldCrownRows,
   rowVisible: rowVisible,
   visibleRows: visibleRows,
+  normalizeArtifactRowShape: normalizeArtifactRowShape,
+  handleAction: handleAction,
   toggleEmptyRows: toggleEmptyRows,
   /** 供自动化检查：直接设定「是否显示空占位行」（不碰 localStorage） */
   setShowEmptyForTest: function (on) {
