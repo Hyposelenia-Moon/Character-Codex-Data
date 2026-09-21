@@ -143,7 +143,7 @@ var STAT_CANDIDATES = {
     '风元素伤害加成', '岩元素伤害加成', '草元素伤害加成', '物理伤害加成'],
   理之冠: ['攻击力', '生命值', '防御力', '元素精通', '暴击率', '暴击伤害', '治疗加成'],
   副词条: ['大攻击', '大生命', '大防御', '小攻击', '小生命', '小防御',
-    '暴击率', '暴击伤害', '元素精通', '元素充能效率', '充能效率']
+    '暴击率', '暴击伤害', '元素精通', '元素充能效率']
 }
 
 /** 主词条槽位 → datalist id */
@@ -878,19 +878,96 @@ function emptyNote (text) {
  */
 function multiValue (label, path, values, placeholder, statKind) {
   var listId = STAT_LIST_ID[statKind] || ''
-  var chips = asArray(values).map(function (v, i) {
+  var list = asArray(values)
+  var isSub = statKind === '副词条'
+  // 副词条：两两之间的**优先级关系**可以改（用户定稿 2026-09-21）。
+  // 唯一真相是行上的 `sep`（逐档 token，文档层符号 `>` / `≥` / `=`），这里按档渲染选择器；
+  // 双爆那一档**锁死为 `=`**（编辑器与攻略图都不允许被覆盖）。
+  var rowPath = isSub ? String(path).replace(/\.stats$/, '') : ''
+  var tokens = isSub ? subSepTokens(rowPath, list.length) : []
+  var chips = list.map(function (v, i) {
+    var sepCtl = ''
+    if (isSub && i < list.length - 1) {
+      var locked = isCritPairValues(v, list[i + 1])
+      var cur = locked ? '=' : (tokens[i] || '>')
+      sepCtl = '<select class="mv-sep' + (locked ? ' mv-sep-locked' : '') + '"' +
+        ' data-sep-row="' + esc(rowPath) + '" data-sep-gap="' + i + '"' +
+        (locked ? ' disabled title="双爆固定为 =（不可修改）"' : ' title="这一格与下一格的优先级关系"') + '>' +
+        ['>', '≥', '='].map(function (t) {
+          return '<option value="' + esc(t) + '"' + (t === cur ? ' selected' : '') + '>' + SEP_GLYPH[t] + '</option>'
+        }).join('') +
+        '</select>'
+    }
     return '<span class="mv-chip">' +
       '<input type="text" class="mv-in" data-path="' + esc(path + '.' + i) + '" value="' + esc(v) + '"' +
       (listId ? ' list="' + esc(listId) + '"' : '') +
       ' placeholder="' + esc(placeholder || '词条') + '">' +
       (listId ? actBtn('pick-item', path, '▾', 'mv-pick', '从候选里选', i) : '') +
       actBtn('del-item', path, '×', 'row-del', '删除这一项', i) +
-      '</span>'
+      '</span>' + sepCtl
   }).join('')
   return '<div class="field"><span>' + esc(label) + '</span>' +
     '<div class="mv">' + chips + actBtn('add-item', path, '＋', 'mv-add', '添加一项') + '</div>' +
-    (placeholder && !asArray(values).length ? '<span class="muted" style="font-size:12px">' + esc(placeholder) + '</span>' : '') +
+    (placeholder && !list.length ? '<span class="muted" style="font-size:12px">' + esc(placeholder) + '</span>' : '') +
     '</div>'
+}
+
+/* ---------------------------------------------------------- 副词条优先级关系 */
+
+/** 文档层符号 → 界面字形（`>` 是优先级、`≥` 约等于、`=` 同级） */
+var SEP_GLYPH = { '>': '＞', '≥': '≥', '=': '=' }
+
+/** 显示/输入文本是不是「暴击率」这一侧（与 guide-display.mjs 的 isCritRateText 同口径） */
+function isCritRateValue (text) {
+  var t = String(text == null ? '' : text).replace(/\s+/g, '').replace(/（.*?）|\(.*?\)/g, '').trim()
+  return t === '暴击率' || t === '暴击'
+}
+/** 显示/输入文本是不是「暴击伤害」这一侧 */
+function isCritDmgValue (text) {
+  var t = String(text == null ? '' : text).replace(/\s+/g, '').replace(/（.*?）|\(.*?\)/g, '').trim()
+  return t === '暴击伤害' || t === '爆伤' || t === '暴伤'
+}
+/** 这一档是不是双爆（两边是暴击率 ↔ 暴击伤害）——是的话分隔符锁死 `=` */
+function isCritPairValues (left, right) {
+  return (isCritRateValue(left) && isCritDmgValue(right)) || (isCritDmgValue(left) && isCritRateValue(right))
+}
+
+/**
+ * 把行上的 `sep` 读成**逐档 token**（长度 = 档位数 - 1）。
+ * 仓库约定：全同分隔符写成**单个** token（`' > '` / `' / '`），混合写法才写成逐档（`' / > '`）；
+ * 不足的档位按最后一个 token 补齐（与显示层的 `sepTokens` 同口径）。
+ */
+function subSepTokens (rowPath, count) {
+  var gaps = Math.max(0, count - 1)
+  var row = getPath(state.model, rowPath) || {}
+  var raw = String(row.sep == null ? '' : row.sep).trim()
+  var toks = raw ? raw.split(/\s+/).filter(Boolean) : []
+  var out = []
+  for (var i = 0; i < gaps; i++) out.push(toks[i] || toks[toks.length - 1] || '>')
+  return out
+}
+
+/** 逐档 token → 行上的 `sep` 字符串（全同 → 单 token，否则逐档拼接，两侧各一个空格） */
+function subSepCanonical (tokens) {
+  var list = asArray(tokens).filter(Boolean)
+  if (!list.length) return ' > '
+  var allSame = list.every(function (t) { return t === list[0] })
+  return ' ' + (allSame ? [list[0]] : list).join(' ') + ' '
+}
+
+/** 改某一档的优先级关系：写回 `sep`（双爆那一档忽略——它固定 `=`） */
+function setSubSep (rowPath, gap, token) {
+  var row = getPath(state.model, rowPath)
+  if (!row) return false
+  var list = asArray(row.stats)
+  var gaps = Math.max(0, list.length - 1)
+  if (gap < 0 || gap >= gaps) return false
+  // 双爆固定 `=`：界面上不会改它，这里也挡一道，防止别处误写
+  if (isCritPairValues(list[gap], list[gap + 1])) return false
+  var toks = subSepTokens(rowPath, list.length)
+  toks[gap] = token === '≥' ? '≥' : (token === '=' ? '=' : '>')
+  row.sep = subSepCanonical(toks)
+  return true
 }
 
 /* ============================================================ 渲染：各区块 */
@@ -989,7 +1066,7 @@ function renderArtifacts () {
         '<span class="muted" style="font-size:12px">对某个部位的**补充说明**才写这里（整行就是说明时不必写「注：」）</span>' +
         '</div>'
     } else if (row.kind === 'sub') {
-      body2 = multiValue('副词条（**只有 暴击率↔暴击伤害 是同级**（写 `/` → 渲染 `=`），其余一律用 `>`（渲染 `＞`）；百分比写 `大生命`/`大攻击`/`大防御`，固定值写 `小生命`/`小攻击`/`小防御`）', p + '.stats', row.stats, '如 双爆 / 大攻击', '副词条')
+      body2 = multiValue('副词条（两格之间的符号可改：`＞` 优先级 / `≥` 约等于 / `=` 同级；**双爆固定为 `=`**，不可修改。百分比写 `大生命`/`大攻击`/`大防御`，固定值写 `小生命`/`小攻击`/`小防御`）', p + '.stats', row.stats, '如 双爆 / 大攻击', '副词条')
     } else if (row.kind === 'note') {
       body2 = '<div class="field"><span>备注（注：）</span>' +
         '<input type="text" data-path="' + p + '.text" value="' + esc(row.text) + '" placeholder="该段落末尾的一行「注：…」，多条用「；」分隔">' +
@@ -2422,6 +2499,21 @@ function formEvents () {
     handleAction(act, path, i, el)
   })
 
+  // 副词条优先级关系（两格之间的 `＞ / ≥ / =`）：写回行的 `sep`，重绘让预览同步
+  form.addEventListener('change', function (e) {
+    var el = e.target
+    if (!el || !el.getAttribute || el.getAttribute('data-sep-row') == null) return
+    var rowPath = el.getAttribute('data-sep-row')
+    var gap = Number(el.getAttribute('data-sep-gap'))
+    if (setSubSep(rowPath, gap, el.value)) {
+      markDirty(true)
+      renderForm()
+      var row = getPath(state.model, rowPath) || {}
+      showStatus('已更新副词条关系：' + subSepTokens(rowPath, asArray(row.stats).length)
+        .map(function (t) { return SEP_GLYPH[t] || t }).join(' '), 'ok')
+    }
+  })
+
   // 成员备注：只更新模型，不重绘（避免输入时丢焦点）
   form.addEventListener('input', function (e) {
     var el = e.target
@@ -3200,6 +3292,12 @@ window.__editor = {
     return state.showEmpty
   },
   multiValue: multiValue,
+  // 副词条优先级关系（供自动化检查：逐档 token 读写、双爆锁死）
+  SEP_GLYPH: SEP_GLYPH,
+  subSepTokens: subSepTokens,
+  subSepCanonical: subSepCanonical,
+  setSubSep: setSubSep,
+  isCritPairValues: isCritPairValues,
   statKindOfPath: statKindOfPath,
   memberCandidates: memberCandidates,
   joinCandidates: joinCandidates,

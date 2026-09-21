@@ -212,6 +212,11 @@ function linesToModelRows (lines, labelHints = [], crownHint = null, levelHints 
   // 文档文本行里的 `+` 在显示归一里会退化成首个 token，反推会分叉。
   const setRows = (v2SetRows ?? []).filter(r => r && typeof r === 'object' && Array.isArray(r.sets) && r.sets.some(x => String(x?.name ?? x ?? '').trim()))
   let setAt = 0
+  // v2 的**副词条行**（与派生行同序）：两两之间的优先级关系只有 v2 带得住 ——
+  // 文档行里的 `/` 只表示「同级」，而编辑器还要能写 `≥` / `＝`（用户定稿 2026-09-21：
+  // 副词条两两之间的关系可改，双爆固定 `=`）。按行猜会把这些字形混成一个。
+  const subRows = (v2SetRows ?? []).filter(r => r && typeof r === 'object' && r.kind === 'sub' && (r.stats ?? []).some(s => String(s ?? '').trim()))
+  let subAt = 0
   /**
    * 这一行是不是下一条 v2 套装行：**按套装名核对**（去掉 `（2件套）` 这类括注、忽略分隔符字形）。
    * 只按位置取会错位（圣遗物段的「主词条 / 副词条」行会把游标推歪，导致后面的行拿错数据）。
@@ -326,6 +331,28 @@ function linesToModelRows (lines, labelHints = [], crownHint = null, levelHints 
         }))
       })
       return
+    }
+    // 副词条行：**直接从 v2 取**（`stats` + 逐档 `sep`），与武器 / 套装同源。
+    // 分隔符语义交给显示层（`subSepBetween`）：双爆恒 `=`，其余按数据里的符号原样渲染
+    // （`>` → `＞`、`≥` → `≥`、`=` → `=`；文档里的 `/` 只对双爆成立，非双爆按优先级显示）。
+    if (/^副词条$/.test(label)) {
+      const v2Sub = subRows[subAt]
+      if (v2Sub) {
+        subAt++
+        const stats = (v2Sub.stats ?? []).map(s => String(s ?? '').trim()).filter(Boolean)
+        const toks = String(v2Sub.sep ?? '').trim().split(/\s+/).filter(Boolean)
+        out.push({
+          label,
+          ref: '',
+          items: stats.map((s, i) => ({
+            text: s,
+            note: '',
+            ref: '',
+            sepAfter: i < stats.length - 1 ? (toks[i] ?? toks[toks.length - 1] ?? ' > ') : ''
+          }))
+        })
+        return
+      }
     }
     // 其余档位行：分隔符**原样保留数据里的写法**，与面板侧一致。
     //   · `>` / `≥` = 优先级 → 显示成全角 `＞` / `≥`（`＞` 是文档与面板统一的优先级字形）

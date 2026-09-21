@@ -507,9 +507,20 @@ function normalizeV2 (v2) {
       if (row.__deleted === true) return null
       if (isNoteRow(row)) return { kind: 'note', text: String(row.text ?? '').trim() }
       const label = hasText(row.label) ? row.label.trim() : null
-      if (hasText(row.k)) return { label, k: row.k.trim(), v: hasText(row.v) ? row.v.trim() : '' }
-      if (hasText(row.text)) return { label, text: row.text.trim() }
-      return null
+      const k = hasText(row.k) ? row.k.trim() : ''
+      const v = hasText(row.v) ? row.v.trim() : ''
+      const text = hasText(row.text) ? row.text.trim() : ''
+      // 面板行的**规范形状**（与 parse-docx 的回读一致，data → docx → data 才能闭合）：
+      //   · 带标签 + 键值 → `{label, text:'k：v'}`（文档里就是一行 `标签：k：v`，回读成说明行）
+      //   · 无标签 + 键值 → `{label:null, k, v}`（文档里是一行 `k：v`，回读就是键值对）
+      //   · 无标签 + 文本里像 `k：v` → 折成上一行那种键值对（否则回读会多出一个 k/v，往返断掉）
+      // ⚠ 只动**看不见的表示**：显示层把两种形状渲染成同一个样子（见 guide-display 的 normalizePanelRows）。
+      if (k) return label ? { label, text: `${k}：${v}` } : { label: null, k, v }
+      if (text && !label) {
+        const hit = text.match(/^([^：:]{1,12})[:：]\s*(\S.*)$/)
+        if (hit) return { label: null, k: hit[1].trim(), v: hit[2].trim() }
+      }
+      return text ? { label, text } : null
     })
     .filter(Boolean)
 

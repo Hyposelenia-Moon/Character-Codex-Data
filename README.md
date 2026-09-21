@@ -154,6 +154,29 @@ node scripts/build-html.mjs      # 网页版 guide.html
 node scripts/build-doc.mjs       # 文档版 guide.md（Word 用可再打包 docx，命令见脚本头部）
 ```
 
+### 每天自动把数据回写进主文档
+
+`scripts/daily-docx-sync.mjs`（双击/计划任务入口 `scripts/daily-docx-sync.cmd`）每天检测一次：
+
+1. 取 `data/**` 最新 mtime 与主文档 mtime 比 —— **数据不比文档新就跳过**
+   （你刚在 Word 里改过文档时不会被覆盖；确认要回写时加 `--force`）
+2. 跑 `diagnose-docx-json.mjs`：0 个不一致 → 跳过
+3. 有差异 → `build-docx.mjs --write-main`（自带 `.bak-<时间戳>` 备份与往返校验，
+   校验不过会**拒绝写主文档**）
+4. 每次结果追加到 `out/daily-docx-sync.log`
+
+本机已注册计划任务「Character-Codex 数据回写文档」（每天 12:00）：
+
+```powershell
+schtasks /Query  /TN "Character-Codex 数据回写文档" /FO LIST /V   # 查看
+schtasks /Change /TN "Character-Codex 数据回写文档" /ST 21:30      # 改时间
+schtasks /Run    /TN "Character-Codex 数据回写文档"                # 立刻跑一次
+node scripts/daily-docx-sync.mjs --dry                            # 只报告，不写
+```
+
+> 主文档是 `.docx`（不在本仓库里）；回写方向固定是**数据 → 文档**。
+> 反向（文档 → 数据）仍走 `node scripts/parse-docx.mjs`。
+
 ### 只有栏位、还没填内容（空档角色）
 
 先把六个栏位建好、内容留空即可占位：

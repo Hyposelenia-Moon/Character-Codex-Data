@@ -634,6 +634,10 @@ function parseBlock (lines, index) {
         const label = kv[1].trim()
         const value = kv[2].trim()
         if (STAT_LABELS.some(s => label.startsWith(s))) { data.v2.panels.push({ label: null, k: label, v: value }); continue }
+        // 一行两个冒号（`宗室：元素充能效率：160%+`）：**值里还有冒号 ⇒ 认成「标签 + 说明行」**。
+        // 判据来自写入侧：build-docx 对「带标签的 text 行」写 `标签：text`，而键值行的 v 是
+        // `160%+` 这种、不带冒号。不这么定，这条会来回变形（标签 → 键），往返校验永远过不去。
+        if (/[：:]/.test(value)) { data.v2.panels.push({ label, text: value }); continue }
         if (BUILD_LABELS.includes(label) || !value) { data.v2.panels.push({ label, text: value }); continue }
         data.v2.panels.push({ label: null, k: label, v: value })
         continue

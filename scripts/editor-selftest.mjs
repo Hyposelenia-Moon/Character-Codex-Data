@@ -251,6 +251,33 @@ push('配队：候选拆分', fn('memberCandidates')('迪奥娜 / 阿罗夏'), [
   push('服务端 isEmptyRow：只有空名字成员仍算空行', isEmptyRow({ label: null, members: [{ name: '', ref: 'character:' }], text: '' }), true)
 }
 
+/* 5c. 副词条两两关系可改（用户定稿 2026-09-21）：`＞` / `≥` / `=` 写进行的 `sep`；
+ *     **双爆固定 `=`，编辑器改不动**（与显示层 subSepBetween 同一口径） */
+{
+  const data = mkData({ artifacts: [{ kind: 'sub', stats: ['暴击率', '暴击伤害', '大攻击', '元素精通'], sep: ' / > > ' }] })
+  const model = ctx.__editor.internals.normalizeData(data)
+  api.setModelForTest(model)
+  push('副词条：读到逐档 token', ctx.__editor.subSepTokens('v2.artifacts.0', 4), ['/', '>', '>'])
+  push('副词条：双爆判据（暴击率 ↔ 暴击伤害）', ctx.__editor.isCritPairValues('暴击率', '暴击伤害'), true)
+  push('副词条：非双爆不是双爆对', ctx.__editor.isCritPairValues('大攻击', '元素精通'), false)
+  push('副词条：把第 2 档改成 ≥', ctx.__editor.setSubSep('v2.artifacts.0', 1, '≥'), true)
+  push('副词条：改后 sep 逐档规范化', model.v2.artifacts[0].sep, ' / ≥ > ')
+  push('副词条：把第 3 档改成 =', ctx.__editor.setSubSep('v2.artifacts.0', 2, '='), true)
+  push('副词条：改后 sep', model.v2.artifacts[0].sep, ' / ≥ = ')
+  push('副词条：双爆那一档改不动（锁死 =）', ctx.__editor.setSubSep('v2.artifacts.0', 0, '≥'), false)
+  push('副词条：锁定档的写法没被改动', model.v2.artifacts[0].sep, ' / ≥ = ')
+  push('副词条：全同写法收成单 token', ctx.__editor.subSepCanonical(['=', '=', '=', '=']), ' = ')
+  const out = fn('toJson')()
+  push('副词条：落盘保留新关系', out.v2.artifacts[0].sep, ' / ≥ = ')
+  push('副词条：界面字形表', [ctx.__editor.SEP_GLYPH['>'], ctx.__editor.SEP_GLYPH['≥'], ctx.__editor.SEP_GLYPH['=']], ['＞', '≥', '='])
+  // 界面上真的画出控件：3 档 2 个间隔，双爆那一档禁用（锁死 `=`）
+  const html = ctx.__editor.multiValue('副词条', 'v2.artifacts.0.stats', ['暴击率', '暴击伤害', '大攻击'], '如 双爆 / 大攻击', '副词条')
+  push('副词条：界面出现 2 个关系选择器（3 档 2 个间隔）', (html.match(/class="mv-sep/g) || []).length, 2)
+  push('副词条：双爆那一档是禁用态', /class="mv-sep mv-sep-locked"[^>]*disabled/.test(html), true)
+  push('副词条：非双爆那一档可选 `≥`', /data-sep-gap="1"[\s\S]{0,160}>≥<\/option>/.test(html), true)
+  push('副词条：主词条不加关系选择器', (ctx.__editor.multiValue('时之沙', 'v2.artifacts.0.stats.时之沙', ['攻击力', '元素精通'], 'x', '时之沙').match(/mv-sep/g) || []).length, 0)
+}
+
 /* 6. 圣遗物行不再有「件数」输入（件数已从文档 / 数据 / 显示全部去掉） */
 {
   const data = mkData({ artifacts: [{ kind: 'preferred', label: '首选', sep: ' > ', sets: [{ name: '千岩牢固', ref: 'artifact:千岩牢固' }] }] })

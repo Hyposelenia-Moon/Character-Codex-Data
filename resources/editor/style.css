@@ -435,6 +435,23 @@ textarea { resize: vertical; min-height: 54px; }
 .mv-pick { color: var(--accent); }
 .mv-pick:hover { color: var(--accent-strong, var(--accent)); }
 
+/* 副词条两格之间的优先级关系（`＞` / `≥` / `=`）：唯一真相是行上的 `sep`。
+ * 双爆那一档固定 `=`，界面上是禁用态（用户定稿：不可被覆盖）。 */
+.mv-sep {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: #2f2f2f;
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+.mv-sep:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.mv-sep-locked { background: #f1f3f6; color: #8a8f98; border-style: dashed; cursor: not-allowed; }
+
 /* ---------------------------------------------------------------- 团队/天赋行 */
 
 .members { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
