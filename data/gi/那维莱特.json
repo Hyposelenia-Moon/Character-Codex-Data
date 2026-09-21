@@ -31,6 +31,7 @@
       {
         "label": null,
         "tier": 2,
+        "sep": " > ",
         "items": [
           {
             "name": "帷间夜曲",
