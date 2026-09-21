@@ -2147,25 +2147,33 @@ function formatFieldChanges (fields) {
   return parts.length ? parts.join(' / ') : '无字段变化（可能只改了文字内容或格式）'
 }
 
-/** 单行标题 + 正文要点 */
-function buildTitle (name, perChar, changed) {
+/** 单行标题：`<类型>: <中文简述>`，一句话说清改了什么（书写规范见 README 的 D 节） */
+export function buildTitle (name, perChar, changed) {
   if (!name) {
     const chars = changed.filter(c => c.path.includes('data/gi/') && !c.path.endsWith('_order.json')).length
-    return chars > 1 ? `docs: 批量更新 ${chars} 个角色` : 'docs: 更新角色攻略数据与文档'
+    return chars > 1 ? `data: 更新 ${chars} 个角色的攻略数据` : 'data: 更新角色攻略数据'
   }
-  const fields = perChar[0]?.fields ?? []
-  const names = fields.filter(f => (f.added || f.removed || f.changed)).map(f => f.label)
-  const suffix = names.length ? names.slice(0, 3).join('/') + (names.length > 3 ? ' 等' : '') : '内容'
-  return `docs: 更新 ${name}（${suffix}）`
+  return `data: 更新${name}的攻略数据`
 }
 
-function summaryBullets ({ name, perChar, changed, docx, html }) {
+/**
+ * 正文要点：**每条写"改了什么"**，供提交信息与 PR 正文直接使用。
+ * 构建产物的大小 / 备份路径属于报告信息，放摘要的「变更文件」与页脚，不进提交信息。
+ */
+export function summaryBullets ({ perChar, changed }) {
   const bullets = []
-  if (name) bullets.push(`- 角色：${name}`)
-  for (const p of perChar) bullets.push(`- ${p.name} 字段：${formatFieldChanges(p.fields)}`)
-  bullets.push(`- 数据文件变化：${changed.filter(c => c.path.includes('data/gi/')).length} 个`)
-  bullets.push(`- 主文档：${docx.path.split(path.sep).pop()}（${docx.bytes} 字节，备份 ${docx.backup || '无'}）`)
-  bullets.push(`- 网页版：${html.path.split(path.sep).pop()}（${html.bytes} 字节）`)
+  for (const p of perChar) {
+    const names = (p.fields ?? [])
+      .filter(f => (f.added || f.removed || f.changed))
+      .map(f => String(f.label ?? '').trim())
+      .filter(Boolean)
+    bullets.push(names.length ? `- ${p.name}：${names.join('、')}` : `- ${p.name}：更新攻略内容`)
+  }
+  if (!bullets.length) {
+    const dataCount = changed.filter(c => c.path.includes('data/gi/')).length
+    bullets.push(dataCount ? `- 更新 ${dataCount} 个角色数据文件` : '- 更新角色攻略数据')
+  }
+  bullets.push('- 主文档（docx）与网页版 `guide.html` 同步重建')
   return bullets
 }
 
