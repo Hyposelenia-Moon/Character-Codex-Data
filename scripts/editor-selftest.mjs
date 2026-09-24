@@ -432,6 +432,45 @@ push('配队：候选拆分', fn('memberCandidates')('迪奥娜 / 阿罗夏'), [
   push('目录：六个模块短名齐全', ctx.__editor.MODULE_SHORT.map(function (kv) { return kv[1] }).join(''), '武圣天面命配')
 }
 
+/* 5h. `sep` 的 token 数必须跟着条目数走（薇斯纳的副词条：5 个词条只存了 3 个 token，
+ *     渲染层用最后一个补齐 → 读回来 4 个 token → 往返不闭合、回写被挡下）。
+ *     加/删条目、以及保存时，都要按**落盘后的条目数**重新规范化。 */
+{
+  const data = mkData({ artifacts: [{ kind: 'sub', stats: ['暴击率', '暴击伤害', '大攻击', '元素充能效率'], sep: ' / > > ' }] })
+  const model = ctx.__editor.internals.normalizeData(data)
+  api.setModelForTest(model)
+  push('sep 同步：4 个词条 + 3 个 token → 规范化后仍是 3 个',
+    ctx.__editor.canonicalSep(model.v2.artifacts[0], 4), ' / > > ')
+  // 点「＋」加一条：模型里是 5 格（含一个空条目）→ 4 个 token；保存时空条目被过滤 → 落盘回到 3 个
+  fn('handleAction')('add-item', 'v2.artifacts.0.stats', undefined, null)
+  push('sep 同步：加一条空词条 → 模型按 5 格算 4 个 token', model.v2.artifacts[0].sep, ' / > > > ')
+  push('sep 同步：空条目落盘被过滤 → 文件里仍是 3 个 token', fn('toJson')().v2.artifacts[0].sep, ' / > > ')
+  // 把新条目填上名字 → 5 条，落盘就该有 4 个 token
+  model.v2.artifacts[0].stats[4] = '元素精通'
+  let out = fn('toJson')()
+  push('sep 同步：第 5 条填上名字 → 落盘 4 个 token', out.v2.artifacts[0].sep, ' / > > > ')
+  push('sep 同步：词条确实是 5 条', out.v2.artifacts[0].stats.length, 5)
+  // 删一条 → 回到 4 条 / 3 个 token
+  api.setModelForTest(model)
+  fn('handleAction')('del-item', 'v2.artifacts.0.stats', 4, null)
+  out = fn('toJson')()
+  push('sep 同步：删掉第 5 条 → 回落 3 个 token', out.v2.artifacts[0].sep, ' / > > ')
+  // 武器行同理
+  const w = ctx.__editor.internals.normalizeData(mkData({ weapons: [{ label: '推荐', tier: 1, sep: ' > ', items: [{ name: '甲枪' }, { name: '乙枪' }] }] }))
+  api.setModelForTest(w)
+  fn('handleAction')('add-item', 'v2.weapons.0.items', undefined, null)
+  w.v2.weapons[0].items[2] = { name: '丙枪', note: '' }
+  // 三档全是 `>` → 仓库约定收成**单个** token（不是 `> >`）
+  push('sep 同步：武器行加到第 3 把、全是优先级 → 收成单 token', fn('toJson')().v2.weapons[0].sep, ' > ')
+  w.v2.weapons[0].sep = ' > = '
+  push('sep 同步：混合写法按落盘条目数展开成 2 个 token', fn('toJson')().v2.weapons[0].sep, ' > = ')
+  // 只剩一条时回到默认写法（parse-docx 对单条目行也回 `> `）
+  api.setModelForTest(w)
+  fn('handleAction')('del-item', 'v2.weapons.0.items', 2, null)
+  fn('handleAction')('del-item', 'v2.weapons.0.items', 1, null)
+  push('sep 同步：只剩一条 → 回落单 token 写法', fn('toJson')().v2.weapons[0].sep, ' > ')
+}
+
 /* 6. 圣遗物行不再有「件数」输入（件数已从文档 / 数据 / 显示全部去掉） */
 {
   const data = mkData({ artifacts: [{ kind: 'preferred', label: '首选', sep: ' > ', sets: [{ name: '千岩牢固', ref: 'artifact:千岩牢固' }] }] })

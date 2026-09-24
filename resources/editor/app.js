@@ -1200,6 +1200,38 @@ function subSepCanonical (tokens) {
   return ' ' + (allSame ? [list[0]] : list).join(' ') + ' '
 }
 
+/**
+ * 行对象 + **落盘条目数** → 规范化的 `sep`（token 数恒等于 条目数 − 1）。
+ *
+ * 为什么必须按落盘数量重算：渲染层（`sepTokens`）在 token 不够时会**重复最后一个**，
+ * 所以「条目数 > token 数 + 1」的数据在文档里照样渲染得出来，但读回来 token 多一个 →
+ * `docx → data` 不闭合、每日回写被往返校验挡下（薇斯纳的副词条就是这么坏的：
+ * 5 个词条只存了 3 个 token）。加/删条目、以及保存时都走这里。
+ */
+function canonicalSep (row, count) {
+  var raw = String((row && row.sep) == null ? '' : row.sep).trim()
+  var toks = raw ? raw.split(/\s+/).filter(Boolean) : []
+  var out = []
+  var gaps = Math.max(0, Number(count) - 1)
+  for (var i = 0; i < gaps; i++) out.push(toks[i] || toks[toks.length - 1] || '>')
+  return subSepCanonical(out)
+}
+
+/** 加/删条目后，把这一行的 `sep` 按新的条目数重算（界面上的分隔符选择器数量也跟着对） */
+function resyncRowSep (listPath) {
+  var rowPath = String(listPath || '').replace(/\.(items|stats|sets)$/, '')
+  if (rowPath === String(listPath || '')) return false     // 不是「一行里的多值列表」（主词条槽位等）→ 不管
+  var row = getPath(state.model, rowPath)
+  if (!row || typeof row !== 'object') return false
+  var count = asArray(row.items).length || asArray(row.stats).length || asArray(row.sets).length
+  if (count < 2) {   // 一条/空：还原成默认写法（parse-docx 对单条目行也回默认 `> `）
+    if (hasText(row.sep)) row.sep = ' > '
+    return false
+  }
+  row.sep = canonicalSep(row, count)
+  return true
+}
+
 /** 归一一个 token：只认 `>` / `≥` / `=`（其余按默认 `>`，**默认就是优先级**） */
 function normSepToken (token) {
   return token === '≥' ? '≥' : (token === '=' ? '=' : '>')
@@ -2258,13 +2290,15 @@ function buildBody () {
     // 自定义标签与档位**互斥**：文档一行只有一个标签词（label 非空 → 文档写 `建议：`，
     // 写不进「第N档」）。输入时已联动清空，这里是保存前的兜底，防止手工改过 JSON 的行带进来。
     out.tier = out.label ? null : row.tier
-    // 条目之间的关系（`＞` / `≥` / `=`）**必须显式提交**：唯一真相是行上的 `sep`。
-    // 以前这里不提交，于是编辑器里改了关系也存不下来（用户报：「武器之间存在异常 ≥」改不掉）。
-    out.sep = hasText(row.sep) ? row.sep : ' > '
     out.items = row.items.filter(function (it) { return hasText(it.name) }).map(function (it) {
       // `note` 显式提交（清空就提交 null）：否则「清掉一条备注」会被原文件顶回来
       return { name: it.name.trim(), note: hasText(it.note) ? it.note.trim() : null, ref: 'weapon:' + it.name.trim() }
     })
+    // 条目之间的关系（`＞` / `≥` / `=`）**必须显式提交**：唯一真相是行上的 `sep`。
+    // 以前这里不提交，于是编辑器里改了关系也存不下来（用户报：「武器之间存在异常 ≥」改不掉）。
+    // ⚠ token 数必须 = **落盘条目数 - 1**：按落盘后的数量重新规范化，否则渲染层会用最后一个
+    //   token 补齐、读回来反而多一个 token，往返就不闭合（薇斯纳的副词条踩过这个坑）。
+    out.sep = canonicalSep(row, out.items.length)
     return out
     // ⚠ 这里**不再过滤空行**：每行都要占一个下标（删行靠墓碑表达），
     //   空行由服务器 normalizeV2 丢掉（main 占位行按设计保留）。
@@ -2286,7 +2320,8 @@ function buildBody () {
     }
     if (row.kind === 'sub') {
       var o2 = { kind: 'sub', stats: asArray(row.stats).map(function (x) { return x.trim() }).filter(Boolean) }
-      if (row.sep) o2.sep = row.sep
+      // 同上：sep 的 token 数按**落盘后的词条数**重新规范化
+      if (row.sep) o2.sep = canonicalSep(row, o2.stats.length)
       return o2
     }
     if (row.kind === 'text') return { kind: 'text', label: hasText(row.label) ? row.label : null, text: str(row.text) }
@@ -2303,6 +2338,8 @@ function buildBody () {
       if (hasText(s.pieces)) o.pieces = s.pieces.trim()
       return o
     })
+    // 套装行也有 `sep`（`/` 同级、`+` 是「2+2」组合）：同样按落盘后的套装数规范化
+    if (hasText(o3.sep) || hasText(row.sep)) o3.sep = canonicalSep(row, o3.sets.length)
     return o3
   })
 
@@ -2613,8 +2650,11 @@ function handleAction (act, path, i, el) {
       else target.push({ name: '', note: '' })
     } else if (/\.members$/.test(listPath)) target.push({ name: '', note: '' })
     else target.push('')
+    // 条目数变了 → 这一行的 `sep` token 数跟着变（否则渲染层会替我们补，读回来就多一个 token）
+    resyncRowSep(listPath)
   } else if (act === 'del-item') {
     target.splice(i, 1)
+    resyncRowSep(listPath)
   } else if (act === 'move-item-up') {
     changed = moveRow(target, i, -1)
   } else if (act === 'move-item-down') {
@@ -3792,6 +3832,8 @@ window.__editor = {
   setWeaponSep: setWeaponSep,
   normSepToken: normSepToken,
   subSepCanonical: subSepCanonical,
+  canonicalSep: canonicalSep,
+  resyncRowSep: resyncRowSep,
   setSubSep: setSubSep,
   isCritPairValues: isCritPairValues,
   statKindOfPath: statKindOfPath,
