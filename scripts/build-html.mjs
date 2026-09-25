@@ -614,7 +614,30 @@ export function characterSections (data) {
     const withNotes = title === '圣遗物' ? attachMainNotes(rows, data?.v2?.artifacts ?? []) : rows
     return { title, badge, type: kind === 'stats' ? 'stats' : 'rows', kind, rows: withNotes }
   })
+  // 天赋兜底（用户定稿 2026-09-24）：**没填天赋就按 111 正常显示**，不再显示「暂无」。
+  // 正常数据里每个角色都有 `天赋：A1 E1 Q1` 行（没有的话由 build-docx 补），这里再兜一层：
+  // 以后新增角色还没填天赋时，网页版 / 预览照样画 A 1 ／ E 1 ／ Q 1 三格。
+  for (const section of model) {
+    if (section.kind === 'rows' && section.title === '天赋' && !(section.rows ?? []).length) {
+      section.rows = [defaultTalentRow(levelHints, crownHint)]
+    }
+  }
   return normalizeSections(model)
+}
+
+/** 默认天赋行：固定三格 A → E → Q，等级取 v2（缺省 1），皇冠按皇冠行 —— 与「文档写了 `天赋：A1 E1 Q1`」同一形状 */
+function defaultTalentRow (levelHints, crownHint) {
+  const crowns = new Set(crownHint ?? [])
+  return {
+    label: '',
+    kind: 'talents',
+    ref: '',
+    items: ['A', 'E', 'Q'].map(name => {
+      const lv = levelHints?.get(name)
+      const level = Number.isInteger(lv) && lv >= 1 && lv <= 10 ? lv : 1
+      return { text: name, sepAfter: '', level, crown: crowns.has(name) || level === 10 }
+    })
+  }
 }
 
 /**

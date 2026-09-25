@@ -41,7 +41,29 @@
         }
       }
     ],
-    "talents": [],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "A",
+            "level": 1,
+            "ref": "talent:A"
+          },
+          {
+            "name": "E",
+            "level": 1,
+            "ref": "talent:E"
+          },
+          {
+            "name": "Q",
+            "level": 1,
+            "ref": "talent:Q"
+          }
+        ],
+        "raw": "A1 E1 Q1"
+      }
+    ],
     "panels": [
       {
         "label": null,
@@ -84,6 +106,12 @@
       "title": "2. 圣遗物推荐",
       "lines": [
         "首选：昔时之歌"
+      ]
+    },
+    {
+      "title": "3. 天赋加点",
+      "lines": [
+        "天赋：A1 E1 Q1"
       ]
     },
     {

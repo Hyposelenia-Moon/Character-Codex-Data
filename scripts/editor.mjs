@@ -1068,6 +1068,10 @@ function apiIndex (res) {
 /**
  * 六个模块「有没有真内容」——目录里显示的是**还没填的模块**（用户定稿 2026-09-21）。
  * 口径：空占位行不算填（`首选：` 后面没东西、主词条三槽全空、只有 label 没有值）。
+ *
+ * ⚠ 天赋另有一条（用户定稿 2026-09-24）：**三格全 1 不算填** —— 默认的 `A1 E1 Q1` 只是
+ * 「界面按 111 正常显示」用的占位，不是真投入；要任一格升过级、或投了皇冠、或写了说明才算填。
+ * （这样「没填天赋」的角色在目录里依旧显示「未填：… 天 …」，不会因为补了默认行就变已填。）
  * @param {object} v2
  * @returns {{weapons:boolean, artifacts:boolean, talents:boolean, panels:boolean, constellations:boolean, teams:boolean}}
  */
@@ -1080,10 +1084,18 @@ export function filledModules (v2) {
     }
     return asArray(r?.stats).some(hasText)
   })
+  // 天赋：真投入才算填（等级 > 1 或皇冠，皇冠行有内容，或写了说明文本）
+  const talentsFilled = asArray(v.talents).some(r => {
+    if (r?.kind === 'priority') {
+      return asArray(r?.order).some(it => Number(it?.level) > 1 || it?.crown === true)
+    }
+    if (r?.kind === 'crown') return asArray(r?.items).length > 0
+    return hasText(r?.text)
+  })
   return {
     weapons: anyNamed(v.weapons, 'items'),
     artifacts: anyNamed(v.artifacts, 'sets') || statsFilled(v.artifacts),
-    talents: asArray(v.talents).some(r => asArray(r?.order).length > 0 || asArray(r?.items).length > 0 || hasText(r?.text)),
+    talents: talentsFilled,
     panels: asArray(v.panels).some(r => hasText(r?.k) || hasText(r?.text)),
     constellations: asArray(v.constellations).some(r => hasText(r?.name)),
     teams: anyNamed(v.teams, 'members') || asArray(v.teams).some(r => hasText(r?.text))

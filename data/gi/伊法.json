@@ -56,7 +56,29 @@
         }
       }
     ],
-    "talents": [],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "A",
+            "level": 1,
+            "ref": "talent:A"
+          },
+          {
+            "name": "E",
+            "level": 1,
+            "ref": "talent:E"
+          },
+          {
+            "name": "Q",
+            "level": 1,
+            "ref": "talent:Q"
+          }
+        ],
+        "raw": "A1 E1 Q1"
+      }
+    ],
     "panels": [
       {
         "label": null,
@@ -100,6 +122,12 @@
       "lines": [
         "首选：烬城勇者绘卷 / 翠绿之影",
         "主词条：时之沙：元素精通｜空之杯：元素精通｜理之冠：治疗加成"
+      ]
+    },
+    {
+      "title": "3. 天赋加点",
+      "lines": [
+        "天赋：A1 E1 Q1"
       ]
     },
     {

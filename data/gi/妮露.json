@@ -83,7 +83,29 @@
         }
       }
     ],
-    "talents": [],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "A",
+            "level": 1,
+            "ref": "talent:A"
+          },
+          {
+            "name": "E",
+            "level": 1,
+            "ref": "talent:E"
+          },
+          {
+            "name": "Q",
+            "level": 1,
+            "ref": "talent:Q"
+          }
+        ],
+        "raw": "A1 E1 Q1"
+      }
+    ],
     "panels": [
       {
         "label": null,
@@ -128,6 +150,12 @@
         "首选：千岩牢固 / 花海甘露之光 + 沉沦之心 + 水仙之梦 + 深林的记忆 + 战狂 + 赌徒",
         "过渡：教官",
         "主词条：时之沙：生命值｜空之杯：生命值｜理之冠：生命值"
+      ]
+    },
+    {
+      "title": "3. 天赋加点",
+      "lines": [
+        "天赋：A1 E1 Q1"
       ]
     },
     {

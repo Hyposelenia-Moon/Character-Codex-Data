@@ -261,6 +261,15 @@ push('配队：候选拆分', fn('memberCandidates')('迪奥娜 / 阿罗夏'), [
   push('filledModules：配队只有空成员 → 配队未填', filledModules({ teams: [{ members: [{ name: '' }], text: '' }] }).teams, false)
   push('filledModules：整行备注算配队有内容', filledModules({ teams: [{ kind: 'note', text: '二命' }] }).teams, true)
   push('filledModules：六个键都在', Object.keys(filledModules({})).join(','), 'weapons,artifacts,talents,panels,constellations,teams')
+  // 天赋：**三格全 1 不算填**（用户定稿 2026-09-24：默认 111 只是「界面按 111 正常显示」的占位，
+  // 补过默认行的角色在目录里依旧要显示「未填：… 天 …」）
+  const pri = (levels, crown) => ({ kind: 'priority', raw: levels.join(''), order: levels.map((lv, i) => ({ name: 'AEQ'[i], level: lv, crown: lv === 10 || crown === true })) })
+  push('filledModules：天赋 111 → 未填', filledModules({ talents: [pri([1, 1, 1])] }).talents, false)
+  push('filledModules：天赋 E 升到 2 → 已填', filledModules({ talents: [pri([1, 2, 1])] }).talents, true)
+  push('filledModules：三格全 1 但有皇冠行 → 已填',
+    filledModules({ talents: [{ kind: 'crown', items: [{ name: 'E', level: 10 }] }] }).talents, true)
+  push('filledModules：只有空 note 行不算天赋已填',
+    filledModules({ talents: [{ kind: 'note', text: '' }] }).talents, false)
 }
 
 /* 5c. 副词条两两关系可改（用户定稿 2026-09-21）：`＞` / `≥` / `=` 写进行的 `sep`；
@@ -430,6 +439,16 @@ push('配队：候选拆分', fn('memberCandidates')('迪奥娜 / 阿罗夏'), [
   push('目录：未识别单独标记', /未识别/.test(html), true)
   push('目录：坏文件标「读取失败」且不误报未填', /读取失败/.test(html) && !/丁[\s\S]*?未填/.test(html), true)
   push('目录：六个模块短名齐全', ctx.__editor.MODULE_SHORT.map(function (kv) { return kv[1] }).join(''), '武圣天面命配')
+
+  // 排序（用户定稿 2026-09-24）：**未填优先**，组内保持默认顺序；全都填完就是默认顺序
+  const mk = (name, all) => ({ name, filled: { weapons: all, artifacts: all, talents: all, panels: all, constellations: all, teams: all } })
+  const sort = ctx.__editor.sortListItems
+  push('目录排序：未填的排前面、组内保持默认顺序',
+    sort([mk('甲', true), mk('乙', false), mk('丙', true), mk('丁', false)]).map(x => x.name), ['乙', '丁', '甲', '丙'])
+  push('目录排序：一个未填都没有 → 就是默认顺序',
+    sort([mk('甲', true), mk('乙', true), mk('丙', true)]).map(x => x.name), ['甲', '乙', '丙'])
+  push('目录排序：缺 filled 信息的行按「已填」沉底',
+    sort([{ name: '甲' }, mk('乙', false)]).map(x => x.name), ['乙', '甲'])
 }
 
 /* 5h. `sep` 的 token 数必须跟着条目数走（薇斯纳的副词条：5 个词条只存了 3 个 token，

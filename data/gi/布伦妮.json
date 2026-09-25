@@ -87,7 +87,29 @@
         "sep": " > "
       }
     ],
-    "talents": [],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "A",
+            "level": 1,
+            "ref": "talent:A"
+          },
+          {
+            "name": "E",
+            "level": 1,
+            "ref": "talent:E"
+          },
+          {
+            "name": "Q",
+            "level": 1,
+            "ref": "talent:Q"
+          }
+        ],
+        "raw": "A1 E1 Q1"
+      }
+    ],
     "panels": [],
     "constellations": [
       {
@@ -127,6 +149,12 @@
         "首选：翠绿之影 / 天之美赐",
         "主词条：时之沙：元素充能效率 / 攻击力｜空之杯：攻击力｜理之冠：攻击力",
         "副词条：元素充能效率 > 小攻击"
+      ]
+    },
+    {
+      "title": "3. 天赋加点",
+      "lines": [
+        "天赋：A1 E1 Q1"
       ]
     },
     {

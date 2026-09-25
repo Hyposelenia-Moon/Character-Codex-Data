@@ -128,7 +128,29 @@
         "sep": " > "
       }
     ],
-    "talents": [],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "A",
+            "level": 1,
+            "ref": "talent:A"
+          },
+          {
+            "name": "E",
+            "level": 1,
+            "ref": "talent:E"
+          },
+          {
+            "name": "Q",
+            "level": 1,
+            "ref": "talent:Q"
+          }
+        ],
+        "raw": "A1 E1 Q1"
+      }
+    ],
     "panels": [],
     "constellations": [
       {
@@ -170,6 +192,12 @@
         "过渡：教官",
         "主词条：时之沙：元素充能效率 / 元素精通｜空之杯：元素精通｜理之冠：元素精通",
         "副词条：元素充能效率 > 元素精通 > 小攻击 > 暴击"
+      ]
+    },
+    {
+      "title": "3. 天赋加点",
+      "lines": [
+        "天赋：A1 E1 Q1"
       ]
     },
     {

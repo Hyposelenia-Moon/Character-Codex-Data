@@ -69,7 +69,29 @@
         "sep": " / > "
       }
     ],
-    "talents": [],
+    "talents": [
+      {
+        "kind": "priority",
+        "order": [
+          {
+            "name": "A",
+            "level": 1,
+            "ref": "talent:A"
+          },
+          {
+            "name": "E",
+            "level": 1,
+            "ref": "talent:E"
+          },
+          {
+            "name": "Q",
+            "level": 1,
+            "ref": "talent:Q"
+          }
+        ],
+        "raw": "A1 E1 Q1"
+      }
+    ],
     "panels": [],
     "constellations": [
       {
@@ -131,6 +153,12 @@
         "首选：绝缘之旗印 / 冰风迷途的勇士",
         "主词条：时之沙：攻击力｜空之杯：冰元素伤害加成｜理之冠：暴击率 / 暴击伤害",
         "副词条：暴击率 / 暴击伤害 > 小攻击"
+      ]
+    },
+    {
+      "title": "3. 天赋加点",
+      "lines": [
+        "天赋：A1 E1 Q1"
       ]
     },
     {

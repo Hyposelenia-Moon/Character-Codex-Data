@@ -151,6 +151,31 @@ for (const [名称, weapon] of synthCases) {
   if (!same) bad.push(`合成样例（${名称}）\n  web  ${web.join('\n  web  ')}\n  panel${panel.join('\n  panel')}`)
 }
 
+/* ------------------------------------------------------------------ *
+ * 合成样例：**没填天赋**（`v2.talents` 空、文档里也没有那一行）——
+ * 两端都要按 `A1 E1 Q1` 画三格（用户定稿 2026-09-24：不再显示「暂无」）；顺带比一次 111 与带皇冠的。
+ * ------------------------------------------------------------------ */
+const talentSig = (s) => (s?.empty ? '暂无' : (s?.rows ?? [])
+  .map(r => (r.items ?? []).map(i => `${i.text}/${i.talentLevel ?? i.level}${i.crown ? '★' : ''}`).join(' ')).join(' ｜ '))
+for (const [名称, talents, want] of [
+  ['没填天赋（v2 空、文档无行）', [], 'A/1 E/1 Q/1'],
+  ['天赋 111', [{ kind: 'priority', order: [{ name: 'A', level: 1 }, { name: 'E', level: 1 }, { name: 'Q', level: 1 }], raw: 'A1 E1 Q1' }], 'A/1 E/1 Q/1'],
+  ['天赋 E10 Q10 + 皇冠行', [
+    { kind: 'priority', order: [{ name: 'A', level: 1 }, { name: 'E', level: 10 }, { name: 'Q', level: 10 }], raw: 'A1 E10 Q10' },
+    { kind: 'crown', items: [{ name: 'E', level: 10 }, { name: 'Q', level: 10 }] }
+  ], 'A/1 E/10★ Q/10★']
+]) {
+  const data = { schema: 2, name: '合成样例', game: 'gi', meta: {}, v2: { weapons: [], artifacts: [], talents, panels: [], constellations: [], teams: [] } }
+  data.sections = deriveSections(data)
+  const web = talentSig(build.characterSections(data).find(s => s.title === '天赋'))
+  const panel = talentSig(parseGuideJson(data, { fileDir: giDir, fileName: '合成样例' }).sections.find(s => s.title === '天赋'))
+  const same = web === panel
+  const ok = same && web === want
+  if (!ok) synthBad++
+  console.log(`合成样例（${名称}）：网页版 ${web} ｜ 面板 ${panel} ｜ 期望 ${want} —— ${ok ? '一致' : '❌ 不一致/不符'}`)
+  if (!ok) bad.push(`合成样例（${名称}）\n  web  ${web}\n  panel${panel}\n  期望 ${want}`)
+}
+
 console.log(`网页版与面板渲染不一致的角色：${bad.length - synthBad}（应为 0）；合成样例不一致：${synthBad}（应为 0）`)
 for (const b of bad.slice(0, 8)) console.log('· ' + b)
 process.exitCode = bad.length ? 1 : 0

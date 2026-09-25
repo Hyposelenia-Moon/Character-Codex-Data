@@ -1770,10 +1770,30 @@ function renderListHtml (items) {
   }).join('')
 }
 
+/** 这个角色还有没有「未填」模块（服务端 `/api/characters` 的 `filled`） */
+function hasUnfilled (it) {
+  return !!(it && it.filled) && MODULE_SHORT.some(function (kv) { return it.filled[kv[0]] === false })
+}
+
+/**
+ * 目录排序（用户定稿 2026-09-24）：**未填优先** —— 有未填模块的角色排在前面，
+ * 全填的沉到后面；两组内部都保持**默认顺序**（`_order.json`，即 `state.items` 的顺序）。
+ * 用一个稳定的两段 filter（不是比较函数），所以「全都填完」时结果就是默认顺序 ✓。
+ */
+function sortListItems (items) {
+  var list = asArray(items)
+  return list.filter(hasUnfilled).concat(list.filter(function (it) { return !hasUnfilled(it) }))
+}
+
+/** 目录要显示的角色（搜索过滤 + 未填优先排序）—— 渲染与键盘 ↑↓ 共用，两处顺序必须一致 */
+function listedItems () {
+  var kw = state.filter.trim().toLowerCase()
+  return sortListItems(state.items.filter(function (it) { return !kw || it.name.toLowerCase().indexOf(kw) >= 0 }))
+}
+
 function renderList () {
   var box = $('list')
-  var kw = state.filter.trim().toLowerCase()
-  var items = state.items.filter(function (it) { return !kw || it.name.toLowerCase().indexOf(kw) >= 0 })
+  var items = listedItems()
   if (!items.length) {
     box.innerHTML = '<div class="muted" style="padding:8px;font-size:13px">没有匹配的角色</div>'
     return
@@ -1781,12 +1801,9 @@ function renderList () {
   box.innerHTML = renderListHtml(items)
 }
 
-/** 当前列表里可见的角色名（键盘 ↑↓ 用） */
+/** 当前列表里可见的角色名（键盘 ↑↓ 用）—— 顺序与目录一致（未填优先） */
 function visibleListNames () {
-  var kw = state.filter.trim().toLowerCase()
-  return state.items
-    .filter(function (it) { return !kw || it.name.toLowerCase().indexOf(kw) >= 0 })
-    .map(function (it) { return it.name })
+  return listedItems().map(function (it) { return it.name })
 }
 
 /** 下拉候选 */
@@ -3848,6 +3865,8 @@ window.__editor = {
   planRowFit: planRowFit,
   WEAPON_ROW_CAP: WEAPON_ROW_CAP,
   renderListHtml: renderListHtml,
+  sortListItems: sortListItems,
+  listedItems: listedItems,
   MODULE_SHORT: MODULE_SHORT,
   MODULE_FULL: MODULE_FULL,
   FIT_MIN: FIT_MIN,
