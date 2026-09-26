@@ -7,9 +7,11 @@
  *   - **副词条里 `/` 只允许出现在「暴击率 / 暴击伤害」之间**（用户定稿：
  *     只有暴击和爆伤是等价的，其他都是大于）—— 非暴击对用 `/` 会被显示层当成「同级」渲染成 `=`，
  *     所以这里当错误拦下来。
+ *   - 主词条行还在用 `note` / `noteSlot` 字段的**当错误拦下来**：那种形状写进 docx 读不回来，
+ *     `build-docx` 往返校验不过、「保存并发布」会失败（编辑器保存时已经折进值里了）。
  *
  * 用法：node scripts/scan-separators.mjs [--json]
- *   退出码：有悬挂分隔符或非法同级对 → 1，没有 → 0
+ *   退出码：有悬挂分隔符 / 非法同级对 / 主词条字段写法 → 1，没有 → 0
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -42,6 +44,15 @@ const slashNameHits = []
  * 出现在中间会被部位/档位分隔符逻辑切开，文档与数据就会漂移。**只警告，不影响退出码**。
  */
 const parenHits = []
+/**
+ * 主词条行还在用 `note` / `noteSlot` 字段的（**硬错误**）。
+ *
+ * 文档层只有「括注写在值里」这一种形状（`parse-docx` 按用户定稿 2026-09-20 不剥字段），
+ * 所以这种写法写进 docx 就再也读不回字段 → `build-docx` 往返校验不过 →「保存并发布」直接失败
+ * （用户 2026-09-26 报过）。编辑器保存时已经会折进值里（见 `foldMainNoteIntoStats`），
+ * 这里把漏网的老数据扫出来。
+ */
+const legacyNoteHits = []
 /** 显示后仍是「暴击率 / 暴击伤害」这一对？ */
 const isCritPair = (a, b) => {
   const x = String(a ?? '').trim()
@@ -88,6 +99,9 @@ for (const f of files) {
     }
   }
   for (const a of (d.v2?.artifacts ?? [])) {
+    if (a?.kind === 'main' && (a.note !== undefined || a.noteSlot !== undefined)) {
+      legacyNoteHits.push(`${name} 主词条 note=${JSON.stringify(a.note)} noteSlot=${JSON.stringify(a.noteSlot)}`)
+    }
     for (const st of (a.sets ?? [])) {
       const nm = String(st?.name ?? '')
       if (/[/／｜]/.test(nm)) nameHits.push(`${name} 套装「${nm}」`)
@@ -140,5 +154,11 @@ if (process.argv.includes('--json')) {
     console.log(`[!] 括注没写在值末尾的：${parenHits.length} 处（会被分隔符逻辑切开 → 文档与数据漂移）`)
     for (const h of parenHits.slice(0, 20)) console.log(`  · ${h}`)
   }
+  if (!legacyNoteHits.length) {
+    console.log('主词条 note / noteSlot 字段（应折进值里）：0 处 ✅')
+  } else {
+    console.log(`主词条还在用 note / noteSlot 字段：${legacyNoteHits.length} 处（写回文档后读不回字段 → 往返失败、「保存并发布」会被挡下）`)
+    for (const h of legacyNoteHits.slice(0, 20)) console.log(`  · ${h}`)
+  }
 }
-process.exit(hits.length || critHits.length ? 1 : 0)
+process.exit(hits.length || critHits.length || legacyNoteHits.length ? 1 : 0)

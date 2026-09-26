@@ -42,7 +42,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { deriveSections, deriveTags, validate, parseRef, itemText } from './lib/schema.mjs'
+import { deriveSections, deriveTags, validate, parseRef, itemText, foldMainNoteIntoStats } from './lib/schema.mjs'
 import { renderGuideSectionsHtml, renderGuideSectionsText, characterSections, renderCard } from './build-html.mjs'
 import { verifyThreeWay, snapshotMainDoc, sha1File } from './lib/publish-verify.mjs'
 import { buildIndex } from './build-index.mjs'
@@ -354,7 +354,7 @@ function mergeV2 (bodyV2, prevV2) {
  * @param {object} v2 合并后的 v2（见 mergeV2）
  * @returns {object}
  */
-function normalizeV2 (v2) {
+export function normalizeV2 (v2) {
   const src = v2 && typeof v2 === 'object' ? v2 : {}
   const out = {}
 
@@ -403,20 +403,16 @@ function normalizeV2 (v2) {
       const label = hasText(row.label) ? row.label.trim() : null
       if (kind === 'main') {
         const st = row.stats && typeof row.stats === 'object' ? row.stats : {}
-        // 主词条行不写 sep（渲染器只用它拼多值），三个部位键始终齐全
-        // note / noteSlot：括注（`水元素伤害加成（二命）`）与它挂在哪个部位，
-        // 字段顺序保持 kind, note, noteSlot, stats
-        const r = { kind }
-        if (hasText(row.note)) {
-          r.note = String(row.note).trim()
-          if (hasText(row.noteSlot) && ['时之沙', '空之杯', '理之冠'].includes(row.noteSlot)) r.noteSlot = row.noteSlot
-        }
-        r.stats = {
+        // 主词条行不写 sep（渲染器只用它拼多值），三个部位键始终齐全。
+        // `note` / `noteSlot` **不落盘**：文档层只认「括注写在值里」（parse-docx 按用户定稿
+        // 2026-09-20 不把它剥成字段），所以这里折进该部位的值末尾（`元素精通（高命）`）。
+        // 留字段的话 data → docx → data 往返对不上，「保存并发布」会失败（用户报过）。
+        const stats = {
           时之沙: asArray(st['时之沙']).map(x => String(x).trim()).filter(Boolean),
           空之杯: asArray(st['空之杯']).map(x => String(x).trim()).filter(Boolean),
           理之冠: asArray(st['理之冠']).map(x => String(x).trim()).filter(Boolean)
         }
-        return r
+        return { kind, stats: foldMainNoteIntoStats({ note: row.note, noteSlot: row.noteSlot, stats }) }
       }
       if (kind === 'sub') {
         const r = { kind, stats: asArray(row.stats).map(x => String(x).trim()).filter(Boolean) }

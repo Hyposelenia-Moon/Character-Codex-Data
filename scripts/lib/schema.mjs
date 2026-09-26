@@ -532,6 +532,37 @@ export function pickMainNoteSlot (row) {
 }
 
 /**
+ * 把主词条行的 `note`（+ `noteSlot`）**折进值里**：`时之沙：攻击力 / 元素精通（高命）`。
+ *
+ * 为什么必须折：文档层只有「括注写在值里」这一种形状 —— `parse-docx` 按用户定稿（2026-09-20）
+ * 不把值末尾的括注剥成 `note` / `noteSlot` 字段。所以编辑器保存时若还留着这两个字段，
+ * 就会写成 `data: {note:'高命'} → docx: '…元素精通（高命）' → data: {值里带括注}`，
+ * 往返对不上 → `build-docx` 的往返校验不过 →「保存并发布」失败（用户报过）。
+ *
+ * 已经是同一条括注时不重复追加（幂等）；末值为空 / 找不到落点时原样返回（宁可丢括注也不写坏值）。
+ * @param {object} row
+ * @returns {object} 折好括注的 stats（没有 note 时原样返回）
+ */
+export function foldMainNoteIntoStats (row) {
+  const stats = row?.stats
+  if (!stats || typeof stats !== 'object') return stats
+  const note = stripMarks(String(row?.note ?? '')).trim()
+  if (!note) return stats
+  const slot = pickMainNoteSlot(row)
+  if (!slot) return stats
+  const list = (Array.isArray(stats[slot]) ? stats[slot] : []).map(v => stripMarks(String(v ?? '')))
+  // 落在最后一个**非空**值上（值与值之间的空串不参与）
+  let at = -1
+  for (let i = list.length - 1; i >= 0; i--) if (list[i].trim()) { at = i; break }
+  if (at < 0) return stats
+  const suffix = `（${note}）`
+  if (list[at].endsWith(suffix)) return stats
+  const next = [...list]
+  next[at] = next[at] + suffix
+  return { ...stats, [slot]: next }
+}
+
+/**
  * 主词条行：把每个词条值按需补上括注，再拼成一行。
  *
  * 分隔符语义（重要，别改回去）：

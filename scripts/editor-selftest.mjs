@@ -250,7 +250,8 @@ push('配队：候选拆分', fn('memberCandidates')('迪奥娜 / 阿罗夏'), [
 }
 
 {
-  const { isEmptyRow, filledModules } = await import(pathToFileURL(path.join(root, 'scripts', 'editor.mjs')).href)
+  const { isEmptyRow, filledModules, normalizeV2 } = await import(pathToFileURL(path.join(root, 'scripts', 'editor.mjs')).href)
+  const { foldMainNoteIntoStats } = await import(pathToFileURL(path.join(root, 'scripts', 'lib', 'schema.mjs')).href)
   push('服务端 isEmptyRow：只有成员的配队行不算空行', isEmptyRow({ label: null, members: [{ name: '阿贝多', ref: 'character:阿贝多' }], text: '' }), false)
   push('服务端 isEmptyRow：只有空名字成员仍算空行', isEmptyRow({ label: null, members: [{ name: '', ref: 'character:' }], text: '' }), true)
   // 目录里的「未填」判据：**有真内容才算填**（空占位行不算）
@@ -270,6 +271,32 @@ push('配队：候选拆分', fn('memberCandidates')('迪奥娜 / 阿罗夏'), [
     filledModules({ talents: [{ kind: 'crown', items: [{ name: 'E', level: 10 }] }] }).talents, true)
   push('filledModules：只有空 note 行不算天赋已填',
     filledModules({ talents: [{ kind: 'note', text: '' }] }).talents, false)
+
+  // 主词条括注：**保存时必须折进值里**（用户 2026-09-26 报「保存并发布」失败：
+  // 文档层只认值内括注，留 note/noteSlot 字段的话 data → docx → data 对不上）
+  const mainRow = { kind: 'main', note: '高命', noteSlot: '时之沙', stats: { 时之沙: ['攻击力', '元素精通'], 空之杯: ['攻击力'], 理之冠: ['暴击伤害', '暴击率'] } }
+  const folded = normalizeV2({ artifacts: [mainRow] }).artifacts[0]
+  push('主词条括注：折进 noteSlot 指定部位的最后一个值',
+    folded.stats['时之沙'].join(' / '), '攻击力 / 元素精通（高命）')
+  push('主词条括注：不再落 note / noteSlot 字段',
+    [folded.note === undefined, folded.noteSlot === undefined].join(','), 'true,true')
+  push('主词条括注：其它部位原样不动',
+    [folded.stats['空之杯'].join(''), folded.stats['理之冠'].join('/')].join(' | '), '攻击力 | 暴击伤害/暴击率')
+  push('主词条括注：没写 noteSlot 时挂在第一个还没括注的部位（部位顺序 时之沙 → 空之杯 → 理之冠）',
+    foldMainNoteIntoStats({ note: '二命', stats: { 时之沙: ['攻击力'], 空之杯: ['生命值'], 理之冠: [] } })['时之沙'][0],
+    '攻击力（二命）')
+  push('主词条括注：没写 noteSlot、第一个部位已有括注时顺延到下一个部位',
+    foldMainNoteIntoStats({ note: '二命', stats: { 时之沙: ['攻击力（高命）'], 空之杯: ['生命值'], 理之冠: [] } })['空之杯'][0],
+    '生命值（二命）')
+  push('主词条括注：值里已经有同一条括注 → 不重复追加（幂等）',
+    foldMainNoteIntoStats({ note: '高命', noteSlot: '时之沙', stats: { 时之沙: ['攻击力', '元素精通（高命）'] } })['时之沙'].join(' / '),
+    '攻击力 / 元素精通（高命）')
+  push('主词条括注：值里本来就是括注写法 → 原样透过（再存一次不会变）',
+    normalizeV2({ artifacts: [{ kind: 'main', stats: { 时之沙: ['攻击力', '元素精通（高命）'], 空之杯: [], 理之冠: [] } }] }).artifacts[0].stats['时之沙'].join(' / '),
+    '攻击力 / 元素精通（高命）')
+  push('主词条括注：没有 note 时值一个字都不改（老数据打开再保存不变）',
+    JSON.stringify(normalizeV2({ artifacts: [{ kind: 'main', stats: { 时之沙: ['攻击力'], 空之杯: ['防御力'], 理之冠: ['暴击率'] } }] }).artifacts[0].stats),
+    JSON.stringify({ 时之沙: ['攻击力'], 空之杯: ['防御力'], 理之冠: ['暴击率'] }))
 }
 
 /* 5c. 副词条两两关系可改（用户定稿 2026-09-21）：`＞` / `≥` / `=` 写进行的 `sep`；

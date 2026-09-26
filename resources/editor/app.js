@@ -1384,7 +1384,8 @@ function renderArtifacts () {
         '<span class="muted" style="font-size:12px">主词条括注</span>' +
         '<input type="text" class="w-sm" data-path="' + p + '.note" value="' + esc(row.note) + '" placeholder="可空，如 二命">' +
         selectBox(p + '.noteSlot', row.noteSlot, [{ value: '', label: '挂在哪个部位' }].concat(MAIN_SLOTS.map(function (s) { return { value: s, label: '挂在 ' + s } })), 'w-sm') +
-        '<span class="muted" style="font-size:12px" title="只给某个部位写补充说明时才填；整行就是说明时不必写「注：」">只给某个部位写补充说明</span>' +
+        '<span class="muted" style="font-size:12px" title="保存时会写进该部位最后一个值的末尾（值（括注）），与文档层同一种写法">' +
+        '保存时折进该部位的值末尾（<code>元素精通（高命）</code>）</span>' +
         '</div>'
     } else if (row.kind === 'sub') {
       body2 = multiValue('副词条', p + '.stats', row.stats, '双爆', '副词条',
@@ -2480,19 +2481,23 @@ function save () {
     markDirty(false)
     state.before = snapshotShape(state.model)
     renderForm()
-    // 保存后服务器会自动重建 data/_index.json（索引已刷新 / 重建失败只算警告，不影响保存）
-    var idxNote = (res && res.indexRefreshed) ? '，索引已刷新' : ''
+    // 保存后服务器会自动重建 data/_index.json（重建失败只算警告，不影响保存）
     var idxWarn = (res && res.indexWarning) ? res.indexWarning : ''
     return refreshIndex().then(refreshList).then(function () {
       var lines = diff.length ? diff : ['内容与上次打开时一致（只有格式/顺序层面的改动）']
       lines.push('武器行 ' + after.weapons + ' / 圣遗物行 ' + after.artifacts + ' / 配队行 ' + after.teams + ' / 命座行 ' + after.constellations)
       if (state.issues.length) lines.push('⚠ ' + state.issues.length + ' 处名称不在图鉴（输入框旁的 ⚠ 可看详情）')
       if (idxWarn) lines.push(idxWarn)
-      toast('已保存 ' + state.current + '.json' + idxNote, lines, (state.issues.length || idxWarn) ? 'warn' : 'ok')
-      if (state.issues.length) {
-        showStatus('已保存' + idxNote + '；但有 ' + state.issues.length + ' 处名称不在图鉴里（输入框旁的 ⚠ 可看详情）' + (idxWarn ? '；' + idxWarn : ''), 'warn', true)
+      // 用户定稿 2026-09-26：成功只显示一句「保存成功」；**有警告 / 有问题时照旧把明细摊开**
+      if (state.issues.length || idxWarn) {
+        toast('保存成功，但有警告', lines, 'warn')
+        showStatus('保存成功：' + [
+          state.issues.length ? state.issues.length + ' 处名称不在图鉴里（输入框旁的 ⚠ 可看详情）' : '',
+          idxWarn
+        ].filter(Boolean).join('；'), 'warn', true)
       } else {
-        showStatus('已保存 ' + state.current + '.json' + idxNote + (idxWarn ? '；' + idxWarn : ''), idxWarn ? 'warn' : 'ok', !!idxWarn)
+        toast('保存成功')
+        showStatus('保存成功', 'ok')
       }
       return true
     })
@@ -2510,7 +2515,7 @@ function save () {
  * 响应形状以 steps[] + summary 为准；同时兼容旧形状的 files[]。
  */
 function publish () {
-  showStatus('正在发布（索引 / 主文档 / guide.html）…', '', true)
+  showStatus('发布中…', '', true)
   return api('POST', '/api/publish', {}).then(function (res) {
     var lines = []
     asArray(res.steps).forEach(function (s) { lines.push((s.ok ? '✓ ' : '✗ ') + s.step + (s.detail ? '：' + s.detail : '')) })
@@ -2520,12 +2525,15 @@ function publish () {
     if (changed.length) lines.push('变更文件：' + changed.map(function (c) { return c.path + '（' + c.status + '）' }).join('、'))
     lines.push('未执行 git 提交' + (res.summary && res.summary.suggestedMessage ? '；建议提交信息：' + res.summary.suggestedMessage : ''))
     asArray(res.errors).forEach(function (e) { lines.push('⚠ ' + e) })
-    toast(res.ok === false ? '发布有错误' : '已发布', lines, res.ok === false ? 'error' : 'ok')
     var failed = asArray(res.steps).filter(function (s) { return s.ok === false })
-    showStatus(res.ok === false || failed.length
-      ? ('发布失败：' + (res.error || failed.map(function (s) { return s.step + ' — ' + s.detail }).join('；')))
-      : ('已发布：' + asArray(res.steps).map(function (s) { return s.step }).join(' → ') + '（未提交，摘要见 ' + (res.summaryFile || 'out/_commit-summary.md') + '）'),
-    (res.ok === false || failed.length) ? 'error' : 'ok', true)
+    // 用户定稿 2026-09-26：成功只显示一句「发布成功」；失败照旧把步骤明细摊开
+    if (res.ok === false || failed.length) {
+      toast('发布失败', lines, 'error')
+      showStatus('发布失败：' + (res.error || failed.map(function (s) { return s.step + ' — ' + s.detail }).join('；')), 'error', true)
+    } else {
+      toast('发布成功')
+      showStatus('发布成功', 'ok')
+    }
     if (state.current) { refreshIndex().then(refreshList).catch(function () {}) }
     return res
   }).catch(function (e) {
@@ -2537,23 +2545,21 @@ function publish () {
 
 /* ==================================================== 保存并发布（全链路） */
 
-/** 「保存并发布」的四个阶段（用于进度提示） */
-var PUBLISH_STEPS = ['写角色 JSON', '重建 data/_index.json', '写回主文档（含备份）', '生成 guide.html', '三方一致性校验', '自动提交（不推送）']
-
 /**
  * 保存并发布（Ctrl+Shift+S，按钮「保存并发布」）：
  *   写 JSON → 重建索引 → build-docx 写回 Word 主文档（含备份）→ build-html 生成 guide.html
- *   → **三方一致性校验**（数据/文档/网页/分隔符，全过才继续）→ `git add` + `git commit`
- *   （**绝不 push**，推送由人工执行）。
+ *   → **三方一致性校验**（数据/文档/网页/分隔符，全过才继续）
+ *   （**不自动 commit / push**：提交与推送由人工执行）。
  * 校验不过或提交失败都不回滚：文档与网页保持可用，返回里说明原因与手动提交命令。
  * 摘要落盘 out/_commit-summary.md（+ 最近 5 份时间戳副本）。
+ * 界面提示（用户定稿 2026-09-26）：成功只说一句「保存并发布成功」，提交摘要用「复制提交信息」取；
+ * 失败 / 校验没过才摊开明细。
  */
 function saveAndPublish () {
   if (!state.current || !state.model) return Promise.resolve(false)
   syncRefInputs()
   var body = buildBody()
-  showStatus('保存并发布：' + PUBLISH_STEPS.join(' → ') + ' …', '', true)
-  toast('保存并发布中…', PUBLISH_STEPS.map(function (s, i) { return (i + 1) + '. ' + s }), 'ok')
+  showStatus('保存并发布中…', '', true)
   return api('POST', '/api/publish', { name: state.current, character: body, targets: ['html'] }).then(function (res) {
     markDirty(false)
     state.issues = asArray(res.issues)
@@ -2577,19 +2583,22 @@ function saveAndPublish () {
       lines.push('摘要文件：' + (res.summaryFile || 'out/_commit-summary.md'))
       var failed = asArray(res.steps).filter(function (st) { return st.ok === false })
       var blocked = res.ok === false && res.step === 'verify'
-      toast(failed.length ? '保存并发布有失败步骤' : (blocked ? '已保存并发布；三方校验未通过，未提交' : (res.commitExecuted ? '已保存并发布并提交（未推送）' : '已保存并发布（未提交）')), lines, (failed.length || blocked) ? 'warn' : 'ok', {
-        text: s.markdown,
-        label: '复制提交信息',
-        title: s.suggestedMessage || s.title
-      })
-      showStatus(failed.length
-        ? ('保存并发布失败：' + failed.map(function (st) { return st.step + ' — ' + st.detail }).join('；'))
-        : blocked
-          ? ('保存并发布：三方一致性校验未通过，未提交 — ' + (res.detail || ''))
-          : ('已保存并发布 ' + state.current + '；主文档已写回（备份 ' + ((res.docx && res.docx.backup) || '无') + '）'
-            + (res.commitExecuted ? '；已提交 ' + res.commit + '（未推送）' : (res.commitError ? '；自动提交失败，请手动提交' : '；无改动可提交'))
-            + '；摘要 ' + (res.summaryFile || 'out/_commit-summary.md')),
-      (failed.length || blocked) ? 'error' : 'ok', true)
+      // 用户定稿 2026-09-26：成功只显示一句「保存并发布成功」（提交摘要仍可用下方的「复制提交信息」取）；
+      // 有失败步骤 / 三方校验没过 / 提交失败时照旧把明细摊开
+      if (failed.length || blocked || res.commitError) {
+        toast(failed.length ? '保存并发布失败' : (blocked ? '保存并发布：三方校验未通过' : '保存并发布成功，但自动提交失败'),
+          lines, (failed.length || blocked) ? 'error' : 'warn',
+          { text: s.markdown, label: '复制提交信息', title: s.suggestedMessage || s.title })
+        showStatus(failed.length
+          ? ('保存并发布失败：' + failed.map(function (st) { return st.step + ' — ' + st.detail }).join('；'))
+          : blocked
+            ? ('保存并发布失败：三方一致性校验未通过，未提交 — ' + (res.detail || ''))
+            : ('保存并发布成功，但自动提交失败：' + res.commitError),
+        (failed.length || blocked) ? 'error' : 'warn', true)
+      } else {
+        toast('保存并发布成功', null, 'ok', { text: s.markdown, label: '复制提交信息', title: s.suggestedMessage || s.title })
+        showStatus('保存并发布成功', 'ok')
+      }
       return res
     })
   }).catch(function (e) {

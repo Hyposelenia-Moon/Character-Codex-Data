@@ -19,7 +19,7 @@
 | 3 | **标记版 docx**（`out\…(标记版).docx` + `D:\…\…(标记版).docx`） | 由 `build-docx --write-main` 一并产出，无需手改 | 标记版 sha1 + "去标记后逐字一致：是" |
 | 4 | `guide.html` | `node scripts/build-html.mjs` | 卡片数 129 + `audit-guide-html` 通过 |
 | 5 | `guide.md` | `node scripts/build-doc.mjs`（**选 A 口径**：只过滤占位符，**文档词汇不变**） | `___`=0 + 文档词汇计数 + 新旧字节/行数 |
-| 6 | **编辑器**（表单文案 + `/api/preview` 预览） | `resources/editor/app.js`（文案 / 下拉 / **标签与档位联动** / **删行墓碑** / **面板一行两个控件** / **chip 宽度自适应与「放得下几把」** / **左栏未填与旅行者·奇偶豁免**）＋ `scripts/editor.mjs`（保存协议：删行墓碑、清空＝显式 `null`；**写请求带跨站防护**）；**改完必须重启编辑器进程**（长驻进程会缓存旧模块） | `/api/preview` html 与 `guide.html` **逐字节一致** ＋ `scripts/editor-selftest.mjs` 166/166 ＋ `.dsh/verify-editor-rt.mjs`（129 角色「打开→原样保存」逐字节不变 + 预览逐字节一致）＋ `.dsh/verify-editor-click.mjs`（行尾图标按钮：点按钮 / `<svg>` / `<path>` 三种点法都要能删行）＋ `.dsh/verify-panel-editor.mjs`（面板行新增 / 带标签 / 删行 / 说明行，端到端）＋ `.dsh/probe-editor-ui.mjs`（离线表单：占位截断 / 字号 / 溢出）＋ `.dsh/probe-editor-live.mjs` / `.dsh/audit-editor-ui-live.mjs`（**真实编辑器**里量同一批指标 + 武器行提示，`--zoom=2` 出放大截图） |
+| 6 | **编辑器**（表单文案 + `/api/preview` 预览） | `resources/editor/app.js`（文案 / 下拉 / **标签与档位联动** / **删行墓碑** / **面板一行两个控件** / **chip 宽度自适应与「放得下几把」** / **左栏未填与旅行者·奇偶豁免**）＋ `scripts/editor.mjs`（保存协议：删行墓碑、清空＝显式 `null`；**写请求带跨站防护**）；**改完必须重启编辑器进程**（长驻进程会缓存旧模块） | `/api/preview` html 与 `guide.html` **逐字节一致** ＋ `scripts/editor-selftest.mjs` 174/174 ＋ `.dsh/verify-editor-rt.mjs`（129 角色「打开→原样保存」逐字节不变 + 预览逐字节一致）＋ `.dsh/verify-editor-click.mjs`（行尾图标按钮：点按钮 / `<svg>` / `<path>` 三种点法都要能删行）＋ `.dsh/verify-panel-editor.mjs`（面板行新增 / 带标签 / 删行 / 说明行，端到端）＋ `.dsh/probe-editor-ui.mjs`（离线表单：占位截断 / 字号 / 溢出）＋ `.dsh/probe-editor-live.mjs` / `.dsh/audit-editor-ui-live.mjs`（**真实编辑器**里量同一批指标 + 武器行提示，`--zoom=2` 出放大截图） |
 | 7 | **插件面板** | `model/codexIndex/display.js`（**与 `scripts/lib/guide-display.mjs` 逐字节一致**）、`parse.js`、`resources/atlas/codex.html`、`codex.css`（武器段小字说明 = 共享的 `WEAPON_REFINE_HINT` → `.codex-hint`） | `node scripts/check-display-sync.mjs` + `audit-web-vs-panel`（含「武器段说明 129/129」）+ `test/codex-template.test.mjs`（说明落在标题与正文之间） |
 | 8 | `README` 与 `templates/` | 改受影响的说明、词汇表、符号语义、期望值 | 本节表格与预期计数 |
 | 9 | **审计脚本的期望值** | `audit-*` / `display-*` / `check-display-sync` 的断言与合法集 | 每个审计 `exit=0` |
@@ -34,9 +34,9 @@ node scripts/diagnose-docx-json.mjs               # 不一致 0
 node scripts/audit-web-vs-panel.mjs               # 真实角色 0 + 自定义档位词合成样例 3 条一致 + 武器段说明 129/129
 node scripts/audit-dup-items.mjs                  # 重复名 0/0、序列不一致 0
 node scripts/check-display-sync.mjs               # 两份显示级归一逐字节一致
-node scripts/scan-separators.mjs                  # 悬挂 0 + 副词条非法同级对 0（`/` 只许出现在暴击对之间）
+node scripts/scan-separators.mjs                  # 悬挂 0 + 副词条非法同级对 0 + 主词条 note 字段 0（`/` 只许出现在暴击对之间）
 node scripts/display-selftest.mjs <角色>           # 词条写法 54/54（含天赋行无标签、副词条 `=`/`≥`、面板两控件、武器段小字说明）
-node scripts/editor-selftest.mjs                  # 编辑器规则 166/166（天赋等级 / 新增行 / 多值输入 / 标签互斥 / 配队槽位 / 面板两控件 / 武器行放得下几把 / 目录未填模块 + 旅行者·奇偶豁免）
+node scripts/editor-selftest.mjs                  # 编辑器规则 174/174（天赋等级 / 新增行 / 多值输入 / 标签互斥 / 配队槽位 / 面板两控件 / 武器行放得下几把 / 目录未填模块 + 旅行者·奇偶豁免 / 主词条括注折进值里）
 node scripts/build-html.mjs && node scripts/build-doc.mjs   # 产物刷新
 # 编辑器 129 角色「打开→原样保存」逐字节不变 + /api/preview 与 guide.html 逐字节一致
 #   （需先 node scripts/editor.mjs --port <p> --no-open 起服务；改过共享层务必重启）
@@ -570,6 +570,24 @@ node .dsh/verify-editor-e2e.mjs      # 端到端：用真实的 buildBody 出 pa
 **双向无损**：`parse-docx` 读懂 `注：` 行 → `{kind:'note'}`；`build-docx` 再把
 `{kind:'note'}` 写回段末 `注：` 行。实测 `JSON → docx → JSON` **129/129 深度相等**且连续两次运行逐字节幂等。
 
+### 主词条括注：**只有「写在值里」一种形状**（别用 `note` / `noteSlot` 字段）
+
+主词条的补充说明跟在**那个部位的某个值末尾**，写全角括弧：
+
+```json
+{ "kind": "main", "stats": { "时之沙": ["攻击力", "元素精通（高命）"], "空之杯": ["攻击力"], "理之冠": ["暴击伤害", "暴击率"] } }
+```
+
+`parse-docx` 按用户定稿（2026-09-20）**不**把值末尾的括注剥成 `note` / `noteSlot` 字段，
+所以文档层只有这一种形状。编辑器表单里的「主词条括注」输入框 + 「挂在哪个部位」下拉是**输入便利**：
+保存时由 `foldMainNoteIntoStats()` 折进 `noteSlot` 那个部位的**最后一个值**上（值是 `元素精通（高命）`），
+**不落** `note` / `noteSlot` 字段。
+
+> 反例（曾经导致「保存并发布」失败，用户 2026-09-26 报过）：数据里留
+> `{"kind":"main","note":"高命","noteSlot":"时之沙", …}` —— 写进 docx 是 `时之沙：攻击力 / 元素精通（高命）`，
+> 读回来括注已经在值里、`note` 字段回不来 ⇒ 往返校验 128/129 ⇒ 发布被挡下。
+> `scripts/scan-separators.mjs` 现在把这种写法当**错误**拦下来（退出码 1）。
+
 ### ref 写法：`类型:名称`
 
 引用一律存成 `{ "name": "显示名", "ref": "类型:名称" }`，类型前缀与 `MARK_RE` 一致：
@@ -650,12 +668,13 @@ node scripts/editor.mjs [--port 8787] [--no-open] [--exit-on-idle[=<秒>]]
 | 武器 / 圣遗物行的 chip | 徽标**只留图标**（完整类型名在 `title` 里）、名字框**按内容自适应宽度**（`field-sizing: content`，不支持的浏览器由 `autoSizeInput` 兜底）—— 名字短占得少，一行就能多放一把 |
 | 武器行的「放得下几把」 | **同级上限 4 把**（`WEAPON_ROW_CAP`）。渲染后按**实际量出来的 chip 宽度**算：放得下 → 行首提示 `可加入 4 把`；名字长放不下 → `仅可加入 N 把`；已经 4 把 → `已达同级上限（4 把）`；当前这行就放不下 → 追一句「当前放不下，请先删到放得下」。算法是纯函数 `planRowFit`（自检直接断言），DOM 那一遍在 `refreshFitHints` |
 | 圣遗物行 | 档位下拉与标签联动（`label` 就是文档原词，`kind` 跟着走）；**件数不再提供输入** |
-| 主词条 / 副词条 | 每个 chip 是**可编辑输入框**（点「＋」加一项后能直接打字，或点「▾」从候选表选）；主词条候选不带「百分比」，副词条候选是 `大X` / `小X` 两套；副词条**只有暴击率↔暴击伤害是同级**（编辑器不提供分隔符编辑，改动走文档层）；主词条三槽是 grid 里的小格子，**放不下时折行**（`.mv-wrap`），武器 / 副词条行仍然不换行、窄了横向滚动 |
+| 主词条 / 副词条 | 每个 chip 是**可编辑输入框**（点「＋」加一项后能直接打字，或点「▾」从候选表选）；主词条候选不带「百分比」，副词条候选是 `大X` / `小X` 两套；副词条**只有暴击率↔暴击伤害是同级**（编辑器不提供分隔符编辑，改动走文档层）；主词条三槽是 grid 里的小格子，**放不下时折行**（`.mv-wrap`），武器 / 副词条行仍然不换行、窄了横向滚动。主词条那一行的「主词条括注」+「挂在哪个部位」是**输入便利**：保存时折进该部位最后一个值的末尾（`元素精通（高命）`），JSON 里**不落** `note` / `noteSlot` 字段（见上文「主词条括注」一节） |
 | 天赋 | 固定三格 A / E / Q，**数字就是等级**（1–10，留空按 1）；数字本身就会生效，皇冠只是把这一格抬到 10 |
 | 面板行 | **一行两个控件**：属性下拉（只有 `攻击力 / 防御力 / 生命值 / 暴击率 / 暴击伤害 / 元素精通 / 元素充能效率` 七种，124px、带原生箭头）+ 数值输入（**固定 200px**，`field-sizing: fixed`）。数值**自动补 `%`**（暴击率 / 暴击伤害 / 元素充能效率）、**不留尾部的 `+`**（`2200+` → `2200`、`800+（非讨龙）` → `800（非讨龙）`）；数值框带 datalist 候选（只是提示，不校验）。只填一半（缺属性或缺数值）写不出合法文档行、保存时会被丢掉 —— 表单会打 ⚠ 提示。「说明行 / 属性行」按钮可整行切换（带标签的结构化行落盘成 `{label, text:'k：v'}`，文档层就是 `标签：k：v` 一行两个冒号） |
 | 命座行 | **命座名必填**（决定 `命之座N` 与命座图标）：只填说明会被丢掉，表单打 ⚠ 提示 |
 | 配队 | 「＋ 成员」打开**槽位**选择器：点名字加进**当前格**，一格可多选（格内 ` / ` = 可替换），「＋ 新槽位」再开一格；`＋ 配队行` 加出来的空行**立刻可见可编辑** |
 | 任何栏目 | 「＋ 新增一行」加出来的空行用界面标记 `_new` 保证可见，**保存时不会落盘**（空行不写进 JSON） |
+| 界面提示 | **成功只说一句**（用户定稿 2026-09-26）：状态栏与右下角 toast 都只显示 `保存成功` / `发布成功` / `保存并发布成功`；提交摘要仍可用 toast 上的「复制提交信息」取（内容不变）。**失败 / 有警告才摊开明细**：失败步骤、三方校验逐项结果、主文档备份路径、索引重建警告、`⚠ 名称不在图鉴` 等一律照旧显示 |
 
 **关闭网页后自动结束服务**（`--exit-on-idle`，默认关闭，只在手动开时生效）
 
@@ -743,7 +762,7 @@ PowerShell 的隐藏命令，而不是直接指向 `node.exe`：
 | `guide.html` | 网页版 |
 | `out/_commit-summary.md` | 提交摘要（最新一份覆盖写），同时留 `out/_commit-summary-<时间戳>.md`（保留最近 5 份） |
 
-**提交摘要**（界面右下角 toast 里显示同样内容，带「复制提交信息」按钮）包含四段：
+**提交摘要**（落盘 `out/_commit-summary.md`；界面上默认**不摊开**，点成功 toast 的「复制提交信息」按钮即可复制全文）包含四段：
 
 1. **建议提交信息** —— 单行标题 + 正文要点（单角色 `docs: 更新 <角色名>（<字段>）`，批量 `docs: 批量更新 <n> 个角色`），
    提交时直接用它（首行标题 + 正文要点）
