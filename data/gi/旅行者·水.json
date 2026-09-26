@@ -97,8 +97,7 @@
           },
           {
             "name": "E",
-            "level": 10,
-            "crown": true,
+            "level": 1,
             "ref": "talent:E"
           },
           {
@@ -107,18 +106,7 @@
             "ref": "talent:Q"
           }
         ],
-        "raw": "A1 E10 Q1"
-      },
-      {
-        "kind": "crown",
-        "items": [
-          {
-            "name": "E",
-            "level": 10,
-            "crown": true,
-            "ref": "talent:E"
-          }
-        ]
+        "raw": "A1 E1 Q1"
       }
     ],
     "panels": [],
@@ -150,8 +138,7 @@
     {
       "title": "3. 天赋加点",
       "lines": [
-        "天赋：A1 E10 Q1",
-        "皇冠：E（10）"
+        "天赋：A1 E1 Q1"
       ]
     }
   ],
