@@ -24,6 +24,32 @@ export const MARK_RE = /\[\[([wactk])[:：]([^[\]]+?)\]\]/g
 export const TALENT_ORDER = ['A', 'E', 'Q']
 
 /**
+ * 六个模块的键（与 `v2` 的键一一对应）。
+ * 顺序即**文档顺序**：武器 → 圣遗物 → 天赋 → 面板 → 命座 → 配队 —— `freeModules` 的落盘顺序用它。
+ */
+export const MODULE_KEYS = ['weapons', 'artifacts', 'talents', 'panels', 'constellations', 'teams']
+
+/**
+ * 角色 JSON 顶层 `freeModules` 的规范化：只认六个模块键、去重、按文档顺序排列。
+ *
+ * 语义（用户定稿 2026-09-26）：该角色**这个模块本身就无需填写** ——
+ * 编辑器左栏不再显示它的「未填」，攻略页在空模块处显示一行自由说明
+ * （文案表在显示层 `guide-display.mjs` 的 `FREE_MODULE_HINTS`）。
+ * 放进角色 JSON（与 `highlight` 同级）而不是侧车文件：网页版与面板都只读角色 JSON，天然能拿到。
+ * @param {unknown} raw
+ * @returns {string[]} 规范化后的模块键（没有则空数组）
+ */
+export function normalizeFreeModules (raw) {
+  const list = Array.isArray(raw) ? raw : (raw == null ? [] : [raw])
+  const seen = new Set()
+  for (const x of list) {
+    const key = String(x ?? '').trim()
+    if (MODULE_KEYS.includes(key)) seen.add(key)
+  }
+  return MODULE_KEYS.filter(k => seen.has(k))
+}
+
+/**
  * 主词条「部位之间」的并列分隔符 —— 全角竖线。
  * 三个槽位（时之沙 / 空之杯 / 理之冠）是并列关系，不是优先级，所以**不能**用 `＞`；
  * 部位内部的候选值仍用 `/`，副词条的优先级仍用 `＞`。

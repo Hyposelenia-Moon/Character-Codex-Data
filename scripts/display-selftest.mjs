@@ -13,7 +13,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { fileURLToPath } from 'node:url'
 import {
-  displayLines, normalizeGuideSections, DISPLAY_SECTIONS, EMPTY_TEXT, WEAPON_REFINE_HINT,
+  displayLines, normalizeGuideSections, DISPLAY_SECTIONS, EMPTY_TEXT, WEAPON_REFINE_HINT, FREE_MODULE_HINTS,
   displayText, displayLabel, constellationNumber, crownItems, isZeroValue, ARTIFACT_KIND_LABEL
 } from './lib/guide-display.mjs'
 
@@ -418,6 +418,22 @@ console.log('\n================ 词条写法 ================')
     characterSections(mk({ artifacts: [{ kind: 'sub', stats: ['暴击率', '暴击伤害'], sep: ' > ' }] })).find(s => s.title === '圣遗物')?.hint ?? '', '')
   push('说明不进文档层（文档 / JSON 都不用维护这句话）',
     (wp.sections.find(s => /武器/.test(s.title))?.lines ?? []).filter(l => /默认为精5/.test(l)).length, 0)
+
+  // ⑥ 模块级「无需填写」（角色 JSON 顶层 freeModules）：空模块显示一行自由说明，替代「暂无」
+  push('自由说明文案表齐全', Object.keys(FREE_MODULE_HINTS).join(','),
+    'weapons,artifacts,talents,panels,constellations,teams')
+  const freeSections = normalizeGuideSections([], { free: ['talents', 'panels'] })
+  push('空模块 + 无需填写 → 挂自由说明（天赋）', freeSections.find(s => s.title === '天赋')?.hint, '无需加点')
+  push('空模块 + 无需填写 → 挂自由说明（面板）', freeSections.find(s => s.title === '面板')?.hint, '无硬性要求')
+  push('空模块 + 无需填写 → 不再标 empty（不显示「暂无」）', freeSections.find(s => s.title === '天赋')?.empty, false)
+  push('没标记的空模块照旧「暂无」', freeSections.find(s => s.title === '命座')?.empty, true)
+  push('没标记的空模块不挂说明', freeSections.find(s => s.title === '命座')?.hint ?? '', '')
+  const withContent = normalizeGuideSections(
+    [{ title: '武器', type: 'rows', rows: [{ label: '', items: [{ text: '西风剑' }] }] }], { free: ['weapons'] })
+  const wsec = withContent.find(s => s.title === '武器')
+  push('有内容的模块不受标记影响（内容优先，仍是自己那句精炼说明）',
+    [wsec?.empty, wsec?.hint], [false, WEAPON_REFINE_HINT])
+  push('不传 free 时行为不变', normalizeGuideSections([]).find(s => s.title === '天赋')?.empty, true)
 
   const bad = checks.filter(c => !c.ok)
   for (const c of checks) console.log(`${c.ok ? '✓' : '✗'} ${c.what}：${JSON.stringify(c.got)}${c.ok ? '' : `（期望 ${JSON.stringify(c.want)}）`}`)

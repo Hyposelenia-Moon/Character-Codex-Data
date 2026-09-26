@@ -17,7 +17,7 @@ import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
   DISPLAY_SECTIONS, TIER_BY_INDEX, EMPTY_TEXT, normalizeSections, displayText, displayLines,
-  resolveSetItems, crownedLetters, normalizePriorityRow
+  resolveSetItems, crownedLetters, normalizePriorityRow, applyFreeHints
 } from './lib/guide-display.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -617,14 +617,18 @@ export function characterSections (data) {
   // 天赋兜底（用户定稿 2026-09-24）：**没填天赋就按 111 正常显示**，不再显示「暂无」。
   // 正常数据里每个角色都有 `天赋：A1 E1 Q1` 行（没有的话由 build-docx 补），这里再兜一层：
   // 以后新增角色还没填天赋时，网页版 / 预览照样画 A 1 ／ E 1 ／ Q 1 三格。
+  // ⚠ 例外：该模块被标记「无需填写」且数据里本来就没有天赋行 → **不兜底**，留给 applyFreeHints
+  //    显示「无需加点」（否则兜底把空模块填成有内容，自由说明就出不来）。
+  const freeList = Array.isArray(data?.freeModules) ? data.freeModules : []
+  const freeEmpty = key => freeList.includes(key) && !(Array.isArray(data?.v2?.[key]) && data.v2[key].length)
   for (const section of model) {
-    if (section.kind === 'rows' && section.title === '天赋' && !(section.rows ?? []).length) {
+    if (section.kind === 'rows' && section.title === '天赋' && !(section.rows ?? []).length && !freeEmpty('talents')) {
       section.rows = [defaultTalentRow(levelHints, crownHint)]
     }
   }
-  return normalizeSections(model)
+  // 「该模块无需填写」（角色 JSON 的 freeModules）：空模块换一行自由说明（替代「暂无」）
+  return applyFreeHints(normalizeSections(model), data?.freeModules)
 }
-
 /** 默认天赋行：固定三格 A → E → Q，等级取 v2（缺省 1），皇冠按皇冠行 —— 与「文档写了 `天赋：A1 E1 Q1`」同一形状 */
 function defaultTalentRow (levelHints, crownHint) {
   const crowns = new Set(crownHint ?? [])

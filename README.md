@@ -19,7 +19,7 @@
 | 3 | **标记版 docx**（`out\…(标记版).docx` + `D:\…\…(标记版).docx`） | 由 `build-docx --write-main` 一并产出，无需手改 | 标记版 sha1 + "去标记后逐字一致：是" |
 | 4 | `guide.html` | `node scripts/build-html.mjs` | 卡片数 129 + `audit-guide-html` 通过 |
 | 5 | `guide.md` | `node scripts/build-doc.mjs`（**选 A 口径**：只过滤占位符，**文档词汇不变**） | `___`=0 + 文档词汇计数 + 新旧字节/行数 |
-| 6 | **编辑器**（表单文案 + `/api/preview` 预览） | `resources/editor/app.js`（文案 / 下拉 / **标签与档位联动** / **删行墓碑** / **面板一行两个控件** / **chip 宽度自适应与「放得下几把」** / **左栏未填与旅行者·奇偶豁免**）＋ `scripts/editor.mjs`（保存协议：删行墓碑、清空＝显式 `null`；**写请求带跨站防护**）；**改完必须重启编辑器进程**（长驻进程会缓存旧模块） | `/api/preview` html 与 `guide.html` **逐字节一致** ＋ `scripts/editor-selftest.mjs` 182/182 ＋ `.dsh/verify-editor-rt.mjs`（129 角色「打开→原样保存」逐字节不变 + 预览逐字节一致）＋ `.dsh/verify-editor-click.mjs`（行尾图标按钮：点按钮 / `<svg>` / `<path>` 三种点法都要能删行）＋ `.dsh/verify-panel-editor.mjs`（面板行新增 / 带标签 / 删行 / 说明行，端到端）＋ `.dsh/probe-editor-ui.mjs`（离线表单：占位截断 / 字号 / 溢出）＋ `.dsh/probe-editor-live.mjs` / `.dsh/audit-editor-ui-live.mjs`（**真实编辑器**里量同一批指标 + 武器行提示，`--zoom=2` 出放大截图） |
+| 6 | **编辑器**（表单文案 + `/api/preview` 预览） | `resources/editor/app.js`（文案 / 下拉 / **标签与档位联动** / **删行墓碑** / **面板一行两个控件** / **chip 宽度自适应与「放得下几把」** / **左栏未填与旅行者·奇偶豁免**）＋ `scripts/editor.mjs`（保存协议：删行墓碑、清空＝显式 `null`；**写请求带跨站防护**）；**改完必须重启编辑器进程**（长驻进程会缓存旧模块） | `/api/preview` html 与 `guide.html` **逐字节一致** ＋ `scripts/editor-selftest.mjs` 200/200 ＋ `.dsh/verify-editor-rt.mjs`（129 角色「打开→原样保存」逐字节不变 + 预览逐字节一致）＋ `.dsh/verify-editor-click.mjs`（行尾图标按钮：点按钮 / `<svg>` / `<path>` 三种点法都要能删行）＋ `.dsh/verify-panel-editor.mjs`（面板行新增 / 带标签 / 删行 / 说明行，端到端）＋ `.dsh/probe-editor-ui.mjs`（离线表单：占位截断 / 字号 / 溢出）＋ `.dsh/probe-editor-live.mjs` / `.dsh/audit-editor-ui-live.mjs`（**真实编辑器**里量同一批指标 + 武器行提示，`--zoom=2` 出放大截图） |
 | 7 | **插件面板** | `model/codexIndex/display.js`（**与 `scripts/lib/guide-display.mjs` 逐字节一致**）、`parse.js`、`resources/atlas/codex.html`、`codex.css`（武器段小字说明 = 共享的 `WEAPON_REFINE_HINT` → `.codex-hint`） | `node scripts/check-display-sync.mjs` + `audit-web-vs-panel`（含「武器段说明 129/129」）+ `test/codex-template.test.mjs`（说明落在标题与正文之间） |
 | 8 | `README` 与 `templates/` | 改受影响的说明、词汇表、符号语义、期望值 | 本节表格与预期计数 |
 | 9 | **审计脚本的期望值** | `audit-*` / `display-*` / `check-display-sync` 的断言与合法集 | 每个审计 `exit=0` |
@@ -36,7 +36,7 @@ node scripts/audit-dup-items.mjs                  # 重复名 0/0、序列不一
 node scripts/check-display-sync.mjs               # 两份显示级归一逐字节一致
 node scripts/scan-separators.mjs                  # 悬挂 0 + 副词条非法同级对 0 + 主词条 note 字段 0（`/` 只许出现在暴击对之间）
 node scripts/display-selftest.mjs <角色>           # 词条写法 54/54（含天赋行无标签、副词条 `=`/`≥`、面板两控件、武器段小字说明）
-node scripts/editor-selftest.mjs                  # 编辑器规则 182/182（天赋等级 / 新增行 / 多值输入 / 标签互斥 / 配队槽位 / 面板两控件 / 武器行放得下几把 / 目录未填模块 + 旅行者·奇偶豁免 / 主词条括注折进值里）
+node scripts/editor-selftest.mjs                  # 编辑器规则 200/200（天赋等级 / 新增行 / 多值输入 / 标签互斥 / 配队槽位 / 面板两控件 / 武器行放得下几把 / 目录未填模块 + 旅行者·奇偶豁免 / 主词条括注折进值里）
 node scripts/build-html.mjs && node scripts/build-doc.mjs   # 产物刷新
 # 编辑器 129 角色「打开→原样保存」逐字节不变 + /api/preview 与 guide.html 逐字节一致
 #   （需先 node scripts/editor.mjs --port <p> --no-open 起服务；改过共享层务必重启）
@@ -117,8 +117,22 @@ guide.md                         生成的文档版文本，请勿手改
 | `game` | | `gi` / `hsr` / `zzz`；缺省按所在目录推断（目录已能表达游戏，通常不用写） |
 | `tags` | | 卡片标签，字符串数组；也可写成 `{ "text": "定位：站场主C", "style": "role" }`（`style` 只影响网页版配色，如 `level` / `role`） |
 | `highlight` | | 卡片顶部高亮行（如 `100级提升：7.6%`），会显示在攻略页标题下方 |
+| `freeModules` | | **模块级「无需填写」标记**（用户定稿 2026-09-26）：数组，取值 `weapons` / `artifacts` / `talents` / `panels` / `constellations` / `teams`。语义 =「该角色这个模块本身就无需填写」——编辑器左栏不再显示它的「未填」，攻略页在**该模块为空**时显示一行自由说明（文案表见下）。编辑器里由模块卡片标题右侧的「无需填写」开关写入（`POST /api/free-modules`，开启要求该模块当前为空）；`parse-docx` 会像 `highlight` 一样从上一份 JSON 带过来（文档表达不了它） |
 | `sections` | ✅ | 段落数组，顺序即展示顺序，见下 |
 | `source.guide` | | 数据来源页名（如 `原神·角色攻略`），插件页脚会展示 |
+
+**`freeModules` 对应的自由说明**（文案在显示层 `scripts/lib/guide-display.mjs` 的 `FREE_MODULE_HINTS`，网页版与面板共用同一份）：
+
+| 模块 | 提示行 |
+|------|--------|
+| `weapons` | 自由选择 |
+| `artifacts` | 自由搭配 |
+| `talents` | 无需加点 |
+| `panels` | 无硬性要求 |
+| `constellations` | 无关键命座 |
+| `teams` | 自由配队 |
+
+渲染规则（`applyFreeHints`）：**只有空模块**才换成这一行（替代「暂无」）；模块里有内容时**内容优先**，标记自动失效（所以「标记之后又填了内容」不会和内容打架）。
 
 ### 段落（sections）
 
@@ -656,6 +670,7 @@ node scripts/editor.mjs [--port 8787] [--no-open] [--exit-on-idle[=<秒>]]
 界面中文、零依赖、无 CDN：左边搜角色 / 新增 / 排序 / 重命名 / 删除（软删除到 `data/_trash/`），
 右边按区块折叠编辑；保存用「保存」按钮或 `Ctrl+S` / `⌘+S`；
 「保存并发布」或 `Ctrl+Shift+S` 走全链路（写 JSON → 重建索引 → 写回 Word 主文档 → 生成 `guide.html` / `guide.md` → 三方一致性校验 → 生成提交摘要）；**不会自动提交**，提交与推送都由人工执行；
+两个按钮都是**全局**的（用户定稿 2026-09-26）：会把编辑器里改过的**所有**角色一起写下去（切走时暂存的也在内）；改过哪些角色、各改了什么，看右下角的**改动清单**（每块可点，直接跳到那个角色那个模块）。
 「发布」按钮只把**已保存的**数据重新生成 `guide.html` 与 Word 主文档，不写入正在编辑的表单。
 
 **表单里的几条硬规则**（都是用户报过问题后定稿的，改动前先看 `scripts/editor-selftest.mjs`）：
@@ -663,7 +678,7 @@ node scripts/editor.mjs [--port 8787] [--no-open] [--exit-on-idle[=<秒>]]
 | 栏目 | 规则 |
 |---|---|
 | 文字排版（全表单） | 控件（输入框 / 下拉 / 文本域）**统一 13px**、说明文字 12px；提示文字（placeholder）**一律不许被截断**（提示词写短，长解释放 `title`）；行尾按钮只留图标（`↑` / `↓` / 垃圾桶），文案在 `title` 里。⚠ 事件委托必须用 `closest('[data-act]')` **往上找**：图标按钮里是内联 SVG，点上去 `e.target` 是 `<path>`（没有 `data-act`），直接读 `e.target` 会让整个点击失灵（用户报过「编辑器无法删除面板的某行」）—— 回归脚本 `.dsh/verify-editor-click.mjs` 会分别点按钮本身 / `<svg>` / `<path>` 各一遍 |
-| 角色目录（左栏） | 每行 = 角色名 + 右侧「**未填：武 圣**」（单个汉字：武 / 圣 / 天 / 面 / 命 / 配 = 六模块，顺序即文档顺序；全填的角色不显示）。**旅行者（各元素）与奇偶（男 / 女）不显示未填**（用户定稿 2026-09-26）：这两族的攻略按形态拆成多份，缺的模块没有参考价值，`unfilledExempt()` 判据按名字族豁免（`^(旅行者\|奇偶)(·\|$)`），它们同时也不参与「未填优先」排序（落到已填那一组），悬停提示写明「旅行者 / 奇偶不显示未填项」。**排序 = 未填优先**（用户定稿 2026-09-24）：有未填模块的排前面、全填的沉底，两组内部都保持**默认顺序**（`_order.json`），全都填完时结果就是默认顺序；键盘 ↑↓ 跟着这个显示顺序走（`listedItems()` 一处供渲染与导航）。判据在服务端 `filledModules()`（**空占位行不算填**：`首选：` 后面没东西、主词条三槽全空都不算；**天赋另有特例**：三格全 1 的默认 `A1 E1 Q1` 只是「按 111 正常显示」的占位，**不算填** —— 要任一格升级 / 投皇冠 / 写说明才算，所以补过默认行的角色在目录里依旧显示「未填：… 天 …」）；鼠标悬停给完整模块名。行距压到 4px/2px 内边距，长名字省略号截断（`.nm` 的 `min-width: 0`）——同屏能多放几个名字 |
+| 角色目录（左栏） | 每行 = 角色名 + 右侧「**未填：武 圣**」（单个汉字：武 / 圣 / 天 / 面 / 命 / 配 = 六模块，顺序即文档顺序；全填的角色不显示）。**标记了「无需填写」（角色 JSON `freeModules`）的模块不算未填**，也不参与下面的排序；改动还没保存的角色带「待保存」小标（当前角色 + 切走时暂存的）。**旅行者（各元素）与奇偶（男 / 女）不显示未填**（用户定稿 2026-09-26）：这两族的攻略按形态拆成多份，缺的模块没有参考价值，`unfilledExempt()` 判据按名字族豁免（`^(旅行者\|奇偶)(·\|$)`），它们同时也不参与「未填优先」排序（落到已填那一组），悬停提示写明「旅行者 / 奇偶不显示未填项」。**排序 = 未填优先**（用户定稿 2026-09-24）：有未填模块的排前面、全填的沉底，两组内部都保持**默认顺序**（`_order.json`），全都填完时结果就是默认顺序；键盘 ↑↓ 跟着这个显示顺序走（`listedItems()` 一处供渲染与导航）。判据在服务端 `filledModules()`（**空占位行不算填**：`首选：` 后面没东西、主词条三槽全空都不算；**天赋另有特例**：三格全 1 的默认 `A1 E1 Q1` 只是「按 111 正常显示」的占位，**不算填** —— 要任一格升级 / 投皇冠 / 写说明才算，所以补过默认行的角色在目录里依旧显示「未填：… 天 …」）；鼠标悬停给完整模块名 + 已标记无需填写的模块。行距压到 4px/2px 内边距，长名字省略号截断（`.nm` 的 `min-width: 0`）——同屏能多放几个名字 |
 | 武器行 | 「自定义标签」与「档位」**二选一**：填了自定义词（如 `建议`）自动清空档位下拉，反之亦然；行首实时显示「显示为：X」 |
 | 武器 / 圣遗物行的 chip | 徽标**只留图标**（完整类型名在 `title` 里）、名字框**按内容自适应宽度**（`field-sizing: content`，不支持的浏览器由 `autoSizeInput` 兜底）—— 名字短占得少，一行就能多放一把 |
 | 武器行的「放得下几把」 | **同级上限 4 把**（`WEAPON_ROW_CAP`）。渲染后按**实际量出来的 chip 宽度**算：放得下 → 行首提示 `可加入 4 把`；名字长放不下 → `仅可加入 N 把`；已经 4 把 → `已达同级上限（4 把）`；当前这行就放不下 → 追一句「当前放不下，请先删到放得下」。算法是纯函数 `planRowFit`（自检直接断言），DOM 那一遍在 `refreshFitHints` |
@@ -674,7 +689,10 @@ node scripts/editor.mjs [--port 8787] [--no-open] [--exit-on-idle[=<秒>]]
 | 命座行 | **命座名必填**（决定 `命之座N` 与命座图标）：只填说明会被丢掉，表单打 ⚠ 提示 |
 | 配队 | 「＋ 成员」打开**槽位**选择器：点名字加进**当前格**，一格可多选（格内 ` / ` = 可替换），「＋ 新槽位」再开一格；`＋ 配队行` 加出来的空行**立刻可见可编辑** |
 | 任何栏目 | 「＋ 新增一行」加出来的空行用界面标记 `_new` 保证可见，**保存时不会落盘**（空行不写进 JSON） |
-| 界面提示 | **成功只说一句**（用户定稿 2026-09-26）：状态栏与右下角 toast 都只显示 `保存成功` / `发布成功` / `保存并发布成功`；提交摘要仍可用 toast 上的「复制提交信息」取（内容不变）。**失败 / 有警告才摊开明细**：失败步骤、三方校验逐项结果、主文档备份路径、索引重建警告、`⚠ 名称不在图鉴` 等一律照旧显示 |
+| 模块「无需填写」开关 | 每个模块卡片**标题右侧**一个开关（`无需填写` / `已标记无需填写`）：该角色这个模块本身就无需填写时点一下 —— 左栏不再显示它的「未填」，攻略页该模块（空着时）显示一行自由说明（武器「自由选择」/ 天赋「无需加点」…）。**模块有内容时不允许开启**：只回一条引导（「先清空再标记」）并把该卡片闪一下，不写盘。写着的是角色 JSON 顶层 `freeModules`（`POST /api/free-modules`），所以**不参与「未填优先」排序**（按已填沉底）。标记之后又填了内容 → 内容优先，标记失效（卡片上仍显示已标记，但攻略页按内容渲染） |
+| 保存 / 发布（**全局生效**） | 用户定稿 2026-09-26：`保存` / `发布` / `保存并发布` 作用在**编辑器里改过的所有角色**上，不只是当前打开的那个 —— 切走时改动**暂存在内存**（不写盘），状态栏显示「● N 个角色待保存」，左栏对应角色带「待保存」小标。保存走 `POST /api/save`（批量、只重建一次索引），发布走 `POST /api/publish { characters: [...] }`（提交摘要的「按角色变化」覆盖**全部写盘角色** = 提交信息是所有修改内容的总和） |
+| 改动清单（保存 / 发布之后） | 右下角可滚动、可关闭的清单（不再是一次性 toast）：一行一个角色 + 每个改动模块的「N 改 / N 增 / N 删」，**每一块都能点** → 跳到该角色、展开并高亮那个模块（给卡片一个 `data-module` 锚点，跳转后闪一下），方便回头改小错。清单标题写明这次动了几个角色，发布时右上角还有「复制提交信息」 |
+| 界面提示 | **成功只说一句**（用户定稿 2026-09-26）：状态栏与右下角 toast 都只显示 `保存成功` / `发布成功` / `保存并发布成功`；提交摘要仍可用清单上的「复制提交信息」取（内容不变）。**失败 / 有警告才摊开明细**：失败步骤、三方校验逐项结果、主文档备份路径、索引重建警告、`⚠ 名称不在图鉴` 等一律照旧显示 |
 
 **关闭网页后自动结束服务**（`--exit-on-idle`，默认关闭，只在手动开时生效）
 
@@ -850,11 +868,13 @@ node scripts/build-docx.mjs [--out 目标docx] [--template 模板docx] [--no-mar
 |------|------|------|
 | （所有写请求） | —— | **跨站防护**：`Host` 必须是 `127.0.0.1` / `localhost`；写请求必须带自定义头 `X-Codex-Editor: 1`（页面里的 `api()` 自动带；外部脚本自己加），带 `Origin` 时 Origin 也必须是本机。否则 `403`。心跳 / 关闭（`sendBeacon`）只校验 Host 与 Origin |
 | GET | `/api/index` | `data/_index.json`（不存在时返回 `{weapons:[],artifacts:[],characters:[]}`） |
-| GET | `/api/characters` | `{ order, items: [{name, weapons, artifacts, filled, hasUnparsed, broken}], missing }`；`weapons`/`artifacts` 是 v2 行数，`filled` 是六模块各自「有没有真内容」（目录右侧的「未填：武 圣」用它） |
+| GET | `/api/characters` | `{ order, items: [{name, weapons, artifacts, filled, filledRaw, free, hasUnparsed, broken}], missing }`；`weapons`/`artifacts` 是 v2 行数，`filled` 是六模块各自「有没有真内容」（目录右侧的「未填：武 圣」用它，**已扣掉 `free` 里标记「无需填写」的模块**），`filledRaw` 是同一份判断的未扣版本（用来发现「标记之后又填了内容」的失效标记），`free` 是角色 JSON 顶层 `freeModules` |
 | GET | `/api/character?name=X` | 角色 JSON，附带 `issues: validate(data, index)` |
 | PUT | `/api/character?name=X` | body 为完整 JSON；保存并返回 `{ok:true, issues:[...]}`；`X` 不在 `_order.json` 时追加 |
 | POST | `/api/character` | body `{name}`，新建空白 v2 模板（meta 三项空、v2 六数组空）；已存在返回 409 |
 | POST | `/api/rename` | body `{from,to}`，改文件名 + `_order.json` |
+| POST | `/api/save` | **全局保存**：body `{characters:[{name, character}]}`（一次写多个角色，只重建一次索引）；返回 `{ok, characters:[{name, json, fields}], issues, indexRefreshed}`，`fields` 是每个角色六个模块的「增 / 删 / 改」计数（界面用右下角的改动清单展示 + 跳转） |
+| POST | `/api/free-modules` | **模块级「无需填写」开关**：body `{name, module, free}`（`module` ∈ `weapons/artifacts/talents/panels/constellations/teams`）；写角色 JSON 顶层 `freeModules`。**开启要求该模块当前为空**，否则返回 `{ok:false, reason:'has-content', detail}`（引导用户先清空）；关闭随时可以 |
 | DELETE | `/api/character?name=X` | 软删除：移到 `data/_trash/X.json` 并从 `_order.json` 移除 |
 | POST | `/api/reorder` | body `{order:[...]}`，重写 `_order.json`（没提到的角色补在后面） |
 | GET | `/api/trash` | 回收站清单：`{ok,total,items:[{name,file,bytes,deletedAt,schema,broken,summary:{weapons,artifacts,teams,constellations},conflicts}]}`（按删除时间倒序；`conflicts` = `data/gi/` 已有同名文件，恢复会 409） |
@@ -865,7 +885,7 @@ node scripts/build-docx.mjs [--out 目标docx] [--template 模板docx] [--no-mar
 | GET | `/api/name-usage` | 名称库使用统计：`{weapons,artifacts,characters}`，每项 `{name,total,characters:[{name,count}]}`（未出现的名字即「未使用」） |
 | POST | `/api/batch-replace` | body `{type,from,to,dry?}`。`dry:true` 只预览（返回 `total` / `files` / `perCharacter` / `hits` / `warnings`）；否则执行替换，返回 `{stamp,files,perCharacter,changed,remaining,warnings}`，并在 `data/_backup/<stamp>/` 留副本 |
 | POST | `/api/batch-replace/undo` | body `{stamp}`，用备份逐字节还原并删除该备份目录 |
-| POST | `/api/publish` | 保存并发布全链路：写角色 JSON（body 带 `name` 才写）→ 重建 `data/_index.json` → `build-docx.mjs --write-main` 写回 Word 主文档（自动备份）→ `build-html.mjs` 生成 `guide.html` → `build-doc.mjs` 生成 `guide.md` → 提交摘要 `out/_commit-summary.md`（+ 最近 5 份时间戳副本）→ **三方一致性校验**（diagnose 不一致 0 / 往返 129-129 / guide.html 本次生成 / 悬挂分隔符 0）。返回 `{ok, steps, verify, summary, docx, html, summaryFile, summaryStampFile, commit:null, commitExecuted:false, pushed:false}`；校验不过时 `{ok:false, step:'verify', detail}`。**不执行 git add / commit / push**：提交与推送永远由人工做（详见「保存即发布」一节） |
+| POST | `/api/publish` | 保存并发布全链路：写角色 JSON（body 带 `characters:[{name,character}]` 就批量写；旧的 `{name,character}` 也认，不传就沿用磁盘上的 JSON）→ 重建 `data/_index.json` → `build-docx.mjs --write-main` 写回 Word 主文档（自动备份）→ `build-html.mjs` 生成 `guide.html` → `build-doc.mjs` 生成 `guide.md` → 提交摘要 `out/_commit-summary.md`（+ 最近 5 份时间戳副本）→ **三方一致性校验**（diagnose 不一致 0 / 往返 129-129 / guide.html 本次生成 / 悬挂分隔符 0）。返回 `{ok, steps, verify, summary, docx, html, summaryFile, summaryStampFile, commit:null, commitExecuted:false, pushed:false}`；`summary.characterChanges` 覆盖**本次写盘的全部角色**（提交信息 = 所有修改内容的总和）；校验不过时 `{ok:false, step:'verify', detail}`。**不执行 git add / commit / push**：提交与推送永远由人工做（详见「保存即发布」一节） |
 | POST | `/api/commit` | 手动提交入口（界面无入口）：body `{message?, paths?}`，不传 message 则取摘要里的建议标题；只 `git add -- <paths>`（**没有 paths 就不提交，绝不 `add -A`**）+ `git commit`，返回 `{ok, commit:'<短hash>', commitExecuted, commitError?, commitSkipped?, pushed:false}`；**无改动不报错**，同样不 push |
 | GET/POST | `/api/heartbeat` | 页面心跳（前端每 5 秒一次）：返回 `{ok, exitOnIdle, idleSeconds, at}`；`--exit-on-idle` 未开启时 `exitOnIdle:false`（空操作，不影响命令行用法） |
 | POST | `/api/close` | 页面关闭信号：返回 `{ok, exitOnIdle, graceMs}`。开启空闲退出时，**5 秒宽限期**后退出；期间再来一次心跳就取消退出（刷新页面不会误杀服务）。未开启时是空操作。前端用 `navigator.sendBeacon('/api/close')` 在 `pagehide` / `beforeunload` 时发出 |

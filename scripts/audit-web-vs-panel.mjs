@@ -176,6 +176,26 @@ for (const [名称, talents, want] of [
   if (!ok) bad.push(`合成样例（${名称}）\n  web  ${web}\n  panel${panel}\n  期望 ${want}`)
 }
 
+/* ------------------------------------------------------------------ *
+ * 合成样例：模块级「无需填写」（角色 JSON 顶层 freeModules，用户定稿 2026-09-26）——
+ * 空模块两端都要显示同一行自由说明（替代「暂无」），且文案来自共享显示层。
+ * ------------------------------------------------------------------ */
+for (const [名称, free, wantTitle, wantHint] of [
+  ['天赋标记无需填写（天赋空）', ['talents'], '天赋', '无需加点'],
+  ['面板标记无需填写（面板空）', ['panels'], '面板', '无硬性要求']
+]) {
+  const data = { schema: 2, name: '合成样例', game: 'gi', meta: {}, freeModules: free, v2: { weapons: [], artifacts: [], talents: [], panels: [], constellations: [], teams: [] } }
+  data.sections = deriveSections(data)
+  const pick = (sections) => sections.find(s => s.title === wantTitle)
+  const web = pick(build.characterSections(data))
+  const panel = pick(parseGuideJson(data, { fileDir: giDir, fileName: '合成样例' }).sections)
+  const same = web?.hint === panel?.hint && web?.empty === panel?.empty
+  const ok = same && web?.hint === wantHint && web?.empty === false
+  if (!ok) synthBad++
+  console.log(`合成样例（${名称}）：网页版 ${JSON.stringify(web?.hint)}/empty=${web?.empty} ｜ 面板 ${JSON.stringify(panel?.hint)}/empty=${panel?.empty} ｜ 期望 ${JSON.stringify(wantHint)}/empty=false —— ${ok ? '一致' : '❌ 不一致'}`)
+  if (!ok) bad.push(`合成样例（${名称}）\n  web  ${JSON.stringify(web)}\n  panel${JSON.stringify(panel)}\n  期望 ${wantHint}`)
+}
+
 console.log(`网页版与面板渲染不一致的角色：${bad.length - synthBad}（应为 0）；合成样例不一致：${synthBad}（应为 0）`)
 for (const b of bad.slice(0, 8)) console.log('· ' + b)
 

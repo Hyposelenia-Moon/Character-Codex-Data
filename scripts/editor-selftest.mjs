@@ -250,8 +250,8 @@ push('配队：候选拆分', fn('memberCandidates')('迪奥娜 / 阿罗夏'), [
 }
 
 {
-  const { isEmptyRow, filledModules, normalizeV2 } = await import(pathToFileURL(path.join(root, 'scripts', 'editor.mjs')).href)
-  const { foldMainNoteIntoStats } = await import(pathToFileURL(path.join(root, 'scripts', 'lib', 'schema.mjs')).href)
+  const { isEmptyRow, filledModules, normalizeV2, applyFreeExemption } = await import(pathToFileURL(path.join(root, 'scripts', 'editor.mjs')).href)
+  const { foldMainNoteIntoStats, normalizeFreeModules } = await import(pathToFileURL(path.join(root, 'scripts', 'lib', 'schema.mjs')).href)
   push('服务端 isEmptyRow：只有成员的配队行不算空行', isEmptyRow({ label: null, members: [{ name: '阿贝多', ref: 'character:阿贝多' }], text: '' }), false)
   push('服务端 isEmptyRow：只有空名字成员仍算空行', isEmptyRow({ label: null, members: [{ name: '', ref: 'character:' }], text: '' }), true)
   // 目录里的「未填」判据：**有真内容才算填**（空占位行不算）
@@ -271,6 +271,21 @@ push('配队：候选拆分', fn('memberCandidates')('迪奥娜 / 阿罗夏'), [
     filledModules({ talents: [{ kind: 'crown', items: [{ name: 'E', level: 10 }] }] }).talents, true)
   push('filledModules：只有空 note 行不算天赋已填',
     filledModules({ talents: [{ kind: 'note', text: '' }] }).talents, false)
+
+  // 模块级「无需填写」（角色 JSON 顶层 freeModules，用户定稿 2026-09-26）：
+  // 目录口径把标记的模块算成已填（左栏不显示该未填、也不参与未填优先排序），
+  // 但 filledModules 仍是真实内容 —— 两者都留着，才能发现「标记之后又填了内容」。
+  const none6 = { weapons: false, artifacts: false, talents: false, panels: false, constellations: false, teams: false }
+  push('applyFreeExemption：标记的天赋算已填', applyFreeExemption({ ...none6 }, ['talents']).talents, true)
+  push('applyFreeExemption：没标记的模块不动', applyFreeExemption({ ...none6 }, ['talents']).weapons, false)
+  push('applyFreeExemption：空标记原样返回', applyFreeExemption({ ...none6 }, []).talents, false)
+  push('applyFreeExemption：未知键被忽略', Object.keys(applyFreeExemption({ talents: false }, ['talents', 'bogus'])).join(','), 'talents')
+  push('applyFreeExemption：真内容口径不被改写（filledRaw 仍是 false）',
+    filledModules({ talents: [{ kind: 'priority', order: [{ name: 'A', level: 1 }, { name: 'E', level: 1 }, { name: 'Q', level: 1 }] }] }).talents, false)
+  push('normalizeFreeModules：只认六个键、去重、按文档顺序',
+    normalizeFreeModules(['teams', 'talents', 'bogus', 'talents']).join(','), 'talents,teams')
+  push('normalizeFreeModules：非数组/空值 → 空数组',
+    [normalizeFreeModules(undefined).length, normalizeFreeModules('talents').join(',')].join('|'), '0|talents')
 
   // 主词条括注：**保存时必须折进值里**（用户 2026-09-26 报「保存并发布」失败：
   // 文档层只认值内括注，留 note/noteSlot 字段的话 data → docx → data 对不上）
@@ -495,6 +510,17 @@ push('配队：候选拆分', fn('memberCandidates')('迪奥娜 / 阿罗夏'), [
   push('目录排序：旅行者 / 奇偶按「没有未填」处理（沉到已填那一组）',
     sort([mk('旅行者·火', false), mk('甲', true), mk('奇偶·女性', false), mk('乙', false)]).map(x => x.name),
     ['乙', '旅行者·火', '甲', '奇偶·女性'])
+
+  // 模块级「无需填写」：目录条目带 `free` 时那个模块不算未填（服务端已把它算成已填，客户端再兜一层）
+  const allFalse = { weapons: false, artifacts: false, talents: false, panels: false, constellations: false, teams: false }
+  push('目录：标记「无需填写」的模块不算未填',
+    ctx.__editor.unfilledModules({ name: '甲', filled: { ...allFalse }, free: ['talents'] }).map(kv => kv[0]).indexOf('talents') >= 0, false)
+  push('目录：其它模块照旧算未填',
+    ctx.__editor.unfilledModules({ name: '甲', filled: { ...allFalse }, free: ['talents'] }).map(kv => kv[0]).join(','),
+    'weapons,artifacts,panels,constellations,teams')
+  push('目录：带 free 的角色按已填参与排序（沉底）',
+    sort([mk('甲', false), { name: '乙', filled: { ...allFalse, talents: true }, free: ['talents'] }]).map(x => x.name),
+    ['甲', '乙'])
 }
 
 /* 5h. `sep` 的 token 数必须跟着条目数走（薇斯纳的副词条：5 个词条只存了 3 个 token，
@@ -660,6 +686,31 @@ push('配队：候选拆分', fn('memberCandidates')('迪奥娜 / 阿罗夏'), [
   row.kind = 'preferred'
   fn('normalizeArtifactRowShape')(row)
   push('切回档位行：sets 仍在（切来切去不丢数据）', Array.isArray(row.sets) && row.sets.length, 1)
+}
+
+/* 8. 全局保存 / 发布（用户定稿 2026-09-26）：当前角色 + 切走时暂存的角色一次写盘。
+ *    这里只钉**纯逻辑**（待保存集合、payload 形状、计数）；渲染与真实写盘在
+ *    `.dsh/verify-global-save.mjs` 里对着真服务跑。 */
+{
+  const model = (name, weapon) => {
+    const m = ctx.__editor.internals.normalizeData(mkData({ weapons: [{ tier: 1, sep: ' > ', items: [{ name: weapon }] }] }, name))
+    return m
+  }
+  api.setModelForTest(model('甲', '西风剑'))
+  api.markDirty(true)
+  push('全局保存：当前角色算 1 个待保存', api.dirtyCount(), 1)
+  push('全局保存：切走时暂存当前角色', api.stashCurrent(), true)
+  api.setModelForTest(model('乙', '祭礼剑'))
+  api.markDirty(true)
+  push('全局保存：待保存集合 = 暂存 + 当前', api.dirtyJobs().map(j => j.name).sort(), ['乙', '甲'])
+  push('全局保存：状态栏计数', api.dirtyCount(), 2)
+  const payload = api.charactersPayload(api.dirtyJobs())
+  push('全局保存：payload 覆盖两个角色（暂存的在前、当前在后）', payload.map(x => x.name), ['甲', '乙'])
+  push('全局保存：payload 内容取自各自模型', payload.map(x => x.character.v2.weapons[0].items[0].name), ['西风剑', '祭礼剑'])
+  push('全局保存：payload 形状 = name + character', Object.keys(payload[0]).sort(), ['character', 'name'])
+  // 没有改动时集合为空（「发布」会按磁盘上的 JSON 发布）
+  api.markDirty(false)
+  push('全局保存：当前角色不脏时只剩暂存的', api.dirtyJobs().map(j => j.name), ['甲'])
 }
 
 /* ---------------------------------------------------------------- 汇总 */

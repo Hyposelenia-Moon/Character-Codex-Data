@@ -757,6 +757,8 @@ function main () {
       name: parsed.name,
       game: 'gi',
       ...(prev.highlight ? { highlight: prev.highlight } : {}),
+      // 模块级「无需填写」标记：文档表达不了它，从上一份 JSON 原样带过来（与 highlight 同一套做法）
+      ...(prev.freeModules ? { freeModules: prev.freeModules } : {}),
       meta: parsed.meta,
       v2: parsed.v2,
       tags: [],

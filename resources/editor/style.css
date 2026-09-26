@@ -297,6 +297,32 @@ code {
 .card > summary .count { font-weight: 400; font-size: 12px; color: var(--text-soft); }
 .card > summary .spacer { flex: 1 1 auto; }
 
+/* 模块级「无需填写」开关（卡片标题右侧；用户定稿 2026-09-26）：
+   点一下 = 该角色这个模块本身就无需填写 —— 左栏不再显示这个未填，攻略页加一行自由说明。
+   模块有内容时服务端拒绝开启，客户端把这张卡片闪一下提示（.free-blocked）。 */
+.card > summary .free-switch {
+  margin-left: 8px;
+  padding: 1px 8px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-soft);
+  background: transparent;
+  border: 1px dashed var(--line);
+  border-radius: 9px;
+  cursor: pointer;
+}
+.card > summary .free-switch:hover { color: var(--text); border-color: var(--text-soft); }
+.card > summary .free-switch.on {
+  color: #fff;
+  background: var(--accent, #4a7ab8);
+  border: 1px solid var(--accent, #4a7ab8);
+  font-weight: 700;
+}
+.card.free-blocked > summary { background: #fdf3e7; box-shadow: inset 0 0 0 1px #e8c9a0; }
+
+/* 左栏「待保存」标记（全局保存：当前角色有改动或切走时暂存过） */
+.list-item .unsaved { color: #b7791f; font-size: 11px; }
+
 .card-body { padding: 12px 14px; }
 
 .row-list { display: flex; flex-direction: column; gap: 10px; }
@@ -753,6 +779,61 @@ textarea { resize: vertical; min-height: 54px; }
 .lib-unused { flex: 0 0 auto; font-size: 11px; color: var(--text-soft); background: #f1f3f7; border-radius: 999px; padding: 0 6px; }
 
 /* ============================================================ toast */
+
+/* ============================================================ 改动清单
+   保存 / 发布之后停在右下角（用户定稿 2026-09-26）：列出这次改过的角色 + 每个模块的增/删/改，
+   每一块都能点进去（跳转到该角色、展开并高亮那个模块）。
+   放在 toast 上面，不与 toast 抢位置；能滚、能关。 */
+.changes {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 70;
+  width: 420px;
+  max-width: calc(100vw - 36px);
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid var(--line);
+  box-shadow: 0 14px 34px rgba(20, 26, 38, .22);
+  font-size: 13px;
+  overflow: hidden;
+}
+.changes.hidden { display: none; }
+.chg-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: #f4f7fb;
+  border-bottom: 1px solid var(--line);
+}
+.chg-title { font-weight: 700; color: var(--text); }
+.chg-head .spacer { flex: 1 1 auto; }
+.chg-body { overflow: auto; padding: 6px 10px 10px; }
+.chg-row { display: flex; gap: 8px; align-items: baseline; padding: 5px 0; border-bottom: 1px dashed #eef1f5; }
+.chg-row:last-child { border-bottom: 0; }
+.chg-name { flex: 0 0 auto; font-weight: 700; color: var(--text); }
+.chg-fields { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.chg-chip {
+  padding: 1px 8px;
+  font-size: 12px;
+  line-height: 18px;
+  color: #2b4c7e;
+  background: #eef4fd;
+  border: 1px solid #cfe0f5;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.chg-chip:hover { background: #e2ecfb; border-color: #9dbfe8; }
+/* 跳转过去后目标卡片闪一下，方便一眼找到 */
+.card.flash > summary { animation: card-flash 1.6s ease-out 1; }
+@keyframes card-flash {
+  0% { background: #fdf0d5; box-shadow: inset 0 0 0 2px #e8b45a; }
+  100% { background: transparent; box-shadow: none; }
+}
 
 .toast {
   position: fixed;

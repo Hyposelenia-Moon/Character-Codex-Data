@@ -42,7 +42,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { deriveSections, deriveTags, validate, parseRef, itemText, foldMainNoteIntoStats } from './lib/schema.mjs'
+import { deriveSections, deriveTags, validate, parseRef, itemText, foldMainNoteIntoStats, normalizeFreeModules, MODULE_KEYS } from './lib/schema.mjs'
 import { renderGuideSectionsHtml, renderGuideSectionsText, characterSections, renderCard } from './build-html.mjs'
 import { verifyThreeWay, snapshotMainDoc, sha1File } from './lib/publish-verify.mjs'
 import { buildIndex } from './build-index.mjs'
@@ -85,7 +85,7 @@ const MIME = {
 }
 
 const V2_KEYS = ['weapons', 'artifacts', 'talents', 'panels', 'constellations', 'teams']
-const KEEP_KEYS = ['source', 'highlight', 'meta', 'unparsed']
+const KEEP_KEYS = ['source', 'highlight', 'freeModules', 'meta', 'unparsed']
 
 /* ---------------------------------------------------------------- 基础工具 */
 
@@ -99,6 +99,27 @@ function readJson (file) {
 /** 写 JSON（UTF-8 无 BOM、2 空格缩进、末尾换行） */
 function writeJsonFile (file, value) {
   fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n', 'utf8')
+}
+
+/** 六个模块的中文名（提示文案用） */
+const MODULE_LABELS = {
+  weapons: '武器', artifacts: '圣遗物', talents: '天赋',
+  panels: '面板', constellations: '命座', teams: '配队'
+}
+
+/**
+ * 顶层字段按仓库既有顺序重排（未知字段排在最后，顺序不变）。
+ * 只服务「只动一个顶层字段」的接口（如 freeModules 开关），避免新字段被追加到文件末尾、
+ * 与 parse-docx / buildCharacter 写出来的顺序不一致。
+ * @param {object} data
+ * @returns {object}
+ */
+function orderTopLevel (data) {
+  const order = ['schema', 'name', 'game', 'highlight', 'freeModules', 'meta', 'v2', 'unparsed', 'tags', 'sections', 'source']
+  const out = {}
+  for (const key of order) if (data[key] !== undefined) out[key] = data[key]
+  for (const key of Object.keys(data)) if (!(key in out)) out[key] = data[key]
+  return out
 }
 
 /**
@@ -596,10 +617,14 @@ function buildCharacter (body, name, prev = {}) {
   }
 
   // 顶层字段顺序按仓库既有文件的写法，保证「原样保存」不会产生无意义 diff：
-  //   schema, name, game, [highlight], meta, v2, [unparsed], tags, sections, source
+  //   schema, name, game, [highlight], [freeModules], meta, v2, [unparsed], tags, sections, source
   const data = { schema: 2, name, game }
 
   if (hasText(prev.highlight)) data.highlight = prev.highlight
+
+  // freeModules（该模块无需填写）：编辑器**不认识**它、也不从表单提交，只在原文件与开关接口之间流转
+  const free = normalizeFreeModules(prev.freeModules ?? body.freeModules)
+  if (free.length) data.freeModules = free
 
   data.meta = {}
   const meta = body.meta && typeof body.meta === 'object' && !Array.isArray(body.meta) ? body.meta : {}
@@ -1098,6 +1123,25 @@ export function filledModules (v2) {
   }
 }
 
+/**
+ * 目录口径：把「该角色这个模块本身就无需填写」（角色 JSON 顶层 `freeModules`）的模块算成已填，
+ * 于是左栏不再显示该「未填」、也不参与「未填优先」排序。
+ *
+ * 只改**目录显示**：`filledModules()` 保持纯函数（真实内容），
+ * 标记与内容冲突时（标记之后又填了内容）渲染层按「内容优先」处理（见显示层的 applyFreeHints）。
+ * @param {object} filled `filledModules()` 的结果
+ * @param {string[]} free 规范化后的模块键
+ * @returns {object}
+ */
+export function applyFreeExemption (filled, free) {
+  if (!filled || typeof filled !== 'object') return filled
+  const list = normalizeFreeModules(free)
+  if (!list.length) return filled
+  const out = { ...filled }
+  for (const key of list) if (key in out) out[key] = true
+  return out
+}
+
 function apiCharacters (res) {
   const order = readOrder()
   const names = listCharacterNames()
@@ -1112,12 +1156,17 @@ function apiCharacters (res) {
     }
     const v2 = data?.v2 ?? {}
     const unparsed = data?.unparsed ?? {}
+    const free = normalizeFreeModules(data?.freeModules)
+    const filledRaw = filledModules(v2)
     items.push({
       name,
       // 旧的计数（「打开第一个有内容的角色」还在用），目录里不再显示
       weapons: asArray(v2.weapons).length,
       artifacts: asArray(v2.artifacts).length,
-      filled: filledModules(v2),
+      // filled：目录用的口径（已扣掉「无需填写」的模块）；filledRaw：真实内容，用来发现失效标记
+      filled: applyFreeExemption(filledRaw, free),
+      filledRaw,
+      free,
       hasUnparsed: Object.values(unparsed).some(lines => asArray(lines).length > 0)
     })
   }
@@ -1169,8 +1218,87 @@ async function apiPutCharacter (req, res, url) {
   })
 }
 
-async function apiCreateCharacter (req, res) {
+/**
+ * 模块级「无需填写」开关：`POST /api/free-modules` body `{ name, module, free }`。
+ *
+ * 语义（用户定稿 2026-09-26）：该角色这个模块本身就无需填写 ——
+ * 左栏不再显示它的「未填」，攻略页在该模块为空时显示一行自由说明
+ * （文案表在显示层 `FREE_MODULE_HINTS`）。落在角色 JSON 顶层 `freeModules`（与 `highlight` 同级）。
+ *
+ * 开启条件：**该模块当前必须是空的**（`filledModules()` 判据，空占位行不算内容）——
+ * 有内容时只回一条引导信息（`ok:false, reason:'has-content'`），让用户先清空，
+ * 避免攻略页同时出现内容和「自由选择」。关闭随时可以。
+ * @param {http.IncomingMessage} req
+ * @param {http.ServerResponse} res
+ */
+async function apiFreeModules (req, res) {
   const body = await readJsonBody(req)
+  const name = safeName(body?.name)
+  const module = String(body?.module ?? '').trim()
+  const on = body?.free !== false
+  if (!MODULE_KEYS.includes(module)) return sendError(res, 400, `未知模块：${module || '(空)'}`)
+  const file = characterFile(name)
+  if (!fs.existsSync(file)) return sendError(res, 404, `角色不存在：${name}`)
+  const data = readJson(file)
+  const v2 = data?.v2 ?? {}
+
+  if (on && filledModules(v2)[module] === true) {
+    const label = MODULE_LABELS[module] ?? module
+    return sendJson(res, 200, {
+      ok: false,
+      reason: 'has-content',
+      name,
+      module,
+      detail: `「${label}」已经有内容了：先清空/删掉这些内容再标记「无需填写」，或者保留内容不用标记`
+    })
+  }
+
+  const cur = normalizeFreeModules(data.freeModules)
+  const next = on ? cur.concat([module]) : cur.filter(k => k !== module)
+  if (!next.length) delete data.freeModules
+  else data.freeModules = next
+  writeJsonFile(file, orderTopLevel(data))
+  sendJson(res, 200, { ok: true, name, module, on, freeModules: next })
+}
+
+/**
+ * 全局保存：`POST /api/save` body `{ characters: [{ name, character }] }`。
+ *
+ * 「保存」按钮现在是**全局**的（用户定稿 2026-09-26）：把编辑器里改过的**所有**角色一次写盘，
+ * 并回每个角色的字段级变化（前端改动清单 / 快速跳转用）。只写 JSON + 重建一次索引，
+ * 不发文档、不生成网页（那是「发布」的事）。
+ * @param {http.IncomingMessage} req
+ * @param {http.ServerResponse} res
+ */
+async function apiSaveAll (req, res) {
+  const body = await readJsonBody(req)
+  const payloads = readCharacterPayloads(body)
+  if (!payloads.length) return sendError(res, 400, '没有要保存的角色（characters 为空）')
+  let written
+  let index
+  try {
+    ({ written, index } = writeCharacters(payloads))
+  } catch (e) {
+    return sendError(res, e?.status === 500 ? 500 : 400, String(e?.message ?? e))
+  }
+  const issues = []
+  const idx = readIndex()
+  for (const w of written) {
+    try {
+      for (const issue of validate(readJson(characterFile(w.name)), idx)) issues.push({ name: w.name, ...issue })
+    } catch { /* 读不回来就跳过校验（写盘已成功） */ }
+  }
+  sendJson(res, 200, {
+    ok: true,
+    characters: written,
+    issues,
+    indexRefreshed: index.refreshed,
+    ...(index.refreshed ? { indexGeneratedAt: index.generatedAt } : {}),
+    ...(index.warning ? { indexWarning: index.warning } : {})
+  })
+}
+
+async function apiCreateCharacter (req, res) {  const body = await readJsonBody(req)
   const name = safeName(body?.name)
   const file = characterFile(name)
   if (fs.existsSync(file)) return sendError(res, 409, `角色已存在：${name}`)
@@ -1596,9 +1724,64 @@ async function apiBatchUndo (req, res) {
  * 「保存即发布」：一次点击把改动铺到全链路
  *   ① 写角色 JSON（body.name 给了才写；没给就假定界面已经保存过）
  *   ② 重建 data/_index.json
+/**
+ * 把请求体里的角色列表归一成 `[{ name, body }]`（**全局保存 / 全局发布**用，用户定稿 2026-09-26）。
+ *
+ * 两种写法都认：
+ *   · 旧的单角色 `{ name, character }`
+ *   · 新的批量 `{ characters: [{ name, character }] }`
+ * 名字重复时**后者覆盖前者**（同一角色在一次请求里只写一次），顺序保持请求里的先后。
+ * @param {object} body
+ * @returns {Array<{name: string, body: object}>}
+ */
+function readCharacterPayloads (body) {
+  const out = []
+  const push = (name, character) => {
+    if (!name) return
+    const key = safeName(name)
+    const hit = out.findIndex(x => x.name === key)
+    if (hit >= 0) out[hit] = { name: key, body: character }
+    else out.push({ name: key, body: character })
+  }
+  for (const item of asArray(body?.characters)) {
+    if (!item || typeof item !== 'object') continue
+    push(item.name, item.character ?? item)
+  }
+  if (!out.length && body?.name) push(body.name, body.character ?? body)
+  return out
+}
+
+/**
+ * 批量写角色 JSON（全局保存的核心）：逐个 `buildCharacter`（带原文件合并）→ 写盘 → **只重建一次索引**。
+ * 返回每个角色的**字段级变化**（`diffCharacterFields`，前端改动清单与提交摘要都用它）。
+ * @param {Array<{name: string, body: object}>} items
+ * @returns {{written: object[], index: object}}
+ */
+function writeCharacters (items) {
+  const written = []
+  for (const { name, body } of items) {
+    const file = characterFile(name)
+    let prev = {}
+    if (fs.existsSync(file)) {
+      try { prev = readJson(file) } catch (e) { throw Object.assign(new Error(`原文件不是合法 JSON：${name}.json —— ${e.message}`), { step: '写角色 JSON' }) }
+    }
+    const data = buildCharacter(body, name, prev)
+    writeJsonFile(file, data)
+    appendOrder(name)
+    written.push({ name, json: `${name}.json`, fields: diffCharacterFields(name, prev, data, `${name}.json`).fields })
+  }
+  return { written, index: refreshIndexFile() }
+}
+
+/**
+ * 发布（「保存并发布」的服务端）：写角色 JSON → 重建索引 → 写回主文档 → guide.html → guide.md → 三方校验 → 提交摘要
+ *
  *   ③ build-docx.mjs 写回主文档（自动备份 + 两种模式都做 129/129 往返校验）
  *   ④ build-html.mjs 生成 guide.html
  *   ⑤ 生成提交摘要 → out/_commit-summary.md + 响应
+ *
+ * 请求体：`{ characters: [{ name, character }] }`（**全局发布**，一次写多个角色）；
+ * 旧的 `{ name, character }` 仍然兼容。提交摘要的「按角色变化」会覆盖**本次写盘的全部角色**。
  *
  * **默认不执行 git add / git commit**：摘要只落盘 + 回传，提交由人工执行。
  * 显式提交走 POST /api/commit（界面默认不触发）。
@@ -1607,7 +1790,8 @@ async function apiBatchUndo (req, res) {
  */
 async function apiPublish (req, res) {
   const body = await readJsonBody(req).catch(() => ({}))
-  const name = body?.name ? safeName(body.name) : null
+  const payloads = readCharacterPayloads(body)
+  const name = payloads.length === 1 ? payloads[0].name : null
   const steps = []
   const mark = (step, ok, detail) => {
     steps.push({ step, ok, ...(detail ? { detail } : {}) })
@@ -1617,21 +1801,26 @@ async function apiPublish (req, res) {
   // 变更前的快照：改名 / 改写角色 JSON 都靠它做前后对比
   const before = snapshotFiles()
   let wroteJson = false
-  /** 写盘前的角色 JSON（提交摘要的对比基线） */
+  /** 写盘前的角色 JSON（提交摘要的对比基线，单角色时用） */
   let prevJson = null
-  if (name) {
-    const file = characterFile(name)
-    let prev = {}
-    if (fs.existsSync(file)) {
-      try { prev = readJson(file) } catch (e) { throw Object.assign(new Error(`原文件不是合法 JSON：${name}.json —— ${e.message}`), { step: '写角色 JSON' }) }
+  /** 每个写盘角色的字段级变化（提交摘要与改动清单用） */
+  let perChar = []
+  if (payloads.length) {
+    const first = payloads[0]
+    if (payloads.length === 1) {
+      const file = characterFile(first.name)
+      if (fs.existsSync(file)) {
+        try { prevJson = readJson(file) } catch (e) { throw Object.assign(new Error(`原文件不是合法 JSON：${first.name}.json —— ${e.message}`), { step: '写角色 JSON' }) }
+      }
     }
-    prevJson = prev // 基线必须是写盘前读到的内容
     try {
-      const data = buildCharacter(body?.character ?? body, name, prev)
-      writeJsonFile(file, data)
-      appendOrder(name)
+      const { written } = writeCharacters(payloads)
+      perChar = written
       wroteJson = true
-      mark('写角色 JSON', true, `data/gi/${name}.json`)
+      const detail = written.length === 1
+        ? `data/gi/${written[0].json}`
+        : `${written.length} 个角色：${written.map(w => w.name).join('、')}`
+      mark('写角色 JSON', true, detail)
     } catch (e) {
       mark('写角色 JSON', false, String(e?.message ?? e))
     }
@@ -1689,8 +1878,6 @@ async function apiPublish (req, res) {
 
   const after = snapshotFiles()
   const relJson = name ? path.posix.join('data', 'gi', `${name}.json`) : null
-  const curJson = name ? readJsonSafe(path.join(root, relJson)) : null
-  const perChar = name ? [diffCharacterFields(name, prevJson, curJson, relJson)] : []
   const baselineInfo = {
     name,
     json: prevJson,
@@ -2387,6 +2574,8 @@ async function route (req, res) {
     }
     if (pathname === '/api/rename' && method === 'POST') return await apiRename(req, res)
     if (pathname === '/api/reorder' && method === 'POST') return await apiReorder(req, res)
+    if (pathname === '/api/free-modules' && method === 'POST') return await apiFreeModules(req, res)
+    if (pathname === '/api/save' && method === 'POST') return await apiSaveAll(req, res)
     if (pathname === '/api/trash') {
       if (method === 'GET') return apiTrashList(res)
       if (method === 'DELETE') return url.searchParams.get('name') ? apiTrashDelete(res, url) : apiTrashEmpty(res)

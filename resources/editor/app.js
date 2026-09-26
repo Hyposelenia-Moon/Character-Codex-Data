@@ -237,7 +237,9 @@ var state = {
   items: [],
   current: null,
   model: null,
-  before: null,          // 打开角色时的「形状快照」，保存后用来算改动摘要
+  // 全局保存（用户定稿 2026-09-26）：切走时把**有改动**的角色暂存在这里（不写盘），
+  // 「保存 / 发布」一次把当前 + 暂存的全部写下去。
+  pending: {},           // name → { model, issues, issueMap }
   issues: [],
   issueMap: {},
   dirty: false,
@@ -536,6 +538,8 @@ function normalizeData (data) {
     },
     unparsed: d.unparsed && typeof d.unparsed === 'object' && !Array.isArray(d.unparsed) ? d.unparsed : null,
     legacy: d.v2 == null,
+    // 模块级「无需填写」标记（角色 JSON 顶层）：只影响左栏未填与攻略页那一行说明，不进表单
+    freeModules: asArray(d.freeModules).map(function (k) { return str(k) }).filter(Boolean),
     _raw: { source: d.source, highlight: d.highlight, meta: d.meta, game: d.game, schema: d.schema, unparsed: d.unparsed }
   }
   // 皇冠行条目的**原顺序**（A/E/Q 之外的写法，如 Q 在 A 前）：保存时照原样写回，
@@ -661,52 +665,24 @@ function fallbackCopy (text) {
   }
 }
 
-/**
- * 模型「形状」快照：保存前后各取一次，用来算改动摘要。
- * 只数条数，不比对内容 —— 目的是告诉用户「这次动了什么」，不是逐字 diff。
- * @param {object} m 编辑器模型
- */
-function snapshotShape (m) {
-  var v2 = (m && m.v2) || {}
-  var count = function (list, fn) {
-    var n = 0
-    asArray(list).forEach(function (r) { n += fn(r) ? 1 : 0 })
-    return n
-  }
-  return {
-    weapons: count(v2.weapons, function (r) { return asArray(r.items).length > 0 }),
-    weaponItems: asArray(v2.weapons).reduce(function (n, r) { return n + asArray(r.items).length }, 0),
-    artifacts: count(v2.artifacts, function () { return true }),
-    teams: count(v2.teams, function () { return true }),
-    members: asArray(v2.teams).reduce(function (n, r) { return n + asArray(r.members).length }, 0),
-    talents: count(v2.talents, function () { return true }),
-    panels: count(v2.panels, function () { return true }),
-    constellations: count(v2.constellations, function () { return true }),
-    meta: ['建议等级', '定位', '100级提升'].filter(function (k) { return hasText(m && m.meta && m.meta[k]) }).length
-  }
-}
-
-var SHAPE_LABELS = {
-  weapons: '武器行', weaponItems: '武器条目', artifacts: '圣遗物行', teams: '配队行',
-  members: '配队成员', talents: '天赋行', panels: '面板行', constellations: '命座行', meta: '已填基本信息'
-}
-
-/** 两个形状快照 → 人类可读的改动摘要（没变化就返回空数组） */
-function diffSummary (before, after) {
-  if (!before || !after) return []
-  var out = []
-  Object.keys(SHAPE_LABELS).forEach(function (k) {
-    var d = (after[k] || 0) - (before[k] || 0)
-    if (d) out.push(SHAPE_LABELS[k] + ' ' + (d > 0 ? '+' : '') + d + '（' + before[k] + ' → ' + after[k] + '）')
-  })
-  return out
-}
-
 function markDirty (on) {
   state.dirty = !!on
-  $('dirty').className = state.dirty ? 'dirty' : 'dirty hidden'
+  renderDirtyBadge()
   // 改动后刷新实时预览（预览面板没开时是空操作）
   if (state.dirty) renderPreviewSoon()
+}
+
+/** 待保存提示：当前角色 + 切走时暂存下来的角色（全局保存的口径） */
+function dirtyCount () {
+  return (state.dirty && state.current ? 1 : 0) + Object.keys(state.pending || {}).length
+}
+
+function renderDirtyBadge () {
+  var el = $('dirty')
+  if (!el) return
+  var n = dirtyCount()
+  el.textContent = n > 1 ? '● ' + n + ' 个角色待保存' : '● 未保存'
+  el.className = n ? 'dirty' : 'dirty hidden'
 }
 
 /* ============================================================ 弹窗 */
@@ -1365,7 +1341,7 @@ function renderWeapons () {
       actBtn('add-item', p + '.items', '＋ 条目', 'btn mini', '再加一件武器') + '</div>' +
       '</div>'
   }, '武器行')
-  return card('武器推荐', s.weapons.length + ' 行', body, true)
+  return card('武器推荐', s.weapons.length + ' 行', body, true, false, 'weapons')
 }
 
 function renderArtifacts () {
@@ -1432,7 +1408,7 @@ function renderArtifacts () {
     }
     return '<div class="box"' + rowAttr(rowId) + '>' + head + body2 + '</div>'
   }, '圣遗物行')
-  return card('圣遗物推荐', s.artifacts.length + ' 行', body, true)
+  return card('圣遗物推荐', s.artifacts.length + ' 行', body, true, false, 'artifacts')
 }
 
 function renderTalents () {
@@ -1467,7 +1443,7 @@ function renderTalents () {
     '<span class="box-title">A / E / Q</span>' + rawHint + '<span class="spacer"></span>' +
     '<span class="muted" style="font-size:12px">数字 = 等级（1–10，留空按 1）· 点皇冠 = 10</span>' +
     '</div><div class="talent-slots">' + slotHtml + '</div></div>'
-  return card('天赋加点', s.talents.length + ' 行', body, true)
+  return card('天赋加点', s.talents.length + ' 行', body, true, false, 'talents')
 }
 
 function renderPanels () {
@@ -1516,7 +1492,7 @@ function renderPanels () {
       (PANEL_VALUE_HINTS[a] || []).map(function (v) { return '<option value="' + esc(v) + '"></option>' }).join('') +
       '</datalist>'
   }).join('')
-  return card('毕业面板参考', s.panels.length + ' 行', body + lists, true)
+  return card('毕业面板参考', s.panels.length + ' 行', body + lists, true, false, 'panels')
 }
 
 function renderConstellations () {
@@ -1538,7 +1514,7 @@ function renderConstellations () {
       '<input type="text" data-path="' + p + '.text" value="' + esc(row.text) + '" placeholder="说明">' +
       '</div>'
   }, '命座行')
-  return card('命座推荐', s.constellations.length + ' 行', body, true)
+  return card('命座推荐', s.constellations.length + ' 行', body, true, false, 'constellations')
 }
 
 function renderTeams () {
@@ -1587,7 +1563,7 @@ function renderTeams () {
       '<input type="text" data-path="' + p + '.text" value="' + esc(row.text) + '" placeholder="如 自由选择"></div>' +
       '</div>'
   }, '配队行')
-  return card('配队推荐', s.teams.length + ' 行', body, true)
+  return card('配队推荐', s.teams.length + ' 行', body, true, false, 'teams')
 }
 
 function renderUnparsed () {
@@ -1609,13 +1585,87 @@ function renderTeamsHtml () {
   return state.model ? renderTeams() : ''
 }
 
-function card (title, count, body, open, readonly) {
+/** 这个角色被标记「无需填写」的模块键（角色 JSON 顶层 freeModules；模型里带一份） */
+function freeModulesOf (m) {
+  return asArray(m && m.freeModules).map(function (k) { return str(k) }).filter(Boolean)
+}
+
+/** 模块键 → 中文名（提示文案用，与卡片标题一致） */
+var MODULE_LABEL = {
+  weapons: '武器', artifacts: '圣遗物', talents: '天赋',
+  panels: '面板', constellations: '命座', teams: '配队'
+}
+
+/**
+ * 切换「该模块无需填写」（用户定稿 2026-09-26）。
+ *
+ * 只改角色 JSON 顶层的 `freeModules`（左栏未填 + 攻略页那一行自由说明），**不动模块内容**：
+ * · 开启：服务端要求该模块当前是空的；有内容时回 `{ok:false, reason:'has-content'}`，
+ *   这里把它当「引导提示」显示（并高亮该模块），不写盘。
+ * · 关闭：随时可以，标记删掉后左栏照旧显示未填。
+ * @param {string} moduleKey v2 模块键（weapons / artifacts / …）
+ */
+function toggleFreeModule (moduleKey) {
+  if (!state.current || !state.model) return Promise.resolve(false)
+  if (!MODULE_LABEL[moduleKey]) return Promise.resolve(false)
+  var on = freeModulesOf(state.model).indexOf(moduleKey) < 0
+  showStatus((on ? '正在标记「' : '正在取消「') + MODULE_LABEL[moduleKey] + '无需填写」…', '', true)
+  return api('POST', '/api/free-modules', { name: state.current, module: moduleKey, free: on }).then(function (res) {
+    if (res && res.ok === false) {
+      // 有内容 → 引导提示（不写盘）：告诉用户怎么才能标记
+      toast('「' + MODULE_LABEL[moduleKey] + '」还不能标记', [res.detail || '该模块已有内容：先清空再标记'], 'warn')
+      showStatus(res.detail || '该模块已有内容：先清空再标记', 'warn', true)
+      var btnEl = document.querySelector('[data-act="toggle-free"][data-module="' + moduleKey + '"]')
+      if (btnEl && btnEl.closest) {
+        var box = btnEl.closest('.card')
+        if (box) { box.classList.add('free-blocked'); setTimeout(function () { box.classList.remove('free-blocked') }, 1600) }
+      }
+      return res
+    }
+    state.model.freeModules = asArray(res && res.freeModules)
+    renderForm()
+    markDirty(false)
+    return refreshIndex().then(refreshList).then(function () {
+      var label = MODULE_LABEL[moduleKey]
+      toast(on ? '已标记「' + label + '」无需填写' : '已取消「' + label + '」的无需填写标记',
+        [on ? '左栏不再显示该未填项；攻略页会在这一块显示一行自由说明' : '左栏恢复显示该未填项'], 'ok')
+      showStatus(on ? '已标记「' + label + '」无需填写' : '已取消「' + label + '」的无需填写标记', 'ok')
+      return res
+    })
+  }).catch(function (e) {
+    showStatus('切换失败：' + e.message, 'error', true)
+    toast('切换失败', [e.message], 'error')
+    return null
+  })
+}
+
+/**
+ * 模块卡片标题右侧的「无需填写」开关（用户定稿 2026-09-26）。
+ *
+ * 语义：该角色这个模块本身就无需填写 —— 左栏不再显示它的「未填」，
+ * 攻略页在该模块为空时显示一行自由说明（武器「自由选择」/ 天赋「无需加点」…）。
+ * 模块**有内容**时服务端会拒开并回引导信息（避免攻略页同时出现内容和「自由选择」）。
+ */
+function freeSwitch (moduleKey) {
+  var on = freeModulesOf(state.model).indexOf(moduleKey) >= 0
+  var title = on
+    ? '已标记「无需填写」：左栏不再显示这个未填项，攻略页加一行自由说明（再点一下取消）'
+    : '这个模块该角色本身就无需填写？点一下标记：左栏不再显示未填，攻略页加一行自由说明'
+  return '<button type="button" class="free-switch' + (on ? ' on' : '') + '"' +
+    ' data-act="toggle-free" data-module="' + esc(moduleKey) + '" title="' + esc(title) + '">' +
+    (on ? '已标记无需填写' : '无需填写') + '</button>'
+}
+
+function card (title, count, body, open, readonly, moduleKey) {
   // 空模块在标题旁显示「暂无」灰字提示（与面板 / 网页版的占位一致）
+  // 被标记「无需填写」的空模块：左栏不再显示未填，这里把占位也让位给开关状态
+  var free = moduleKey ? freeModulesOf(state.model).indexOf(moduleKey) >= 0 : false
   var isEmpty = /^0(\s|行|$)/.test(String(count || ''))
-  return '<details class="card"' + (open ? ' open' : '') + '>' +
+  return '<details class="card"' + (open ? ' open' : '') + (moduleKey ? ' data-module="' + esc(moduleKey) + '"' : '') + '>' +
     '<summary>' + esc(title) +
+    (moduleKey ? freeSwitch(moduleKey) : '') +
     '<span class="spacer"></span>' +
-    (isEmpty ? '<span class="count empty">' + EMPTY_TEXT + '</span>' : (count ? '<span class="count">' + esc(count) + '</span>' : '')) +
+    (isEmpty ? (free ? '' : '<span class="count empty">' + EMPTY_TEXT + '</span>') : (count ? '<span class="count">' + esc(count) + '</span>' : '')) +
     (readonly ? '<span class="count">只读</span>' : '') +
     '</summary><div class="card-body">' + body + '</div></details>'
 }
@@ -1777,10 +1827,11 @@ function unfilledExempt (name) {
   return UNFILLED_EXEMPT_RE.test(String(name == null ? '' : name).trim())
 }
 
-/** 这个角色还没填的模块短名列表（豁免角色 / 没有 filled 信息的一律为空） */
+/** 这个角色还没填的模块短名列表（豁免角色 / 已标记「无需填写」的模块 / 没有 filled 信息的一律为空） */
 function unfilledModules (it) {
   if (!it || !it.filled || unfilledExempt(it.name)) return []
-  return MODULE_SHORT.filter(function (kv) { return it.filled[kv[0]] === false })
+  var free = asArray(it.free).map(function (k) { return String(k) })
+  return MODULE_SHORT.filter(function (kv) { return it.filled[kv[0]] === false && free.indexOf(kv[0]) < 0 })
 }
 
 /** 角色目录的 HTML（纯函数，自检直接断言「未填：武 圣」这一行文字） */
@@ -1796,11 +1847,18 @@ function renderListHtml (items) {
     }
     if (it.hasUnparsed) meta.push('<span class="un">未识别</span>')
     if (it.broken) meta.push('<span class="un">读取失败</span>')
+    // 待保存：当前角色有改动，或切走时暂存过（全局保存的口径，与状态栏那个计数一致）
+    if (it.name === state.current ? state.dirty : !!state.pending[it.name]) meta.push('<span class="unsaved">待保存</span>')
     var tip = it.name + '：' + (unfilledExempt(it.name)
       ? '旅行者 / 奇偶不显示未填项'
       : (unfilled.length
           ? '未填 ' + unfilled.map(function (kv) { return MODULE_FULL[kv[0]] }).join('、')
           : '全部模块已填'))
+    var marked = asArray(it.free).map(function (k) {
+      var hit = MODULE_SHORT.filter(function (kv) { return kv[0] === k })[0]
+      return hit ? MODULE_FULL[hit[0]] : k
+    })
+    if (marked.length) tip += '（已标记无需填写：' + marked.join('、') + '）'
     return '<div class="list-item' + (it.name === state.current ? ' active' : '') + '" data-name="' + esc(it.name) + '" title="' + esc(tip) + '">' +
       '<span class="nm">' + esc(it.name) + '</span>' +
       '<span class="meta">' + meta.join(' ') + '</span></div>'
@@ -1836,6 +1894,7 @@ function renderList () {
     return
   }
   box.innerHTML = renderListHtml(items)
+  renderDirtyBadge()
 }
 
 /** 当前列表里可见的角色名（键盘 ↑↓ 用）—— 顺序与目录一致（未填优先） */
@@ -2278,11 +2337,34 @@ function buildIssueMap (issues) {
   return map
 }
 
+/**
+ * 切走之前把当前角色的改动**暂存在内存**（不写盘，用户定稿 2026-09-26）。
+ * 之后点「保存 / 发布」会把它一起写下去；切回来时从暂存恢复（见 openCharacter）。
+ * @returns {boolean} 是否真的暂存了
+ */
+function stashCurrent () {
+  if (!state.current || !state.model || !state.dirty) return false
+  syncRefInputs()
+  state.pending[state.current] = { model: state.model, issues: state.issues, issueMap: state.issueMap }
+  return true
+}
+
 function openCharacter (name) {
+  var stashed = state.pending[name]
+  if (stashed) {
+    delete state.pending[name]
+    state.current = name
+    state.model = stashed.model
+    state.issues = asArray(stashed.issues)
+    state.issueMap = stashed.issueMap || buildIssueMap(state.issues)
+    markDirty(true)
+    renderForm()
+    renderList()
+    return Promise.resolve(state.model)
+  }
   return api('GET', '/api/character?name=' + encodeURIComponent(name)).then(function (data) {
     state.current = name
     state.model = normalizeData(data)
-    state.before = snapshotShape(state.model)
     state.issues = asArray(data.issues)
     state.issueMap = buildIssueMap(state.issues)
     markDirty(false)
@@ -2294,19 +2376,49 @@ function openCharacter (name) {
 
 function selectCharacter (name) {
   if (name === state.current && state.model) return Promise.resolve()
-  var go = function () { return openCharacter(name) }
-  if (state.dirty) {
-    return modal({
-      title: '有未保存的改动',
-      message: '「' + state.current + '」还有改动没保存，切换会丢失。要先保存吗？',
-      okText: '保存并切换',
-      cancelText: '放弃改动'
-    }).then(function (answer) {
-      if (answer) return save().then(go)
-      return go()
-    })
+  // 切走不丢改动：当前角色的改动先暂存在内存里（状态栏会显示「N 个角色待保存」）
+  stashCurrent()
+  return openCharacter(name)
+}
+
+/**
+ * 本次要写盘的角色：当前角色（有改动时）+ 切走时暂存下来的。
+ * @returns {Array<{name: string, model: object}>}
+ */
+function dirtyJobs () {
+  var jobs = []
+  Object.keys(state.pending || {}).forEach(function (name) {
+    jobs.push({ name: name, model: state.pending[name].model })
+  })
+  if (state.current && state.model && state.dirty) jobs.push({ name: state.current, model: state.model })
+  return jobs
+}
+
+/**
+ * 用**指定模型**产出保存 payload。
+ *
+ * `buildBody()` 读的是 `state.model` / `state.current`，而全局保存要给「暂存的其它角色」
+ * 也产出 payload —— 这里临时切一下再还原（buildBody 本身是纯函数，只读这两个状态）。
+ * @param {string} name
+ * @param {object} model
+ * @returns {object}
+ */
+function payloadFromModel (name, model) {
+  var keepModel = state.model
+  var keepCurrent = state.current
+  state.model = model
+  state.current = name
+  try {
+    return buildBody()
+  } finally {
+    state.model = keepModel
+    state.current = keepCurrent
   }
-  return go()
+}
+
+/** 全局保存 / 发布的请求体：`{ characters: [{ name, character }] }` */
+function charactersPayload (jobs) {
+  return jobs.map(function (j) { return { name: j.name, character: payloadFromModel(j.name, j.model) } })
 }
 
 /** 保存前把引用输入框里的当前文本同步回模型（用户可能没触发 blur） */
@@ -2496,37 +2608,40 @@ function buildBody () {
   }
 }
 
+/**
+ * 保存（**全局**，用户定稿 2026-09-26）：把当前角色 + 切走时暂存的其它角色一次写盘。
+ * 用法：`POST /api/save { characters: [...] }` → 返回每个角色的字段级变化（改动清单用）。
+ */
 function save () {
-  if (!state.current || !state.model) return Promise.resolve(false)
   syncRefInputs()
-  var before = state.before
-  var after = snapshotShape(state.model)
-  var diff = diffSummary(before, after)
-  var body = buildBody()
-  showStatus('正在保存…', '', true)
-  return api('PUT', '/api/character?name=' + encodeURIComponent(state.current), body).then(function (res) {
-    state.issues = asArray(res && res.issues)
+  var jobs = dirtyJobs()
+  if (!jobs.length) {
+    showStatus('没有需要保存的改动', 'warn')
+    toast('没有需要保存的改动')
+    return Promise.resolve(false)
+  }
+  showStatus('正在保存 ' + jobs.length + ' 个角色…', '', true)
+  return api('POST', '/api/save', { characters: charactersPayload(jobs) }).then(function (res) {
+    var savedNames = jobs.map(function (j) { return j.name })
+    savedNames.forEach(function (n) { delete state.pending[n] })
+    state.issues = asArray(res && res.issues).filter(function (i) { return !i.name || i.name === state.current })
     state.issueMap = buildIssueMap(state.issues)
     markDirty(false)
-    state.before = snapshotShape(state.model)
-    renderForm()
     // 保存后服务器会自动重建 data/_index.json（重建失败只算警告，不影响保存）
     var idxWarn = (res && res.indexWarning) ? res.indexWarning : ''
+    var issueCount = asArray(res && res.issues).length
     return refreshIndex().then(refreshList).then(function () {
-      var lines = diff.length ? diff : ['内容与上次打开时一致（只有格式/顺序层面的改动）']
-      lines.push('武器行 ' + after.weapons + ' / 圣遗物行 ' + after.artifacts + ' / 配队行 ' + after.teams + ' / 命座行 ' + after.constellations)
-      if (state.issues.length) lines.push('⚠ ' + state.issues.length + ' 处名称不在图鉴（输入框旁的 ⚠ 可看详情）')
-      if (idxWarn) lines.push(idxWarn)
-      // 用户定稿 2026-09-26：成功只显示一句「保存成功」；**有警告 / 有问题时照旧把明细摊开**
-      if (state.issues.length || idxWarn) {
-        toast('保存成功，但有警告', lines, 'warn')
+      showChanges(asArray(res && res.characters), savedNames.length + ' 个角色保存成功')
+      renderForm()
+      if (issueCount || idxWarn) {
         showStatus('保存成功：' + [
-          state.issues.length ? state.issues.length + ' 处名称不在图鉴里（输入框旁的 ⚠ 可看详情）' : '',
+          issueCount ? issueCount + ' 处名称不在图鉴（输入框旁的 ⚠ 可看详情）' : '',
           idxWarn
         ].filter(Boolean).join('；'), 'warn', true)
+        toast('保存成功，但有警告', [issueCount ? issueCount + ' 处名称不在图鉴' : '', idxWarn].filter(Boolean), 'warn')
       } else {
-        toast('保存成功')
         showStatus('保存成功', 'ok')
+        toast('保存成功')
       }
       return true
     })
@@ -2538,14 +2653,15 @@ function save () {
 }
 
 /**
- * 发布：把改动铺到全链路（Ctrl+Shift+S）。
- * 服务端的 /api/publish 会依次：写角色 JSON（给了 name 才写）→ 重建 _index.json →
- * 写回主文档 .docx（自动备份）→ 生成 guide.html → 产出提交摘要（**不自动 commit**）。
- * 响应形状以 steps[] + summary 为准；同时兼容旧形状的 files[]。
+ * 发布（**全局**，用户定稿 2026-09-26）：把编辑器里改过的所有角色一起写盘，再走全链路。
+ * 没有任何待保存改动时，就按磁盘上的 JSON 发布（旧行为）。
  */
 function publish () {
+  syncRefInputs()
+  var jobs = dirtyJobs()
   showStatus('发布中…', '', true)
-  return api('POST', '/api/publish', {}).then(function (res) {
+  return api('POST', '/api/publish', { characters: charactersPayload(jobs) }).then(function (res) {
+    jobs.forEach(function (j) { delete state.pending[j.name] })
     var lines = []
     asArray(res.steps).forEach(function (s) { lines.push((s.ok ? '✓ ' : '✗ ') + s.step + (s.detail ? '：' + s.detail : '')) })
     asArray(res.files).forEach(function (f) { lines.push(f.file + '（' + String(f.mtime).replace('T', ' ').slice(0, 19) + '）') })
@@ -2562,7 +2678,9 @@ function publish () {
     } else {
       toast('发布成功')
       showStatus('发布成功', 'ok')
+      showChanges(asArray(res.summary && res.summary.characterChanges), '发布成功')
     }
+    markDirty(false)
     if (state.current) { refreshIndex().then(refreshList).catch(function () {}) }
     return res
   }).catch(function (e) {
@@ -2587,12 +2705,12 @@ function publish () {
 function saveAndPublish () {
   if (!state.current || !state.model) return Promise.resolve(false)
   syncRefInputs()
-  var body = buildBody()
+  var jobs = dirtyJobs()
   showStatus('保存并发布中…', '', true)
-  return api('POST', '/api/publish', { name: state.current, character: body, targets: ['html'] }).then(function (res) {
+  return api('POST', '/api/publish', { characters: charactersPayload(jobs), targets: ['html'] }).then(function (res) {
+    jobs.forEach(function (j) { delete state.pending[j.name] })
     markDirty(false)
     state.issues = asArray(res.issues)
-    state.before = snapshotShape(state.model)
     return refreshIndex().then(refreshList).then(function () {
       renderForm()
       var s = (res && res.summary) || {}
@@ -2627,6 +2745,7 @@ function saveAndPublish () {
       } else {
         toast('保存并发布成功', null, 'ok', { text: s.markdown, label: '复制提交信息', title: s.suggestedMessage || s.title })
         showStatus('保存并发布成功', 'ok')
+        showChanges(asArray(s.characterChanges), '保存并发布成功', { text: s.markdown, suggested: s.suggestedMessage || s.title })
       }
       return res
     })
@@ -2648,6 +2767,74 @@ function fieldChangeText (fields) {
     if (bits.length) parts.push(f.label + ' ' + bits.join(' '))
   })
   return parts.length ? parts.join(' / ') : '无字段变化'
+}
+
+/* ==================================================== 改动清单（保存 / 发布之后） */
+
+/**
+ * 右下角**改动清单**（用户定稿 2026-09-26）：列出这次写盘的角色 + 每个模块的增 / 删 / 改，
+ * 每一块都能点进去改（跳转到该角色、展开并高亮那个模块）。
+ *
+ * 为什么不用 toast：全局保存一次可能改好几个角色，明细要能停留、能滚、能一条条点。
+ * @param {Array<{name: string, fields: Array<{key: string, label: string, added: number, removed: number, changed: number}>}>} characters
+ * @param {string} title 清单标题（如「3 个角色保存成功」）
+ * @param {{text?: string, suggested?: string}} [copy] 有提交摘要时给一个「复制提交信息」
+ */
+function showChanges (characters, title, copy) {
+  var el = $('changes')
+  if (!el) return
+  var list = asArray(characters).filter(function (c) { return c && c.name })
+  var rows = list.map(function (c) {
+    var chips = asArray(c.fields).map(function (f) {
+      var bits = []
+      if (f.changed) bits.push(f.changed + ' 改')
+      if (f.added) bits.push(f.added + ' 增')
+      if (f.removed) bits.push(f.removed + ' 删')
+      if (!bits.length) return ''
+      return '<button type="button" class="chg-chip" data-act="jump-change" data-name="' + esc(c.name) + '" data-module="' + esc(f.key) + '"' +
+        ' title="跳到「' + esc(c.name) + '」的' + esc(f.label) + '">' + esc(f.label) + ' ' + bits.join(' ') + '</button>'
+    }).filter(Boolean).join('')
+    return '<div class="chg-row"><span class="chg-name">' + esc(c.name) + '</span><span class="chg-fields">' +
+      (chips || '<span class="muted">（无字段变化）</span>') + '</span></div>'
+  }).join('')
+  var empty = '<div class="chg-row muted">这次没有角色字段变化（可能只改了格式 / 顺序）</div>'
+  el.innerHTML = '<div class="chg-head"><span class="chg-title">' + esc(title) + '</span>' +
+    '<span class="spacer"></span>' +
+    (copy && copy.text ? '<button type="button" class="btn mini chg-copy" title="复制提交信息">复制提交信息</button>' : '') +
+    '<button type="button" class="btn mini chg-close" title="关闭">×</button></div>' +
+    '<div class="chg-body">' + (rows || empty) + '</div>'
+  var copyBtn = el.querySelector('.chg-copy')
+  if (copyBtn && copy && copy.text) {
+    copyBtn.addEventListener('click', function () {
+      copyText(copy.text).then(function (ok) {
+        copyBtn.textContent = ok ? '已复制' : '复制失败'
+        showStatus(ok ? '提交信息已复制到剪贴板：' + (copy.suggested || '') : '复制失败，请手动选中摘要文本', ok ? 'ok' : 'warn', true)
+      })
+    })
+  }
+  var closeBtn = el.querySelector('.chg-close')
+  if (closeBtn) closeBtn.addEventListener('click', function () { hideChanges() })
+  el.className = 'changes'
+  return el.innerHTML
+}
+
+function hideChanges () {
+  var el = $('changes')
+  if (el) el.className = 'changes hidden'
+}
+
+/** 跳到某个角色的某个模块：打开角色 → 展开卡片 → 滚到眼前 → 闪一下 */
+function jumpToChange (name, moduleKey) {
+  if (!name) return Promise.resolve(false)
+  return openCharacter(name).then(function () {
+    var card = document.querySelector('.card[data-module="' + moduleKey + '"]')
+    if (!card) return false
+    card.open = true
+    if (card.scrollIntoView) card.scrollIntoView({ block: 'center' })
+    card.classList.add('flash')
+    setTimeout(function () { card.classList.remove('flash') }, 1800)
+    return true
+  })
 }
 
 /* ============================================================ 结构操作 */
@@ -2744,6 +2931,9 @@ function handleAction (act, path, i, el) {
       cslot.crown = cslot.level === '10'
       if (crownRow.kind === 'priority') crownRow.raw = ''
     }
+  } else if (act === 'toggle-free') {
+    // 模块级「无需填写」：改的是角色 JSON 顶层 freeModules（不是 v2 内容），走独立接口
+    toggleFreeModule(el && el.getAttribute ? el.getAttribute('data-module') : '')
   } else if (act === 'add-member') {
     target.push({ name: nextTeamMember(getPath(model, path.replace(/\.members$/, '')), target), note: '' })
   } else if (act === 'open-members') {
@@ -3551,6 +3741,15 @@ function globalEvents () {
 
   $('btn-save').addEventListener('click', function () { save() })
 
+  // 改动清单里的跳转（清单在 #form 外，单独委托）
+  $('changes').addEventListener('click', function (e) {
+    var hit = (e.target && e.target.closest) ? e.target.closest('[data-act="jump-change"]') : null
+    if (!hit) return
+    e.preventDefault()
+    jumpToChange(hit.getAttribute('data-name'), hit.getAttribute('data-module'))
+      .catch(function (err) { showStatus('跳转失败：' + err.message, 'error', true) })
+  })
+
   $('btn-new').addEventListener('click', function () {
     modal({ title: '新增角色', message: '输入角色名（将创建 data/gi/<角色名>.json）', input: true, placeholder: '如 娜维娅', okText: '创建' })
       .then(function (name) {
@@ -3925,6 +4124,18 @@ window.__editor = {
   listedItems: listedItems,
   unfilledModules: unfilledModules,
   unfilledExempt: unfilledExempt,
+  freeModulesOf: freeModulesOf,
+  toggleFreeModule: toggleFreeModule,
+  // 全局保存（优化2）：待保存集合、payload、改动清单与跳转（供自检与自动化断言）
+  dirtyJobs: dirtyJobs,
+  stashCurrent: stashCurrent,
+  markDirty: markDirty,
+  dirtyCount: dirtyCount,
+  payloadFromModel: payloadFromModel,
+  charactersPayload: charactersPayload,
+  showChanges: showChanges,
+  hideChanges: hideChanges,
+  jumpToChange: jumpToChange,
   MODULE_SHORT: MODULE_SHORT,
   MODULE_FULL: MODULE_FULL,
   FIT_MIN: FIT_MIN,
@@ -3937,7 +4148,6 @@ window.__editor = {
   setModelForTest: function (model) {
     state.model = model
     state.current = str(model && model.name) || '自检'
-    state.before = null
     return state.model
   },
   syncRefInputs: syncRefInputs,
@@ -3981,8 +4191,6 @@ window.__editor = {
     handleAction: handleAction,
     applyRef: applyRef,
     constellationIndex: constellationIndex,
-    snapshotShape: snapshotShape,
-    diffSummary: diffSummary,
     memberPool: memberPool,
     moveMemberAt: moveMemberAt,
     visibleListNames: visibleListNames,
