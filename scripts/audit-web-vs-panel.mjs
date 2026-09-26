@@ -178,4 +178,25 @@ for (const [名称, talents, want] of [
 
 console.log(`网页版与面板渲染不一致的角色：${bad.length - synthBad}（应为 0）；合成样例不一致：${synthBad}（应为 0）`)
 for (const b of bad.slice(0, 8)) console.log('· ' + b)
+
+/* ------------------------------------------------------------------ *
+ * 段落固定小字说明（武器段：三星/四星武器默认为精5，用户定稿 2026-09-26）
+ * 文案在共享显示层（guide-display.mjs ↔ display.js）里，网页版与面板都必须挂上，
+ * 且**只**挂在有内容的武器段上 —— 这是「说明由显示层统一供给」的唯一守卫。
+ * ------------------------------------------------------------------ */
+const { WEAPON_REFINE_HINT } = await import(pathToFileURL(path.join(root, 'scripts/lib/guide-display.mjs')).href)
+let hintBad = 0
+for (const n of names) {
+  const d = readJson(path.join(giDir, `${n}.json`))
+  const web = build.characterSections(d).find(s => s.title === '武器')
+  const panel = parseGuideJson(d, { fileDir: giDir, fileName: n }).sections.find(s => s.title === '武器')
+  const ok = web?.hint === panel?.hint && (web?.empty ? web.hint === undefined : web?.hint === WEAPON_REFINE_HINT)
+  if (!ok) {
+    hintBad++
+    if (hintBad <= 3) console.log(`· ${n} 武器段说明不一致：网页版=${JSON.stringify(web?.hint)} 面板=${JSON.stringify(panel?.hint)}`)
+  }
+}
+console.log(`武器段「三星/四星默认精5」说明：${names.length - hintBad}/${names.length} 一致${hintBad ? ' ← 有漂移' : '（含空段不挂说明）'}`)
+if (hintBad) bad.push(`武器段说明漂移 ${hintBad} 个角色`)
+
 process.exitCode = bad.length ? 1 : 0

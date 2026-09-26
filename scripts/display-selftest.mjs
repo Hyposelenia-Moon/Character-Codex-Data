@@ -13,7 +13,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { fileURLToPath } from 'node:url'
 import {
-  displayLines, normalizeGuideSections, DISPLAY_SECTIONS, EMPTY_TEXT,
+  displayLines, normalizeGuideSections, DISPLAY_SECTIONS, EMPTY_TEXT, WEAPON_REFINE_HINT,
   displayText, displayLabel, constellationNumber, crownItems, isZeroValue, ARTIFACT_KIND_LABEL
 } from './lib/guide-display.mjs'
 
@@ -406,6 +406,18 @@ console.log('\n================ 词条写法 ================')
   push('天赋行没有行首标签（「推荐」chip 已去掉）', talRow?.label, '')
   push('天赋行仍带 kind=talents（判行不能只看标签）', talRow?.kind, 'talents')
   push('天赋行文档层仍写「天赋：」', (tal.sections.find(s => /天赋/.test(s.title))?.lines ?? [])[0], '天赋：A1 E10 Q10')
+
+  // ⑤ 武器段的固定小字说明（用户定稿 2026-09-26：三星/四星武器默认为精5，条目不再逐个写「（精5）」）
+  const wp = mk({ weapons: [{ label: null, tier: 1, sep: ' > ', items: [{ name: '西风猎弓', note: '精5' }] }] })
+  push('武器段带「三星/四星默认精5」小字说明',
+    characterSections(wp).find(s => s.title === '武器')?.hint, WEAPON_REFINE_HINT)
+  push('说明文案与面板共用一份', WEAPON_REFINE_HINT, '（四星/三星武器默认为精5）')
+  push('空武器段不挂说明（没有条目就谈不上默认满精）',
+    characterSections(mk({})).find(s => s.title === '武器')?.hint ?? '', '')
+  push('其它段不挂说明',
+    characterSections(mk({ artifacts: [{ kind: 'sub', stats: ['暴击率', '暴击伤害'], sep: ' > ' }] })).find(s => s.title === '圣遗物')?.hint ?? '', '')
+  push('说明不进文档层（文档 / JSON 都不用维护这句话）',
+    (wp.sections.find(s => /武器/.test(s.title))?.lines ?? []).filter(l => /默认为精5/.test(l)).length, 0)
 
   const bad = checks.filter(c => !c.ok)
   for (const c of checks) console.log(`${c.ok ? '✓' : '✗'} ${c.what}：${JSON.stringify(c.got)}${c.ok ? '' : `（期望 ${JSON.stringify(c.want)}）`}`)

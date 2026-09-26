@@ -440,6 +440,22 @@ push('配队：候选拆分', fn('memberCandidates')('迪奥娜 / 阿罗夏'), [
   push('目录：坏文件标「读取失败」且不误报未填', /读取失败/.test(html) && !/丁[\s\S]*?未填/.test(html), true)
   push('目录：六个模块短名齐全', ctx.__editor.MODULE_SHORT.map(function (kv) { return kv[1] }).join(''), '武圣天面命配')
 
+  // 旅行者 / 奇偶：目录不显示「未填」（用户定稿 2026-09-26），也不参与「未填优先」排序
+  const none = { weapons: false, artifacts: false, talents: false, panels: false, constellations: false, teams: false }
+  const exemptHtml = ctx.__editor.renderListHtml([
+    { name: '旅行者·火', filled: none }, { name: '旅行者·草', filled: none },
+    { name: '奇偶·男性', filled: none }, { name: '奇偶·女性', filled: none },
+    { name: '甲', filled: none }
+  ])
+  push('目录：旅行者不显示「未填」', /旅行者·火[\s\S]*?<\/div>/.test(exemptHtml) && !/旅行者·火<\/span><span class="meta">[^<]*未填/.test(exemptHtml), true)
+  push('目录：奇偶不显示「未填」', !/奇偶·[男女]性<\/span><span class="meta">[^<]*未填/.test(exemptHtml), true)
+  push('目录：同一份数据里普通角色照旧显示「未填」', (exemptHtml.match(/未填：/g) || []).length, 1)
+  push('目录：旅行者行的提示词说明豁免', /title="旅行者·火：旅行者 \/ 奇偶不显示未填项"/.test(exemptHtml), true)
+  push('未填豁免判据：只认「旅行者 / 奇偶」这个名字族',
+    ['旅行者·火', '旅行者·草', '奇偶·男性', '奇偶·女性', '旅行者', '奇偶'].every(n => ctx.__editor.unfilledExempt(n)) &&
+    ['琴', '丽莎', '奇偶性'].every(n => !ctx.__editor.unfilledExempt(n)), true)
+  push('未填豁免判据：空名不豁免（坏文件不缺字段）', ctx.__editor.unfilledExempt('') || ctx.__editor.unfilledExempt(null), false)
+
   // 排序（用户定稿 2026-09-24）：**未填优先**，组内保持默认顺序；全都填完就是默认顺序
   const mk = (name, all) => ({ name, filled: { weapons: all, artifacts: all, talents: all, panels: all, constellations: all, teams: all } })
   const sort = ctx.__editor.sortListItems
@@ -449,6 +465,9 @@ push('配队：候选拆分', fn('memberCandidates')('迪奥娜 / 阿罗夏'), [
     sort([mk('甲', true), mk('乙', true), mk('丙', true)]).map(x => x.name), ['甲', '乙', '丙'])
   push('目录排序：缺 filled 信息的行按「已填」沉底',
     sort([{ name: '甲' }, mk('乙', false)]).map(x => x.name), ['乙', '甲'])
+  push('目录排序：旅行者 / 奇偶按「没有未填」处理（沉到已填那一组）',
+    sort([mk('旅行者·火', false), mk('甲', true), mk('奇偶·女性', false), mk('乙', false)]).map(x => x.name),
+    ['乙', '旅行者·火', '甲', '奇偶·女性'])
 }
 
 /* 5h. `sep` 的 token 数必须跟着条目数走（薇斯纳的副词条：5 个词条只存了 3 个 token，

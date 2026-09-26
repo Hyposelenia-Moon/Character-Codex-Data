@@ -1748,12 +1748,28 @@ var MODULE_FULL = {
   panels: '毕业面板参考', constellations: '命座推荐', teams: '配队推荐'
 }
 
+/** 目录里**不显示未填**的角色：旅行者（各元素）与奇偶（男 / 女）（用户定稿 2026-09-26）。
+ *  这两族的攻略按形态拆成多份，各自缺的模块没有参考价值，不该在左栏刷「未填」；
+ *  它们同时也不参与「未填优先」排序（`hasUnfilled` 为 false → 落到已填那一组）。 */
+var UNFILLED_EXEMPT_RE = /^(旅行者|奇偶)(·|$)/
+
+/** 这个角色是否豁免「未填」显示 */
+function unfilledExempt (name) {
+  return UNFILLED_EXEMPT_RE.test(String(name == null ? '' : name).trim())
+}
+
+/** 这个角色还没填的模块短名列表（豁免角色 / 没有 filled 信息的一律为空） */
+function unfilledModules (it) {
+  if (!it || !it.filled || unfilledExempt(it.name)) return []
+  return MODULE_SHORT.filter(function (kv) { return it.filled[kv[0]] === false })
+}
+
 /** 角色目录的 HTML（纯函数，自检直接断言「未填：武 圣」这一行文字） */
 function renderListHtml (items) {
   return asArray(items).map(function (it) {
     var meta = []
     // 目录右侧只报「还没填的模块」（以前是「武2 圣3」这种计数，占地方又看不出缺什么）
-    var unfilled = MODULE_SHORT.filter(function (kv) { return it.filled && it.filled[kv[0]] === false })
+    var unfilled = unfilledModules(it)
     if (unfilled.length) {
       meta.push('<span class="unfilled" title="还没填的模块：' +
         unfilled.map(function (kv) { return MODULE_FULL[kv[0]] }).join(' / ') + '">未填：' +
@@ -1761,18 +1777,20 @@ function renderListHtml (items) {
     }
     if (it.hasUnparsed) meta.push('<span class="un">未识别</span>')
     if (it.broken) meta.push('<span class="un">读取失败</span>')
-    var tip = it.name + '：' + (unfilled.length
-      ? '未填 ' + unfilled.map(function (kv) { return MODULE_FULL[kv[0]] }).join('、')
-      : '全部模块已填')
+    var tip = it.name + '：' + (unfilledExempt(it.name)
+      ? '旅行者 / 奇偶不显示未填项'
+      : (unfilled.length
+          ? '未填 ' + unfilled.map(function (kv) { return MODULE_FULL[kv[0]] }).join('、')
+          : '全部模块已填'))
     return '<div class="list-item' + (it.name === state.current ? ' active' : '') + '" data-name="' + esc(it.name) + '" title="' + esc(tip) + '">' +
       '<span class="nm">' + esc(it.name) + '</span>' +
       '<span class="meta">' + meta.join(' ') + '</span></div>'
   }).join('')
 }
 
-/** 这个角色还有没有「未填」模块（服务端 `/api/characters` 的 `filled`） */
+/** 这个角色还有没有「未填」模块（服务端 `/api/characters` 的 `filled`；旅行者 / 奇偶豁免） */
 function hasUnfilled (it) {
-  return !!(it && it.filled) && MODULE_SHORT.some(function (kv) { return it.filled[kv[0]] === false })
+  return unfilledModules(it).length > 0
 }
 
 /**
@@ -3867,6 +3885,8 @@ window.__editor = {
   renderListHtml: renderListHtml,
   sortListItems: sortListItems,
   listedItems: listedItems,
+  unfilledModules: unfilledModules,
+  unfilledExempt: unfilledExempt,
   MODULE_SHORT: MODULE_SHORT,
   MODULE_FULL: MODULE_FULL,
   FIT_MIN: FIT_MIN,

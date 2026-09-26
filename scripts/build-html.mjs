@@ -798,6 +798,8 @@ export function renderGuideSectionsText (data) {
   for (const section of characterSections(data)) {
     const name = `${section.badge ? section.badge + ' ' : ''}${section.displayTitle ?? section.title}`
     if (section.empty) { out.push(`[${name}] ${EMPTY_TEXT}`); continue }
+    // 段落固定小字说明（武器段）：与网页版 / 面板渲染出的那一行同内容
+    if (section.hint) out.push(`[${name}] ${section.hint}`)
     if (section.kind === 'teams') {
       for (const team of section.teams) {
         // 成员格内的可替换项（`迪奥娜 / 阿罗夏`）已并进 `name`，这里原样输出
@@ -839,6 +841,8 @@ export function renderDisplaySection (section, indent, dir) {
   out.push(`${pad}<div class="section${section.empty ? ' section-empty' : ''}">`)
   const badge = section.badge ? `<span class="section-badge">${escapeHtml(section.badge)}</span>` : ''
   out.push(`${pad}    <div class="section-title">${badge}${inline(section.displayTitle ?? section.title)}</div>`)
+  // 段落的固定小字说明（武器段：三星/四星武器默认为精5，见 guide-display 的 WEAPON_REFINE_HINT）
+  if (section.hint) out.push(`${pad}    <div class="section-hint">${inline(section.hint)}</div>`)
   if (section.empty) {
     out.push(`${pad}    <div class="section-empty-text">${EMPTY_TEXT}</div>`)
   } else if (section.kind === 'teams') {

@@ -19,8 +19,8 @@
 | 3 | **标记版 docx**（`out\…(标记版).docx` + `D:\…\…(标记版).docx`） | 由 `build-docx --write-main` 一并产出，无需手改 | 标记版 sha1 + "去标记后逐字一致：是" |
 | 4 | `guide.html` | `node scripts/build-html.mjs` | 卡片数 129 + `audit-guide-html` 通过 |
 | 5 | `guide.md` | `node scripts/build-doc.mjs`（**选 A 口径**：只过滤占位符，**文档词汇不变**） | `___`=0 + 文档词汇计数 + 新旧字节/行数 |
-| 6 | **编辑器**（表单文案 + `/api/preview` 预览） | `resources/editor/app.js`（文案 / 下拉 / **标签与档位联动** / **删行墓碑** / **面板一行两个控件** / **chip 宽度自适应与「放得下几把」**）＋ `scripts/editor.mjs`（保存协议：删行墓碑、清空＝显式 `null`；**写请求带跨站防护**）；**改完必须重启编辑器进程**（长驻进程会缓存旧模块） | `/api/preview` html 与 `guide.html` **逐字节一致** ＋ `scripts/editor-selftest.mjs` 143/143 ＋ `.dsh/verify-editor-rt.mjs`（129 角色「打开→原样保存」逐字节不变 + 预览逐字节一致）＋ `.dsh/verify-editor-click.mjs`（行尾图标按钮：点按钮 / `<svg>` / `<path>` 三种点法都要能删行）＋ `.dsh/verify-panel-editor.mjs`（面板行新增 / 带标签 / 删行 / 说明行，端到端）＋ `.dsh/probe-editor-ui.mjs`（离线表单：占位截断 / 字号 / 溢出）＋ `.dsh/probe-editor-live.mjs` / `.dsh/audit-editor-ui-live.mjs`（**真实编辑器**里量同一批指标 + 武器行提示，`--zoom=2` 出放大截图） |
-| 7 | **插件面板** | `model/codexIndex/display.js`（**与 `scripts/lib/guide-display.mjs` 逐字节一致**）、`parse.js`、`resources/atlas/codex.html`、`codex.css` | `node scripts/check-display-sync.mjs` + `audit-web-vs-panel` |
+| 6 | **编辑器**（表单文案 + `/api/preview` 预览） | `resources/editor/app.js`（文案 / 下拉 / **标签与档位联动** / **删行墓碑** / **面板一行两个控件** / **chip 宽度自适应与「放得下几把」** / **左栏未填与旅行者·奇偶豁免**）＋ `scripts/editor.mjs`（保存协议：删行墓碑、清空＝显式 `null`；**写请求带跨站防护**）；**改完必须重启编辑器进程**（长驻进程会缓存旧模块） | `/api/preview` html 与 `guide.html` **逐字节一致** ＋ `scripts/editor-selftest.mjs` 166/166 ＋ `.dsh/verify-editor-rt.mjs`（129 角色「打开→原样保存」逐字节不变 + 预览逐字节一致）＋ `.dsh/verify-editor-click.mjs`（行尾图标按钮：点按钮 / `<svg>` / `<path>` 三种点法都要能删行）＋ `.dsh/verify-panel-editor.mjs`（面板行新增 / 带标签 / 删行 / 说明行，端到端）＋ `.dsh/probe-editor-ui.mjs`（离线表单：占位截断 / 字号 / 溢出）＋ `.dsh/probe-editor-live.mjs` / `.dsh/audit-editor-ui-live.mjs`（**真实编辑器**里量同一批指标 + 武器行提示，`--zoom=2` 出放大截图） |
+| 7 | **插件面板** | `model/codexIndex/display.js`（**与 `scripts/lib/guide-display.mjs` 逐字节一致**）、`parse.js`、`resources/atlas/codex.html`、`codex.css`（武器段小字说明 = 共享的 `WEAPON_REFINE_HINT` → `.codex-hint`） | `node scripts/check-display-sync.mjs` + `audit-web-vs-panel`（含「武器段说明 129/129」）+ `test/codex-template.test.mjs`（说明落在标题与正文之间） |
 | 8 | `README` 与 `templates/` | 改受影响的说明、词汇表、符号语义、期望值 | 本节表格与预期计数 |
 | 9 | **审计脚本的期望值** | `audit-*` / `display-*` / `check-display-sync` 的断言与合法集 | 每个审计 `exit=0` |
 | 10 | 离线脚手架 | `.dsh/` 下的脚手架**不得再读陈旧副本**：优先用 `CODEX_DIR` / `CODEX_DOCX` 环境变量、缺省读**主仓库**（现状：仍有不少 `.dsh/*.mjs` 写死绝对路径，逐个换成环境变量即可） | 离线渲染输出能反映主仓库最新数据 |
@@ -31,12 +31,12 @@
 node scripts/parse-docx.mjs --dry                 # 129 角色 / 未识别 0
 node scripts/build-docx.mjs --write-main          # 往返 129/129 深度相等 + 幂等
 node scripts/diagnose-docx-json.mjs               # 不一致 0
-node scripts/audit-web-vs-panel.mjs               # 真实角色 0 + 自定义档位词合成样例 3 条一致
+node scripts/audit-web-vs-panel.mjs               # 真实角色 0 + 自定义档位词合成样例 3 条一致 + 武器段说明 129/129
 node scripts/audit-dup-items.mjs                  # 重复名 0/0、序列不一致 0
 node scripts/check-display-sync.mjs               # 两份显示级归一逐字节一致
 node scripts/scan-separators.mjs                  # 悬挂 0 + 副词条非法同级对 0（`/` 只许出现在暴击对之间）
-node scripts/display-selftest.mjs <角色>           # 词条写法 49/49（含天赋行无标签、副词条 `=`/`≥`、面板两控件）
-node scripts/editor-selftest.mjs                  # 编辑器规则 143/143（天赋等级 / 新增行 / 多值输入 / 标签互斥 / 配队槽位 / 面板两控件 / 武器行放得下几把 / 目录未填模块）
+node scripts/display-selftest.mjs <角色>           # 词条写法 54/54（含天赋行无标签、副词条 `=`/`≥`、面板两控件、武器段小字说明）
+node scripts/editor-selftest.mjs                  # 编辑器规则 166/166（天赋等级 / 新增行 / 多值输入 / 标签互斥 / 配队槽位 / 面板两控件 / 武器行放得下几把 / 目录未填模块 + 旅行者·奇偶豁免）
 node scripts/build-html.mjs && node scripts/build-doc.mjs   # 产物刷新
 # 编辑器 129 角色「打开→原样保存」逐字节不变 + /api/preview 与 guide.html 逐字节一致
 #   （需先 node scripts/editor.mjs --port <p> --no-open 起服务；改过共享层务必重启）
@@ -165,12 +165,24 @@ node scripts/build-doc.mjs       # 文档版 guide.md（Word 用可再打包 doc
 
 `scripts/daily-docx-sync.mjs`（双击/计划任务入口 `scripts/daily-docx-sync.cmd`）每天检测一次：
 
-1. 取 `data/**` 最新 mtime 与主文档 mtime 比 —— **数据不比文档新就跳过**
+1. 取 `data/**` 最新 mtime 与主文档 mtime 比 —— **数据不比文档新就跳过回写**
    （你刚在 Word 里改过文档时不会被覆盖；确认要回写时加 `--force`）
-2. 跑 `diagnose-docx-json.mjs`：0 个不一致 → 跳过
+2. 跑 `diagnose-docx-json.mjs`：0 个不一致 → 跳过回写
 3. 有差异 → `build-docx.mjs --write-main`（自带 `.bak-<时间戳>` 备份与往返校验，
    校验不过会**拒绝写主文档**）
-4. 每次结果追加到 `out/daily-docx-sync.log`
+4. **重建派生文件**：`build-index.mjs`（`data/_index.json`）→ `build-html.mjs`（`guide.html`）
+   → `build-doc.mjs`（`guide.md`）
+5. 每次结果追加到 `out/daily-docx-sync.log`
+
+第 4 步**每次真跑都执行**（不只在回写成功时）：派生文件只依赖 `data/`，重建是幂等的几秒操作，
+这样「在 Word 里加了角色 → `parse-docx` 更新数据 → 文档与数据本来就一致」这条路径也能让网页版跟上。
+提交与推送仍然由人工做（脚本不碰 git）。
+
+> 计划任务「Character-Codex 数据回写文档」原先带 `<DisallowStartIfOnBatteries>` /
+> `<StopIfGoingOnBatteries>`（笔记本用电池时会被直接拒绝，`Last Result` = `0x800710E0`），
+> 2026-09-26 已去掉这两项限制。
+> ⚠ 仍要注意：12:00 时机器若在休眠 / 关机，任务**不会补跑**（`StartWhenAvailable` 目前是 False）；
+> 需要补跑就再加这一项。
 
 本机已注册计划任务「Character-Codex 数据回写文档」（每天 12:00）：
 
@@ -221,6 +233,10 @@ node scripts/daily-docx-sync.mjs --dry                            # 只报告，
 - 正文写纯文本，不要写 HTML 标签
 - `>`、`≥`、`/`、`+` 两侧留一个半角空格：前端按它们断行，没空格就不会被拆开
 - 毕业面板写成「标签：数值」一行一条，数值会自动放大对齐
+- **精炼不用逐条写**（用户定稿 2026-09-26）：三星 / 四星武器默认按满精（精5）推荐，
+  所以条目里**不写** `（精5）`；五星武器默认精1，真要指定满精时才在条目上写 `note`（如 `波乱月白经津（精5）`）。
+  网页版与面板都在「武器」段标题下固定显示一行小字「（四星/三星武器默认为精5）」——
+  这句话由显示层（`scripts/lib/guide-display.mjs` 的 `WEAPON_REFINE_HINT`）供给，**不进数据 / 文档 / 编辑器**。
 
 ## 完整示例
 
@@ -385,7 +401,7 @@ node scripts/daily-docx-sync.mjs --dry                            # 只报告，
 `建议：第一档：西风剑` —— `parse-docx` 认不出（往返立刻不再 129/129）。
 
 断言（改动显示层 / 文档层 / 编辑器标签时都要跑）：
-`scripts/display-selftest.mjs <角色>`（49 条：词条写法 / 天赋行标签 / 副词条同级对 / 面板两控件）、
+`scripts/display-selftest.mjs <角色>`（54 条：词条写法 / 天赋行标签 / 副词条同级对 / 面板两控件 / 武器段说明）、
 `scripts/audit-web-vs-panel.mjs` 的合成样例（3 条）、
 `scripts/editor-selftest.mjs`（143 条：天赋等级 / 新增行可见 / 多值输入 / 标签互斥 /
 配队槽位 / 界面标记不落盘 / **删行墓碑** / **清空字段提交 null** / **面板两控件** / **武器行放得下几把** / **目录未填模块**）。
@@ -472,7 +488,7 @@ node .dsh/verify-editor-e2e.mjs      # 端到端：用真实的 buildBody 出 pa
         "tier": null,                      // 1..6 = 第一档…第六档，可空
         "sep": " > ",                      // 条目连接符（原样保留，">" / "≥" / " / "）
         "items": [
-          { "name": "西风剑", "note": "精5", "ref": "weapon:西风剑" }   // note 可省
+          { "name": "西风剑", "ref": "weapon:西风剑" }   // note 可省：三星/四星默认精5，只有五星要满精时才写 "note": "精5"
         ]
       }
     ],
@@ -629,7 +645,7 @@ node scripts/editor.mjs [--port 8787] [--no-open] [--exit-on-idle[=<秒>]]
 | 栏目 | 规则 |
 |---|---|
 | 文字排版（全表单） | 控件（输入框 / 下拉 / 文本域）**统一 13px**、说明文字 12px；提示文字（placeholder）**一律不许被截断**（提示词写短，长解释放 `title`）；行尾按钮只留图标（`↑` / `↓` / 垃圾桶），文案在 `title` 里。⚠ 事件委托必须用 `closest('[data-act]')` **往上找**：图标按钮里是内联 SVG，点上去 `e.target` 是 `<path>`（没有 `data-act`），直接读 `e.target` 会让整个点击失灵（用户报过「编辑器无法删除面板的某行」）—— 回归脚本 `.dsh/verify-editor-click.mjs` 会分别点按钮本身 / `<svg>` / `<path>` 各一遍 |
-| 角色目录（左栏） | 每行 = 角色名 + 右侧「**未填：武 圣**」（单个汉字：武 / 圣 / 天 / 面 / 命 / 配 = 六模块，顺序即文档顺序；全填的角色不显示）。**排序 = 未填优先**（用户定稿 2026-09-24）：有未填模块的排前面、全填的沉底，两组内部都保持**默认顺序**（`_order.json`），全都填完时结果就是默认顺序；键盘 ↑↓ 跟着这个显示顺序走（`listedItems()` 一处供渲染与导航）。判据在服务端 `filledModules()`（**空占位行不算填**：`首选：` 后面没东西、主词条三槽全空都不算；**天赋另有特例**：三格全 1 的默认 `A1 E1 Q1` 只是「按 111 正常显示」的占位，**不算填** —— 要任一格升级 / 投皇冠 / 写说明才算，所以补过默认行的角色在目录里依旧显示「未填：… 天 …」）；鼠标悬停给完整模块名。行距压到 4px/2px 内边距，长名字省略号截断（`.nm` 的 `min-width: 0`）——同屏能多放几个名字 |
+| 角色目录（左栏） | 每行 = 角色名 + 右侧「**未填：武 圣**」（单个汉字：武 / 圣 / 天 / 面 / 命 / 配 = 六模块，顺序即文档顺序；全填的角色不显示）。**旅行者（各元素）与奇偶（男 / 女）不显示未填**（用户定稿 2026-09-26）：这两族的攻略按形态拆成多份，缺的模块没有参考价值，`unfilledExempt()` 判据按名字族豁免（`^(旅行者\|奇偶)(·\|$)`），它们同时也不参与「未填优先」排序（落到已填那一组），悬停提示写明「旅行者 / 奇偶不显示未填项」。**排序 = 未填优先**（用户定稿 2026-09-24）：有未填模块的排前面、全填的沉底，两组内部都保持**默认顺序**（`_order.json`），全都填完时结果就是默认顺序；键盘 ↑↓ 跟着这个显示顺序走（`listedItems()` 一处供渲染与导航）。判据在服务端 `filledModules()`（**空占位行不算填**：`首选：` 后面没东西、主词条三槽全空都不算；**天赋另有特例**：三格全 1 的默认 `A1 E1 Q1` 只是「按 111 正常显示」的占位，**不算填** —— 要任一格升级 / 投皇冠 / 写说明才算，所以补过默认行的角色在目录里依旧显示「未填：… 天 …」）；鼠标悬停给完整模块名。行距压到 4px/2px 内边距，长名字省略号截断（`.nm` 的 `min-width: 0`）——同屏能多放几个名字 |
 | 武器行 | 「自定义标签」与「档位」**二选一**：填了自定义词（如 `建议`）自动清空档位下拉，反之亦然；行首实时显示「显示为：X」 |
 | 武器 / 圣遗物行的 chip | 徽标**只留图标**（完整类型名在 `title` 里）、名字框**按内容自适应宽度**（`field-sizing: content`，不支持的浏览器由 `autoSizeInput` 兜底）—— 名字短占得少，一行就能多放一把 |
 | 武器行的「放得下几把」 | **同级上限 4 把**（`WEAPON_ROW_CAP`）。渲染后按**实际量出来的 chip 宽度**算：放得下 → 行首提示 `可加入 4 把`；名字长放不下 → `仅可加入 N 把`；已经 4 把 → `已达同级上限（4 把）`；当前这行就放不下 → 追一句「当前放不下，请先删到放得下」。算法是纯函数 `planRowFit`（自检直接断言），DOM 那一遍在 `refreshFitHints` |
