@@ -346,6 +346,10 @@ function joinCandidates (list) {
  *   · 优先级行 → slots（A/E/Q 各一格）；缺字母补 1，多出的旧字母原样留着
  *   · 皇冠行的字母把对应格抬到 10（皇冠 = 已投，等级 10）后**并掉皇冠行**（等级只有一处真相）
  *   · 没有优先级行时补一行空的（界面上三格才有地方填）；**空的不会落盘**（见 buildBody）
+ *
+ * 皇冠行虽然被并掉了，但**原下标记在 `pri.crownAt` 上**：保存时要把它放回原位；
+ * 一个皇冠都不剩时那里得放一个墓碑 —— 客户端不提交那个下标的话，服务端 `mergeRows`
+ * 会把原文件里的旧皇冠行顶回来（用户报的「点皇冠回退，保存不生效」）。
  * @param {object[]} rows
  * @returns {object[]}
  */
@@ -353,6 +357,8 @@ function foldCrownRows (rows) {
   var list = asArray(rows).filter(function (r) { return r && typeof r === 'object' }).map(function (r) { return Object.assign({}, r) })
   var idx = -1
   list.forEach(function (r, i) { if (idx < 0 && r.kind === 'priority') idx = i })
+  var crownIdx = -1
+  list.forEach(function (r, i) { if (crownIdx < 0 && r.kind === 'crown') crownIdx = i })
   var slots = []
   if (idx >= 0) {
     // ⚠ 之前这里只读 `order`：而 normalizeData 造的界面模型只有 `slots`（没有 order），
@@ -398,7 +404,19 @@ function foldCrownRows (rows) {
     })
   })
   var others = list.filter(function (r) { return r.kind !== 'priority' && r.kind !== 'crown' })
-  var pri = { kind: 'priority', slots: slots, raw: idx >= 0 ? str(list[idx].raw) : '', order: idx >= 0 ? asArray(list[idx].order) : [] }
+  // `hadRow`：原文件里**有实质内容的天赋行**（有 order 或有 raw，或者有皇冠行）。
+  // 界面会给「没有天赋行的角色」补一行空三格，那一行没填就不该落盘；
+  // 但文件里本来就有行的角色，**哪怕被清成 111 也必须提交**，否则客户端不提交这个下标，
+  // 服务端 `mergeRows` 会把旧行（含皇冠行）按位置顶回来 —— 用户报的「点皇冠回退，保存不生效」。
+  var hadRow = (idx >= 0 && (asArray(list[idx].order).length > 0 || hasText(list[idx].raw))) || crownIdx >= 0
+  var pri = {
+    kind: 'priority',
+    slots: slots,
+    raw: idx >= 0 ? str(list[idx].raw) : '',
+    order: idx >= 0 ? asArray(list[idx].order) : [],
+    crownAt: crownIdx,
+    hadRow: hadRow
+  }
   return [pri].concat(others)
 }
 
@@ -2384,10 +2402,12 @@ function buildBody () {
     if (row.kind !== 'priority') return
     // 数据里没有天赋行的角色：界面会补一行空三格（有地方填），但**没填就不落盘**，
     // 否则「打开再保存」会凭空多出一行 A1 E1 Q1（还会多出一个「3. 天赋加点」段）。
-    // 判据：这一行**既没有 raw、也没有 A/E/Q 之外的旧字母**，且三格都还是默认的 1（没勾皇冠）
+    // 判据：这一行**既没有 raw、也没有 A/E/Q 之外的旧字母**，且三格都还是默认的 1（没勾皇冠）；
+    // 且原文件里本来就没有天赋行（`hadRow`）—— 文件里本来就有行的话，清成 111 也要提交，
+    // 不然服务端按下标合并会把旧行顶回来（见 foldCrownRows 的 `hadRow` 注释）。
     var slots = talentSlots(mv2.talents)
     var blank = !hasText(row.raw) && slots.every(function (s) { return !s.extra && s.level === '1' && !s.crown })
-    if (blank) return
+    if (blank && !row.hadRow) return
     // 固定三格：A/E/Q 顺序写回；每格一个等级（1..10），10 = 皇冠（crown:true）
     var order = slots.map(function (s) {
       var o = { name: s.name, level: Number(s.level) === 10 ? 10 : (Number(s.level) || 1), ref: 'talent:' + s.name }
@@ -2405,7 +2425,16 @@ function buildBody () {
     var names = prevOrder.filter(function (n) { return crownMap[n] })
     Object.keys(crownMap).forEach(function (n) { if (names.indexOf(n) < 0) names.push(n) })
     var crowns = names.map(function (n) { return { name: n, level: 10, crown: true, ref: 'talent:' + n } })
-    if (crowns.length) talents.push({ kind: 'crown', items: crowns })
+    // 放回原文件里皇冠行的位置（`crownAt`，见 foldCrownRows）；原来是 [优先级, 皇冠] 就还是这个顺序。
+    // ⚠ 一个皇冠都不剩（用户把皇冠点回去）时**要放墓碑占位**：不提交这个下标的话，服务端
+    //   `mergeRows` 会按「没提交的下标仍按原文件补回」把旧皇冠行顶回来 ——
+    //   表现为「点皇冠回退，保存不生效」（用户 2026-09-26 报过）。
+    var hadCrownRow = row.crownAt !== undefined && row.crownAt >= 0
+    if (crowns.length || hadCrownRow) {
+      var crownAt = hadCrownRow ? row.crownAt : talents.length
+      while (talents.length < crownAt) talents.push({ __deleted: true })
+      talents.push(crowns.length ? { kind: 'crown', items: crowns } : { __deleted: true })
+    }
   })
 
   var panels = mv2.panels.map(function (row) {

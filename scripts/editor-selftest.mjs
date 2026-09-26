@@ -536,8 +536,55 @@ push('配队：候选拆分', fn('memberCandidates')('迪奥娜 / 阿罗夏'), [
   push('sep 同步：只剩一条 → 回落单 token 写法', fn('toJson')().v2.weapons[0].sep, ' > ')
 }
 
-/* 6. 圣遗物行不再有「件数」输入（件数已从文档 / 数据 / 显示全部去掉） */
+/* 5i. 点皇冠回退（取消皇冠）必须能保存 —— 用户 2026-09-26 报「点皇冠回退，保存不生效」。
+ *
+ * 数据里带皇冠行的角色是 `[priority, crown]` 两行。客户端把皇冠行**折进三格**后不再提交那个下标，
+ * 服务端 `mergeRows`（「没提交的下标按原文件补回」）就把旧皇冠行顶回来；再加上「三格全 1 → 空行不落盘」
+ * 把优先级行也吞掉，整个天赋段都存不进去。这里钉住客户端该提交的形状：
+ *   · 文件里本来有天赋行（`hadRow`）→ 哪怕清成 111 也要提交
+ *   · 原来有皇冠行、现在一个不剩 → 在原下标记一个墓碑占位
+ */
 {
+  const crowned = () => mkData({
+    talents: [
+      { kind: 'priority', order: [{ name: 'A', level: 1, ref: 'talent:A' }, { name: 'E', level: 10, crown: true, ref: 'talent:E' }, { name: 'Q', level: 10, crown: true, ref: 'talent:Q' }], raw: 'A1 E10 Q10' },
+      { kind: 'crown', items: [{ name: 'E', level: 10, crown: true, ref: 'talent:E' }, { name: 'Q', level: 10, crown: true, ref: 'talent:Q' }] }
+    ]
+  })
+  const kinds = (list) => (list ?? []).map(r => (r && r.__deleted === true) ? '__deleted' : (r && r.kind))
+
+  // 原样打开 → 提交的仍是 [priority, crown]（保证「打开→保存」逐字节不变）
+  let model = ctx.__editor.internals.normalizeData(crowned())
+  api.setModelForTest(model)
+  push('皇冠：打开带皇冠的角色 → 提交形状不变', kinds(fn('toJson')().v2.talents).join(','), 'priority,crown')
+  push('皇冠：模型记下皇冠行的原下标（crownAt）', model.v2.talents[0].crownAt, 1)
+
+  // 点掉 E / Q 的皇冠 → 三格全 1：优先级行照样提交 + 原位墓碑
+  model = ctx.__editor.internals.normalizeData(crowned())
+  api.setModelForTest(model)
+  fn('handleAction')('toggle-crown', 'v2.talents.0', 1, null)
+  fn('handleAction')('toggle-crown', 'v2.talents.0', 2, null)
+  let out = fn('toJson')()
+  push('皇冠：取消全部皇冠后提交的形状', kinds(out.v2.talents).join(','), 'priority,__deleted')
+  push('皇冠：取消后三格回到 111', out.v2.talents[0].order.map(o => o.name + o.level).join(' '), 'A1 E1 Q1')
+  push('皇冠：取消后不带 crown 标记', out.v2.talents[0].order.filter(o => o.crown).length, 0)
+
+  // 再点回来：皇冠行回到原位
+  fn('handleAction')('toggle-crown', 'v2.talents.0', 1, null)
+  out = fn('toJson')()
+  push('皇冠：再点一下 → 皇冠行回来且只带 E', kinds(out.v2.talents).join(',') + '|' + out.v2.talents[1].items.map(i => i.name).join(''), 'priority,crown|E')
+
+  // 文件里**没有**天赋行的角色（新建角色）：空三格不落盘，不会凭空多一行
+  const fresh = ctx.__editor.internals.normalizeData(mkData({ talents: [] }))
+  api.setModelForTest(fresh)
+  push('皇冠：新建角色（文件里没有天赋行）空三格不落盘', fn('toJson')().v2.talents.length, 0)
+  push('皇冠：新建角色点皇冠后才落盘', (function () {
+    fn('handleAction')('toggle-crown', 'v2.talents.0', 1, null)
+    return kinds(fn('toJson')().v2.talents).join(',')
+  })(), 'priority,crown')
+}
+
+/* 6. 圣遗物行不再有「件数」输入（件数已从文档 / 数据 / 显示全部去掉） */{
   const data = mkData({ artifacts: [{ kind: 'preferred', label: '首选', sep: ' > ', sets: [{ name: '千岩牢固', ref: 'artifact:千岩牢固' }] }] })
   const model = ctx.__editor.internals.normalizeData(data)
   api.setModelForTest(model)
