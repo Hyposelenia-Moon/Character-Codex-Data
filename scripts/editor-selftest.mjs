@@ -713,6 +713,18 @@ push('配队：候选拆分', fn('memberCandidates')('迪奥娜 / 阿罗夏'), [
   push('全局保存：当前角色不脏时只剩暂存的', api.dirtyJobs().map(j => j.name), ['甲'])
 }
 
+/* 9. 从图鉴添加新角色（用户定稿 2026-09-26）：缺人判据要认「旅行者 / 奇偶」的多形态，
+ *    否则图鉴里一个「旅行者」会被当成 7 个缺人。真实建文件在 `.dsh/verify-atlas-characters.mjs`。 */
+{
+  const { missingAtlasCharacters } = await import(pathToFileURL(path.join(root, 'scripts', 'editor.mjs')).href)
+  push('图鉴缺人：同名文件存在就不算缺', missingAtlasCharacters([{ name: '琴' }], ['琴']), [])
+  push('图鉴缺人：有「旅行者·火」就不报「旅行者」', missingAtlasCharacters([{ name: '旅行者' }], ['旅行者·火']), [])
+  push('图鉴缺人：一个旅行者形态都没有才报', missingAtlasCharacters([{ name: '旅行者' }], ['琴']), [{ name: '旅行者', rarity: '' }])
+  push('图鉴缺人：奇偶按家族判', missingAtlasCharacters([{ name: '奇偶·男性' }], ['奇偶·女性']), [])
+  push('图鉴缺人：真缺的角色带星级返回',
+    missingAtlasCharacters([{ name: '琴' }, { name: '新角色甲', rarity: '五星' }], ['琴']), [{ name: '新角色甲', rarity: '五星' }])
+}
+
 /* ---------------------------------------------------------------- 汇总 */
 let failed = 0
 for (const c of checks) {

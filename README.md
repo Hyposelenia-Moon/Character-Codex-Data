@@ -19,7 +19,7 @@
 | 3 | **标记版 docx**（`out\…(标记版).docx` + `D:\…\…(标记版).docx`） | 由 `build-docx --write-main` 一并产出，无需手改 | 标记版 sha1 + "去标记后逐字一致：是" |
 | 4 | `guide.html` | `node scripts/build-html.mjs` | 卡片数 129 + `audit-guide-html` 通过 |
 | 5 | `guide.md` | `node scripts/build-doc.mjs`（**选 A 口径**：只过滤占位符，**文档词汇不变**） | `___`=0 + 文档词汇计数 + 新旧字节/行数 |
-| 6 | **编辑器**（表单文案 + `/api/preview` 预览） | `resources/editor/app.js`（文案 / 下拉 / **标签与档位联动** / **删行墓碑** / **面板一行两个控件** / **chip 宽度自适应与「放得下几把」** / **左栏未填与旅行者·奇偶豁免**）＋ `scripts/editor.mjs`（保存协议：删行墓碑、清空＝显式 `null`；**写请求带跨站防护**）；**改完必须重启编辑器进程**（长驻进程会缓存旧模块） | `/api/preview` html 与 `guide.html` **逐字节一致** ＋ `scripts/editor-selftest.mjs` 200/200 ＋ `.dsh/verify-editor-rt.mjs`（129 角色「打开→原样保存」逐字节不变 + 预览逐字节一致）＋ `.dsh/verify-editor-click.mjs`（行尾图标按钮：点按钮 / `<svg>` / `<path>` 三种点法都要能删行）＋ `.dsh/verify-panel-editor.mjs`（面板行新增 / 带标签 / 删行 / 说明行，端到端）＋ `.dsh/probe-editor-ui.mjs`（离线表单：占位截断 / 字号 / 溢出）＋ `.dsh/probe-editor-live.mjs` / `.dsh/audit-editor-ui-live.mjs`（**真实编辑器**里量同一批指标 + 武器行提示，`--zoom=2` 出放大截图） |
+| 6 | **编辑器**（表单文案 + `/api/preview` 预览） | `resources/editor/app.js`（文案 / 下拉 / **标签与档位联动** / **删行墓碑** / **面板一行两个控件** / **chip 宽度自适应与「放得下几把」** / **左栏未填与旅行者·奇偶豁免**）＋ `scripts/editor.mjs`（保存协议：删行墓碑、清空＝显式 `null`；**写请求带跨站防护**）；**改完必须重启编辑器进程**（长驻进程会缓存旧模块） | `/api/preview` html 与 `guide.html` **逐字节一致** ＋ `scripts/editor-selftest.mjs` 205/205 ＋ `.dsh/verify-editor-rt.mjs`（129 角色「打开→原样保存」逐字节不变 + 预览逐字节一致）＋ `.dsh/verify-editor-click.mjs`（行尾图标按钮：点按钮 / `<svg>` / `<path>` 三种点法都要能删行）＋ `.dsh/verify-panel-editor.mjs`（面板行新增 / 带标签 / 删行 / 说明行，端到端）＋ `.dsh/probe-editor-ui.mjs`（离线表单：占位截断 / 字号 / 溢出）＋ `.dsh/probe-editor-live.mjs` / `.dsh/audit-editor-ui-live.mjs`（**真实编辑器**里量同一批指标 + 武器行提示，`--zoom=2` 出放大截图） |
 | 7 | **插件面板** | `model/codexIndex/display.js`（**与 `scripts/lib/guide-display.mjs` 逐字节一致**）、`parse.js`、`resources/atlas/codex.html`、`codex.css`（武器段小字说明 = 共享的 `WEAPON_REFINE_HINT` → `.codex-hint`） | `node scripts/check-display-sync.mjs` + `audit-web-vs-panel`（含「武器段说明 129/129」）+ `test/codex-template.test.mjs`（说明落在标题与正文之间） |
 | 8 | `README` 与 `templates/` | 改受影响的说明、词汇表、符号语义、期望值 | 本节表格与预期计数 |
 | 9 | **审计脚本的期望值** | `audit-*` / `display-*` / `check-display-sync` 的断言与合法集 | 每个审计 `exit=0` |
@@ -36,7 +36,7 @@ node scripts/audit-dup-items.mjs                  # 重复名 0/0、序列不一
 node scripts/check-display-sync.mjs               # 两份显示级归一逐字节一致
 node scripts/scan-separators.mjs                  # 悬挂 0 + 副词条非法同级对 0 + 主词条 note 字段 0（`/` 只许出现在暴击对之间）
 node scripts/display-selftest.mjs <角色>           # 词条写法 54/54（含天赋行无标签、副词条 `=`/`≥`、面板两控件、武器段小字说明）
-node scripts/editor-selftest.mjs                  # 编辑器规则 200/200（天赋等级 / 新增行 / 多值输入 / 标签互斥 / 配队槽位 / 面板两控件 / 武器行放得下几把 / 目录未填模块 + 旅行者·奇偶豁免 / 主词条括注折进值里）
+node scripts/editor-selftest.mjs                  # 编辑器规则 205/205（天赋等级 / 新增行 / 多值输入 / 标签互斥 / 配队槽位 / 面板两控件 / 武器行放得下几把 / 目录未填模块 + 旅行者·奇偶豁免 / 主词条括注折进值里）
 node scripts/build-html.mjs && node scripts/build-doc.mjs   # 产物刷新
 # 编辑器 129 角色「打开→原样保存」逐字节不变 + /api/preview 与 guide.html 逐字节一致
 #   （需先 node scripts/editor.mjs --port <p> --no-open 起服务；改过共享层务必重启）
@@ -689,6 +689,7 @@ node scripts/editor.mjs [--port 8787] [--no-open] [--exit-on-idle[=<秒>]]
 | 命座行 | **命座名必填**（决定 `命之座N` 与命座图标）：只填说明会被丢掉，表单打 ⚠ 提示 |
 | 配队 | 「＋ 成员」打开**槽位**选择器：点名字加进**当前格**，一格可多选（格内 ` / ` = 可替换），「＋ 新槽位」再开一格；`＋ 配队行` 加出来的空行**立刻可见可编辑** |
 | 任何栏目 | 「＋ 新增一行」加出来的空行用界面标记 `_new` 保证可见，**保存时不会落盘**（空行不写进 JSON） |
+| 从图鉴添加新角色 | 工具栏「**从图鉴添加**」：列出图鉴（nanoka.cc 抓下来的 `map.json`）里有、本仓库还没有的角色（带星级，默认全勾），确认后按**空档模板**建文件并补进 `_order.json`。旅行者 / 奇偶 按名字族判覆盖，不会把 7 个旅行者形态误报成缺人；建完自动打开第一个，左栏六个模块都显示未填 |
 | 模块「无需填写」开关 | 每个模块卡片**标题右侧**一个开关（`无需填写` / `已标记无需填写`）：该角色这个模块本身就无需填写时点一下 —— 左栏不再显示它的「未填」，攻略页该模块（空着时）显示一行自由说明（武器「自由选择」/ 天赋「无需加点」…）。**模块有内容时不允许开启**：只回一条引导（「先清空再标记」）并把该卡片闪一下，不写盘。写着的是角色 JSON 顶层 `freeModules`（`POST /api/free-modules`），所以**不参与「未填优先」排序**（按已填沉底）。标记之后又填了内容 → 内容优先，标记失效（卡片上仍显示已标记，但攻略页按内容渲染） |
 | 保存 / 发布（**全局生效**） | 用户定稿 2026-09-26：`保存` / `发布` / `保存并发布` 作用在**编辑器里改过的所有角色**上，不只是当前打开的那个 —— 切走时改动**暂存在内存**（不写盘），状态栏显示「● N 个角色待保存」，左栏对应角色带「待保存」小标。保存走 `POST /api/save`（批量、只重建一次索引），发布走 `POST /api/publish { characters: [...] }`（提交摘要的「按角色变化」覆盖**全部写盘角色** = 提交信息是所有修改内容的总和） |
 | 改动清单（保存 / 发布之后） | 右下角可滚动、可关闭的清单（不再是一次性 toast）：一行一个角色 + 每个改动模块的「N 改 / N 增 / N 删」，**每一块都能点** → 跳到该角色、展开并高亮那个模块（给卡片一个 `data-module` 锚点，跳转后闪一下），方便回头改小错。清单标题写明这次动了几个角色，发布时右上角还有「复制提交信息」 |
@@ -873,6 +874,8 @@ node scripts/build-docx.mjs [--out 目标docx] [--template 模板docx] [--no-mar
 | PUT | `/api/character?name=X` | body 为完整 JSON；保存并返回 `{ok:true, issues:[...]}`；`X` 不在 `_order.json` 时追加 |
 | POST | `/api/character` | body `{name}`，新建空白 v2 模板（meta 三项空、v2 六数组空）；已存在返回 409 |
 | POST | `/api/rename` | body `{from,to}`，改文件名 + `_order.json` |
+| GET | `/api/atlas-characters` | 图鉴（nanoka.cc 抓下来的 `map.json`）里的角色清单 + **本仓库还没有的角色**：`{ok, atlasCount, fileCount, missing:[{name, rarity}]}`（后端读不到时 `ok:false, warning`，不 500）。缺人判据认「旅行者 / 奇偶」的名字族，不会把多形态误报成缺人（`missingAtlasCharacters`） |
+| POST | `/api/atlas-characters/add` | body `{names:[...]}`：按**空档模板**（`emptyCharacter()`：meta 三项占位 + v2 六模块空数组 + `source`）批量建角色，已存在的跳过；补进 `_order.json` 并重建索引。返回 `{ok, created, skipped:[{name,reason}], indexRefreshed}` |
 | POST | `/api/save` | **全局保存**：body `{characters:[{name, character}]}`（一次写多个角色，只重建一次索引）；返回 `{ok, characters:[{name, json, fields}], issues, indexRefreshed}`，`fields` 是每个角色六个模块的「增 / 删 / 改」计数（界面用右下角的改动清单展示 + 跳转） |
 | POST | `/api/free-modules` | **模块级「无需填写」开关**：body `{name, module, free}`（`module` ∈ `weapons/artifacts/talents/panels/constellations/teams`）；写角色 JSON 顶层 `freeModules`。**开启要求该模块当前为空**，否则返回 `{ok:false, reason:'has-content', detail}`（引导用户先清空）；关闭随时可以 |
 | DELETE | `/api/character?name=X` | 软删除：移到 `data/_trash/X.json` 并从 `_order.json` 移除 |

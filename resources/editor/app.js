@@ -692,10 +692,12 @@ function modal (opts) {
     var mask = document.createElement('div')
     mask.className = 'modal-mask'
     var inputHtml = opts.input ? '<input id="modal-input" type="text" value="' + esc(opts.value || '') + '" placeholder="' + esc(opts.placeholder || '') + '">' : ''
+    // `opts.html`：调用方自己拼的正文（复选框列表等）；与 input 二选一
+    var bodyHtml = opts.html ? '<div class="modal-body">' + opts.html + '</div>' : inputHtml
     mask.innerHTML = '<div class="modal" role="dialog">' +
       '<h3>' + esc(opts.title || '') + '</h3>' +
       (opts.message ? '<p>' + esc(opts.message) + '</p>' : '') +
-      inputHtml +
+      bodyHtml +
       '<div class="modal-foot">' +
       '<button type="button" class="btn" data-act="cancel">' + esc(opts.cancelText || '取消') + '</button>' +
       '<button type="button" class="btn ' + (opts.danger ? 'danger' : 'primary') + '" data-act="ok">' + esc(opts.okText || '确定') + '</button>' +
@@ -707,7 +709,8 @@ function modal (opts) {
       document.removeEventListener('keydown', onKey, true)
       resolve(value)
     }
-    function ok () { done(opts.input ? (input.value.trim() || null) : true) }
+    // `opts.collect(mask)`：从自定义正文里取结果（不传就按 input / true 走）
+    function ok () { done(opts.collect ? opts.collect(mask) : (opts.input ? (input && input.value.trim() || null) : true)) }
     function onKey (e) {
       if (e.key === 'Escape') { e.preventDefault(); done(null) }
       else if (e.key === 'Enter' && opts.input) { e.preventDefault(); ok() }
@@ -1625,6 +1628,7 @@ function toggleFreeModule (moduleKey) {
     state.model.freeModules = asArray(res && res.freeModules)
     renderForm()
     markDirty(false)
+    renderPreviewSoon()   // 预览里那一行自由说明要立刻跟上
     return refreshIndex().then(refreshList).then(function () {
       var label = MODULE_LABEL[moduleKey]
       toast(on ? '已标记「' + label + '」无需填写' : '已取消「' + label + '」的无需填写标记',
@@ -2360,6 +2364,7 @@ function openCharacter (name) {
     markDirty(true)
     renderForm()
     renderList()
+    renderPreviewSoon()   // 切角色 / 恢复暂存后预览要跟上
     return Promise.resolve(state.model)
   }
   return api('GET', '/api/character?name=' + encodeURIComponent(name)).then(function (data) {
@@ -2370,6 +2375,7 @@ function openCharacter (name) {
     markDirty(false)
     renderForm()
     renderList()
+    renderPreviewSoon()   // 切角色后预览要跟上
     return data
   })
 }
@@ -2633,6 +2639,7 @@ function save () {
     return refreshIndex().then(refreshList).then(function () {
       showChanges(asArray(res && res.characters), savedNames.length + ' 个角色保存成功')
       renderForm()
+      renderPreviewSoon()
       if (issueCount || idxWarn) {
         showStatus('保存成功：' + [
           issueCount ? issueCount + ' 处名称不在图鉴（输入框旁的 ⚠ 可看详情）' : '',
@@ -2713,6 +2720,7 @@ function saveAndPublish () {
     state.issues = asArray(res.issues)
     return refreshIndex().then(refreshList).then(function () {
       renderForm()
+      renderPreviewSoon()
       var s = (res && res.summary) || {}
       var lines = []
       asArray(s.characterChanges).forEach(function (c) { lines.push(c.name + '：' + fieldChangeText(c.fields)) })
@@ -2834,6 +2842,71 @@ function jumpToChange (name, moduleKey) {
     card.classList.add('flash')
     setTimeout(function () { card.classList.remove('flash') }, 1800)
     return true
+  })
+}
+
+/* ==================================================== 从图鉴添加新角色 */
+
+/**
+ * 从图鉴（nanoka.cc 抓下来的 map.json）添加新角色（用户定稿 2026-09-26）。
+ *
+ * 列的是**图鉴里有、`data/gi` 里还没有**的角色（带星级），勾选后按标准空档模板建文件：
+ * `emptyCharacter()` 的形状 —— meta 三项占位 + v2 六模块空数组 + `source`（与 README
+ * 「只有栏位、还没填内容（空档角色）」一致），并补进 `_order.json`、重建索引。
+ * 旅行者 / 奇偶 按名字族判覆盖，不会把多形态误报成缺人。
+ */
+function addFromAtlas () {
+  return api('GET', '/api/atlas-characters').then(function (res) {
+    if (res && res.warning) {
+      showStatus('读不到图鉴：' + res.warning, 'warn', true)
+      toast('读不到图鉴', [res.warning], 'warn')
+      return null
+    }
+    var missing = asArray(res && res.missing)
+    if (!missing.length) {
+      showStatus('图鉴里没有缺的角色（图鉴 ' + (res.atlasCount || 0) + ' 个 / 本仓库 ' + (res.fileCount || 0) + ' 个）', 'ok')
+      toast('图鉴里没有缺的角色', ['图鉴角色与本仓库已经完全对齐'])
+      return null
+    }
+    var html = '<div class="atlas-list">' + missing.map(function (m) {
+      return '<label class="atlas-item"><input type="checkbox" checked data-atlas-name="' + esc(m.name) + '">' +
+        '<span class="atlas-name">' + esc(m.name) + '</span>' +
+        (m.rarity ? '<span class="muted">' + esc(m.rarity) + '</span>' : '') + '</label>'
+    }).join('') + '</div>' +
+      '<div class="muted" style="font-size:12px;margin-top:6px">按空档模板建文件（meta 三项占位 + 六模块空数组），建好后在左栏点开就能填</div>'
+    return modal({
+      title: '从图鉴添加新角色（' + missing.length + ' 个）',
+      html: html,
+      okText: '按模板创建',
+      collect: function (mask) {
+        var boxes = mask.querySelectorAll('[data-atlas-name]')
+        var out = []
+        for (var i = 0; i < boxes.length; i++) if (boxes[i].checked) out.push(boxes[i].getAttribute('data-atlas-name'))
+        return out
+      }
+    }).then(function (names) {
+      var list = asArray(names)
+      if (!list.length) return null
+      showStatus('正在创建 ' + list.length + ' 个新角色…', '', true)
+      return api('POST', '/api/atlas-characters/add', { names: list }).then(function (r) {
+        var created = asArray(r && r.created)
+        var skipped = asArray(r && r.skipped)
+        return refreshIndex().then(refreshList).then(function () {
+          if (created.length) {
+            toast('已按模板新建 ' + created.length + ' 个角色', created.slice(0, 12)
+              .concat(created.length > 12 ? ['…共 ' + created.length + ' 个'] : []))
+            showStatus('已新建 ' + created.length + ' 个角色：' + created.slice(0, 6).join('、') + (created.length > 6 ? '…' : ''), 'ok', true)
+            return openCharacter(created[0]).then(function () { return created })
+          }
+          toast('没有新建角色', skipped.map(function (s) { return s.name + '：' + s.reason }).slice(0, 6), 'warn')
+          return []
+        })
+      })
+    })
+  }).catch(function (e) {
+    showStatus('从图鉴添加失败：' + e.message, 'error', true)
+    toast('从图鉴添加失败', [e.message], 'error')
+    return null
   })
 }
 
@@ -3740,6 +3813,8 @@ function globalEvents () {
   })
 
   $('btn-save').addEventListener('click', function () { save() })
+
+  $('btn-atlas').addEventListener('click', function () { addFromAtlas() })
 
   // 改动清单里的跳转（清单在 #form 外，单独委托）
   $('changes').addEventListener('click', function (e) {

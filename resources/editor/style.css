@@ -780,6 +780,24 @@ textarea { resize: vertical; min-height: 54px; }
 
 /* ============================================================ toast */
 
+/* ============================================================ 从图鉴添加新角色（nanoka.cc）
+   勾选列表：图鉴里有、本仓库还没有的角色（带星级），确认后按空档模板建文件。 */
+.modal-body { margin: 8px 0 10px; }
+.atlas-list { max-height: 46vh; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+.atlas-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  font-size: 13px;
+  border-bottom: 1px dashed #eef1f5;
+  cursor: pointer;
+}
+.atlas-item:last-child { border-bottom: 0; }
+.atlas-item:hover { background: #f6f9fd; }
+.atlas-item .atlas-name { font-weight: 600; }
+.atlas-item input[type="checkbox"] { margin: 0; }
+
 /* ============================================================ 改动清单
    保存 / 发布之后停在右下角（用户定稿 2026-09-26）：列出这次改过的角色 + 每个模块的增/删/改，
    每一块都能点进去（跳转到该角色、展开并高亮那个模块）。

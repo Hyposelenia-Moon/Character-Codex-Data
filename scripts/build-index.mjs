@@ -91,6 +91,48 @@ function readMapNames (backend) {
   return { weapons: normalizeNames(pick('weapon')), characters: normalizeNames(pick('character')) }
 }
 
+/** 图鉴后端记录里的角色条目（同名多形态只留第一条） */
+function readMapCharacters (backend) {
+  const file = mapFile(backend)
+  if (!fs.existsSync(file)) {
+    throw new Error(`找不到图鉴总表：${file}`)
+  }
+  const pages = readJson(file)?.games?.gi?.locales?.zh?.pages
+  if (!pages || typeof pages !== 'object') {
+    throw new Error(`${file} 里没有 games.gi.locales.zh.pages，后端结构可能变了`)
+  }
+  const byName = new Map()
+  for (const r of recordValues(pages?.character?.records)) {
+    const name = String(r?.name ?? '').trim()
+    if (!name || byName.has(name)) continue
+    byName.set(name, {
+      name,
+      rarity: String(r?.rarity ?? '').trim(),
+      id: String(r?.id ?? '').trim(),
+      path: String(r?.path ?? '').trim()
+    })
+  }
+  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'))
+}
+
+/**
+ * 图鉴（nanoka.cc 抓下来的 map.json）里的角色清单 —— 供编辑器「从图鉴添加新角色」用。
+ *
+ * 比 `readMapNames()` 多带**星级**（添加对话框里给用户看的参考信息）。
+ * @param {string} [backend] 图鉴后端目录（默认 DEFAULT_BACKEND）
+ * @returns {Array<{name: string, rarity: string, id: string, path: string}>}
+ */
+export function readAtlasCharacters (backend = DEFAULT_BACKEND) {
+  const dir = path.resolve(backend)
+  if (!fs.existsSync(dir)) throw new Error(`找不到图鉴后端目录：${dir}`)
+  return readMapCharacters(dir)
+}
+
+/** 图鉴后端目录（编辑器等复用；可用参数或默认值覆盖） */
+export function atlasBackendDir (backend) {
+  return path.resolve(backend ?? DEFAULT_BACKEND)
+}
+
 /** 递归收集某目录下所有 .json（同步、深度优先） */
 function walkJson (dir, out = []) {
   let entries

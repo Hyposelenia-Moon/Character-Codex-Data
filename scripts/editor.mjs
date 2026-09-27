@@ -45,7 +45,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { deriveSections, deriveTags, validate, parseRef, itemText, foldMainNoteIntoStats, normalizeFreeModules, MODULE_KEYS } from './lib/schema.mjs'
 import { renderGuideSectionsHtml, renderGuideSectionsText, characterSections, renderCard } from './build-html.mjs'
 import { verifyThreeWay, snapshotMainDoc, sha1File } from './lib/publish-verify.mjs'
-import { buildIndex } from './build-index.mjs'
+import { buildIndex, readAtlasCharacters } from './build-index.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '..')
@@ -1298,7 +1298,80 @@ async function apiSaveAll (req, res) {
   })
 }
 
-async function apiCreateCharacter (req, res) {  const body = await readJsonBody(req)
+/**
+ * 图鉴里有、`data/gi` 里还没有的角色（「从图鉴添加新角色」的数据源，用户定稿 2026-09-26）。
+ *
+ * 覆盖判据（对齐仓库里的取名习惯，避免把旅行者 / 奇偶的多形态误报成缺人）：
+ *   · 有同名文件 → 已有
+ *   · `旅行者` → 有任何 `旅行者·X.json` 就算已有（攻略按元素拆成 7 份）
+ *   · `奇偶…` → 有同名或同前缀文件就算已有
+ * @param {Array<{name: string, rarity?: string}>} atlas 图鉴角色清单
+ * @param {string[]} files `data/gi` 下的角色文件名（不带 .json）
+ * @returns {Array<{name: string, rarity: string}>}
+ */
+export function missingAtlasCharacters (atlas, files) {
+  const has = new Set(asArray(files).map(n => String(n).trim()).filter(Boolean))
+  const family = (p) => [...has].some(n => n === p || n.startsWith(p + '·'))
+  return asArray(atlas)
+    .filter(c => {
+      const name = String(c?.name ?? '').trim()
+      if (!name) return false
+      if (has.has(name)) return false
+      if (name === '旅行者' || name.startsWith('旅行者·')) return !family('旅行者')
+      if (name.startsWith('奇偶')) return !family('奇偶')
+      return true
+    })
+    .map(c => ({ name: String(c.name).trim(), rarity: String(c?.rarity ?? '').trim() }))
+}
+
+/** 图鉴角色清单 + 还缺哪些角色（后端读不到时给 warning，不让接口 500） */
+function apiAtlasCharacters (res) {
+  let atlas = []
+  let warning = ''
+  try {
+    atlas = readAtlasCharacters()
+  } catch (e) {
+    warning = String(e?.message ?? e)
+  }
+  const files = listCharacterNames()
+  sendJson(res, 200, {
+    ok: !warning,
+    ...(warning ? { warning } : {}),
+    atlasCount: atlas.length,
+    fileCount: files.length,
+    missing: missingAtlasCharacters(atlas, files)
+  })
+}
+
+/** 按标准空档模板批量建新角色（只建缺的，已存在的跳过） */
+async function apiAtlasCharactersAdd (req, res) {
+  const body = await readJsonBody(req).catch(() => ({}))
+  const names = asArray(body?.names).map(n => String(n ?? '').trim()).filter(Boolean)
+  if (!names.length) return sendError(res, 400, '没有要添加的角色（names 为空）')
+  if (!fs.existsSync(giDir)) fs.mkdirSync(giDir, { recursive: true })
+  const created = []
+  const skipped = []
+  for (const raw of names) {
+    let name
+    try { name = safeName(raw) } catch (e) { skipped.push({ name: raw, reason: String(e?.message ?? e) }); continue }
+    const file = characterFile(name)
+    if (fs.existsSync(file)) { skipped.push({ name, reason: '已存在' }); continue }
+    writeJsonFile(file, emptyCharacter(name))
+    appendOrder(name)
+    created.push(name)
+  }
+  const idx = created.length ? refreshIndexFile() : { refreshed: false }
+  sendJson(res, 200, {
+    ok: true,
+    created,
+    skipped,
+    indexRefreshed: idx.refreshed,
+    ...(idx.warning ? { indexWarning: idx.warning } : {})
+  })
+}
+
+async function apiCreateCharacter (req, res) {
+  const body = await readJsonBody(req)
   const name = safeName(body?.name)
   const file = characterFile(name)
   if (fs.existsSync(file)) return sendError(res, 409, `角色已存在：${name}`)
@@ -2576,6 +2649,8 @@ async function route (req, res) {
     if (pathname === '/api/reorder' && method === 'POST') return await apiReorder(req, res)
     if (pathname === '/api/free-modules' && method === 'POST') return await apiFreeModules(req, res)
     if (pathname === '/api/save' && method === 'POST') return await apiSaveAll(req, res)
+    if (pathname === '/api/atlas-characters' && method === 'GET') return apiAtlasCharacters(res)
+    if (pathname === '/api/atlas-characters/add' && method === 'POST') return await apiAtlasCharactersAdd(req, res)
     if (pathname === '/api/trash') {
       if (method === 'GET') return apiTrashList(res)
       if (method === 'DELETE') return url.searchParams.get('name') ? apiTrashDelete(res, url) : apiTrashEmpty(res)
