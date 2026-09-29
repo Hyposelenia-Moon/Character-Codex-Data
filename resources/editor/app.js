@@ -1424,6 +1424,15 @@ function renderTalents () {
   }
   var p0 = priorities.length ? 'v2.talents.' + priorities[0].i : ''
   var slots = talentSlots(s.talents)
+  // 「无需填写」的天赋：数据里那三格 A1/E1/Q1 只是占位，界面不再画三枚空 chip，
+  // 改画一行说明（与标记语义一致：攻略页 / 面板显示「无需加点」）。取消标记即可继续编辑。
+  var talentsFree = freeModulesOf(state.model).indexOf('talents') >= 0
+  var invested = slots.some(function (sl) { return Number(sl.level) > 1 || sl.crown })
+  if (talentsFree && !invested) {
+    return card('天赋加点', '0 行',
+      emptyNote('已标记「无需填写」：攻略页 / 面板显示「无需加点」。取消标记后可继续编辑天赋。'),
+      true, false, 'talents')
+  }
   var slotHtml = slots.map(function (sl, j) {
     var q = p0 + '.slots.' + j
     return '<div class="talent-slot' + (sl.crown ? ' crowned' : '') + '"' + (sl.extra ? ' title="A/E/Q 之外的旧字母，保存时原样保留"' : '') + '>' +

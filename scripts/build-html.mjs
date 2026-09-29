@@ -850,21 +850,24 @@ export function renderDisplaySection (section, indent, dir) {
   if (section.empty) {
     out.push(`${pad}    <div class="section-empty-text">${EMPTY_TEXT}</div>`)
   } else if (section.kind === 'teams') {
-    out.push(`${pad}    <div class="team-rows">`)
-    for (const team of section.teams) {
-      const tag = team.tag ? `<span class="row-label">${inline(team.tag)}</span>` : ''
-      const members = team.members.map(m => {
-        const note = m.note ? `<span class="team-note-inline">（${inline(m.note)}）</span>` : ''
-        // 同一格里的可替换项（`迪奥娜 / 阿罗夏`）并在一格里，**不加任何中文标注**、不额外加分隔符
-        return `<span class="team-member">${inline(m.name)}${note}</span>`
-      }).join('<span class="team-plus">+</span>')
-      const note = team.note ? `<span class="row-note">${team.notePrefix ? '注：' : ''}${inline(team.note)}</span>` : ''
-      // 没有成员也没有备注的行不画（避免渲染出空的「可选：」）
-      if (!team.members.length && !note) return
-      out.push(`${pad}        <div class="row${team.tag ? '' : ' row-nolabel'}">${tag}<span class="row-value">${members}${note}</span></div>`)
+    // 没有任何可画的行时不画空容器（避免「自由配队」说明下面多出一个空块）
+    const lines = (section.teams ?? []).filter(team => team.members.length || team.note)
+    if (lines.length) {
+      out.push(`${pad}    <div class="team-rows">`)
+      for (const team of lines) {
+        const tag = team.tag ? `<span class="row-label">${inline(team.tag)}</span>` : ''
+        const members = team.members.map(m => {
+          const note = m.note ? `<span class="team-note-inline">（${inline(m.note)}）</span>` : ''
+          // 同一格里的可替换项（`迪奥娜 / 阿罗夏`）并在一格里，**不加任何中文标注**、不额外加分隔符
+          return `<span class="team-member">${inline(m.name)}${note}</span>`
+        }).join('<span class="team-plus">+</span>')
+        const note = team.note ? `<span class="row-note">${team.notePrefix ? '注：' : ''}${inline(team.note)}</span>` : ''
+        out.push(`${pad}        <div class="row${team.tag ? '' : ' row-nolabel'}">${tag}<span class="row-value">${members}${note}</span></div>`)
+      }
+      out.push(`${pad}    </div>`)
     }
-    out.push(`${pad}    </div>`)
-  } else {
+  } else if ((section.rows ?? []).length) {
+    // 同理：只有自由说明（rows 为空）的段落不再画空 `<div class="rows">`
     out.push(`${pad}    <div class="rows">`)
     for (const row of section.rows) {
   // 命座：行上有 ref（`constellation:N`）→ 行级 `data-icon-ref`，面板 / 插件据此在**文字前**挂命座图标
