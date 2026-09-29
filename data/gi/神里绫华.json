@@ -56,7 +56,7 @@
         "order": [
           {
             "name": "A",
-            "level": 1,
+            "level": 8,
             "ref": "talent:A"
           },
           {
@@ -66,11 +66,23 @@
           },
           {
             "name": "Q",
-            "level": 1,
+            "level": 10,
+            "crown": true,
             "ref": "talent:Q"
           }
         ],
-        "raw": "A1 E1 Q1"
+        "raw": "A8 E1 Q10"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "Q",
+            "level": 10,
+            "crown": true,
+            "ref": "talent:Q"
+          }
+        ]
       }
     ],
     "panels": [
@@ -107,7 +119,52 @@
         "text": ""
       }
     ],
-    "teams": []
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "神里绫华",
+            "ref": "character:神里绫华"
+          },
+          {
+            "name": "珊瑚宫心海",
+            "ref": "character:珊瑚宫心海"
+          },
+          {
+            "name": "申鹤",
+            "ref": "character:申鹤"
+          },
+          {
+            "name": "枫原万叶",
+            "ref": "character:枫原万叶"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "可选",
+        "members": [
+          {
+            "name": "神里绫华",
+            "ref": "character:神里绫华"
+          },
+          {
+            "name": "罗莎莉亚",
+            "ref": "character:罗莎莉亚"
+          },
+          {
+            "name": "莫娜",
+            "ref": "character:莫娜"
+          },
+          {
+            "name": "枫原万叶",
+            "ref": "character:枫原万叶"
+          }
+        ],
+        "text": ""
+      }
+    ]
   },
   "tags": [
     {
@@ -135,7 +192,8 @@
     {
       "title": "3. 天赋加点",
       "lines": [
-        "天赋：A1 E1 Q1"
+        "天赋：A8 E1 Q10",
+        "皇冠：Q（10）"
       ]
     },
     {
@@ -152,6 +210,13 @@
       "lines": [
         "二命",
         "六命"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：神里绫华 + 珊瑚宫心海 + 申鹤 + 枫原万叶",
+        "可选：神里绫华 + 罗莎莉亚 + 莫娜 + 枫原万叶"
       ]
     }
   ],

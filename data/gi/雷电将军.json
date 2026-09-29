@@ -117,7 +117,52 @@
         "text": ""
       }
     ],
-    "teams": []
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "雷电将军",
+            "ref": "character:雷电将军"
+          },
+          {
+            "name": "行秋",
+            "ref": "character:行秋"
+          },
+          {
+            "name": "香菱",
+            "ref": "character:香菱"
+          },
+          {
+            "name": "班尼特",
+            "ref": "character:班尼特"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "可选",
+        "members": [
+          {
+            "name": "雷电将军",
+            "ref": "character:雷电将军"
+          },
+          {
+            "name": "行秋",
+            "ref": "character:行秋"
+          },
+          {
+            "name": "纳西妲",
+            "ref": "character:纳西妲"
+          },
+          {
+            "name": "白术",
+            "ref": "character:白术"
+          }
+        ],
+        "text": ""
+      }
+    ]
   },
   "tags": [
     {
@@ -163,6 +208,13 @@
       "lines": [
         "二命",
         "六命"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：雷电将军 + 行秋 + 香菱 + 班尼特",
+        "可选：雷电将军 + 行秋 + 纳西妲 + 白术"
       ]
     }
   ],

@@ -118,12 +118,13 @@
         "order": [
           {
             "name": "A",
-            "level": 1,
+            "level": 10,
+            "crown": true,
             "ref": "talent:A"
           },
           {
             "name": "E",
-            "level": 1,
+            "level": 8,
             "ref": "talent:E"
           },
           {
@@ -132,7 +133,18 @@
             "ref": "talent:Q"
           }
         ],
-        "raw": "A1 E1 Q1"
+        "raw": "A10 E8 Q1"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "A",
+            "level": 10,
+            "crown": true,
+            "ref": "talent:A"
+          }
+        ]
       }
     ],
     "panels": [],
@@ -170,11 +182,15 @@
     {
       "title": "3. 天赋加点",
       "lines": [
-        "天赋：A1 E1 Q1"
+        "天赋：A10 E8 Q1",
+        "皇冠：A（10）"
       ]
     }
   ],
   "source": {
     "guide": "原神·角色攻略"
-  }
+  },
+  "freeModules": [
+    "constellations"
+  ]
 }

@@ -103,21 +103,56 @@
           },
           {
             "name": "E",
-            "level": 1,
+            "level": 10,
+            "crown": true,
             "ref": "talent:E"
           },
           {
             "name": "Q",
-            "level": 1,
+            "level": 8,
             "ref": "talent:Q"
           }
         ],
-        "raw": "A1 E1 Q1"
+        "raw": "A1 E10 Q8"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "E",
+            "level": 10,
+            "crown": true,
+            "ref": "talent:E"
+          }
+        ]
       }
     ],
     "panels": [],
     "constellations": [],
-    "teams": []
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "克洛琳德",
+            "ref": "character:克洛琳德"
+          },
+          {
+            "name": "纳西妲",
+            "ref": "character:纳西妲"
+          },
+          {
+            "name": "旅行者·雷",
+            "ref": "character:旅行者·雷"
+          },
+          {
+            "name": "枫原万叶",
+            "ref": "character:枫原万叶"
+          }
+        ],
+        "text": ""
+      }
+    ]
   },
   "tags": [
     {
@@ -145,7 +180,14 @@
     {
       "title": "3. 天赋加点",
       "lines": [
-        "天赋：A1 E1 Q1"
+        "天赋：A1 E10 Q8",
+        "皇冠：E（10）"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：克洛琳德 + 纳西妲 + 旅行者·雷 + 枫原万叶"
       ]
     }
   ],

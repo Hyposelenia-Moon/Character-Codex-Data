@@ -106,16 +106,28 @@
           },
           {
             "name": "E",
-            "level": 1,
+            "level": 10,
+            "crown": true,
             "ref": "talent:E"
           },
           {
             "name": "Q",
-            "level": 1,
+            "level": 8,
             "ref": "talent:Q"
           }
         ],
-        "raw": "A1 E1 Q1"
+        "raw": "A1 E10 Q8"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "E",
+            "level": 10,
+            "crown": true,
+            "ref": "talent:E"
+          }
+        ]
       }
     ],
     "panels": [
@@ -137,7 +149,52 @@
         "text": ""
       }
     ],
-    "teams": []
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "神里绫人",
+            "ref": "character:神里绫人"
+          },
+          {
+            "name": "纳西妲",
+            "ref": "character:纳西妲"
+          },
+          {
+            "name": "八重神子",
+            "ref": "character:八重神子"
+          },
+          {
+            "name": "白术",
+            "ref": "character:白术"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "可选",
+        "members": [
+          {
+            "name": "赛诺",
+            "ref": "character:赛诺"
+          },
+          {
+            "name": "纳西妲",
+            "ref": "character:纳西妲"
+          },
+          {
+            "name": "夜兰",
+            "ref": "character:夜兰"
+          },
+          {
+            "name": "白术",
+            "ref": "character:白术"
+          }
+        ],
+        "text": ""
+      }
+    ]
   },
   "tags": [
     {
@@ -169,7 +226,8 @@
     {
       "title": "3. 天赋加点",
       "lines": [
-        "天赋：A1 E1 Q1"
+        "天赋：A1 E10 Q8",
+        "皇冠：E（10）"
       ]
     },
     {
@@ -183,6 +241,13 @@
       "lines": [
         "二命",
         "六命"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：神里绫人 + 纳西妲 + 八重神子 + 白术",
+        "可选：赛诺 + 纳西妲 + 夜兰 + 白术"
       ]
     }
   ],

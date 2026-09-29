@@ -101,7 +101,7 @@
         "order": [
           {
             "name": "A",
-            "level": 1,
+            "level": 8,
             "ref": "talent:A"
           },
           {
@@ -111,14 +111,42 @@
           },
           {
             "name": "Q",
-            "level": 1,
+            "level": 10,
+            "crown": true,
             "ref": "talent:Q"
           }
         ],
-        "raw": "A1 E1 Q1"
+        "raw": "A8 E1 Q10"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "Q",
+            "level": 10,
+            "crown": true,
+            "ref": "talent:Q"
+          }
+        ]
       }
     ],
-    "panels": [],
+    "panels": [
+      {
+        "label": null,
+        "k": "攻击力",
+        "v": "2100-2400"
+      },
+      {
+        "label": null,
+        "k": "暴击率",
+        "v": "70-75%"
+      },
+      {
+        "label": null,
+        "k": "暴击伤害",
+        "v": "180-230%"
+      }
+    ],
     "constellations": [
       {
         "name": "六命",
@@ -181,7 +209,16 @@
     {
       "title": "3. 天赋加点",
       "lines": [
-        "天赋：A1 E1 Q1"
+        "天赋：A8 E1 Q10",
+        "皇冠：Q（10）"
+      ]
+    },
+    {
+      "title": "4. 毕业面板参考",
+      "lines": [
+        "攻击力：2100-2400",
+        "暴击率：70-75%",
+        "暴击伤害：180-230%"
       ]
     },
     {

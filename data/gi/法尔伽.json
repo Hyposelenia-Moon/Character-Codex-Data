@@ -118,16 +118,28 @@
           },
           {
             "name": "E",
-            "level": 1,
+            "level": 10,
+            "crown": true,
             "ref": "talent:E"
           },
           {
             "name": "Q",
-            "level": 1,
+            "level": 9,
             "ref": "talent:Q"
           }
         ],
-        "raw": "A1 E1 Q1"
+        "raw": "A1 E10 Q9"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "E",
+            "level": 10,
+            "crown": true,
+            "ref": "talent:E"
+          }
+        ]
       }
     ],
     "panels": [],
@@ -143,7 +155,52 @@
         "text": ""
       }
     ],
-    "teams": []
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "法尔伽",
+            "ref": "character:法尔伽"
+          },
+          {
+            "name": "杜林",
+            "ref": "character:杜林"
+          },
+          {
+            "name": "温迪",
+            "ref": "character:温迪"
+          },
+          {
+            "name": "班尼特",
+            "ref": "character:班尼特"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "可选",
+        "members": [
+          {
+            "name": "法尔伽",
+            "ref": "character:法尔伽"
+          },
+          {
+            "name": "温迪",
+            "ref": "character:温迪"
+          },
+          {
+            "name": "申鹤",
+            "ref": "character:申鹤"
+          },
+          {
+            "name": "爱可菲",
+            "ref": "character:爱可菲"
+          }
+        ],
+        "text": ""
+      }
+    ]
   },
   "tags": [
     {
@@ -176,7 +233,8 @@
     {
       "title": "3. 天赋加点",
       "lines": [
-        "天赋：A1 E1 Q1"
+        "天赋：A1 E10 Q9",
+        "皇冠：E（10）"
       ]
     },
     {
@@ -184,6 +242,13 @@
       "lines": [
         "二命",
         "六命"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：法尔伽 + 杜林 + 温迪 + 班尼特",
+        "可选：法尔伽 + 温迪 + 申鹤 + 爱可菲"
       ]
     }
   ],

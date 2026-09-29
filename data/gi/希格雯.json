@@ -121,7 +121,52 @@
         "text": ""
       }
     ],
-    "teams": []
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "娜维娅",
+            "ref": "character:娜维娅"
+          },
+          {
+            "name": "芙宁娜",
+            "ref": "character:芙宁娜"
+          },
+          {
+            "name": "希诺宁",
+            "ref": "character:希诺宁"
+          },
+          {
+            "name": "希格雯",
+            "ref": "character:希格雯"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "可选",
+        "members": [
+          {
+            "name": "艾尔海森",
+            "ref": "character:艾尔海森"
+          },
+          {
+            "name": "行秋",
+            "ref": "character:行秋"
+          },
+          {
+            "name": "妮露",
+            "ref": "character:妮露"
+          },
+          {
+            "name": "希格雯",
+            "ref": "character:希格雯"
+          }
+        ],
+        "text": ""
+      }
+    ]
   },
   "tags": [
     {
@@ -166,6 +211,13 @@
       "lines": [
         "二命",
         "六命"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：娜维娅 + 芙宁娜 + 希诺宁 + 希格雯",
+        "可选：艾尔海森 + 行秋 + 妮露 + 希格雯"
       ]
     }
   ],

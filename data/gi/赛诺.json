@@ -73,16 +73,28 @@
           },
           {
             "name": "E",
-            "level": 1,
+            "level": 8,
             "ref": "talent:E"
           },
           {
             "name": "Q",
-            "level": 1,
+            "level": 10,
+            "crown": true,
             "ref": "talent:Q"
           }
         ],
-        "raw": "A1 E1 Q1"
+        "raw": "A1 E8 Q10"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "Q",
+            "level": 10,
+            "crown": true,
+            "ref": "talent:Q"
+          }
+        ]
       }
     ],
     "panels": [
@@ -114,7 +126,52 @@
         "text": ""
       }
     ],
-    "teams": []
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "赛诺",
+            "ref": "character:赛诺"
+          },
+          {
+            "name": "芙宁娜",
+            "ref": "character:芙宁娜"
+          },
+          {
+            "name": "纳西妲",
+            "ref": "character:纳西妲"
+          },
+          {
+            "name": "白术",
+            "ref": "character:白术"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "可选",
+        "members": [
+          {
+            "name": "赛诺",
+            "ref": "character:赛诺"
+          },
+          {
+            "name": "夜兰",
+            "ref": "character:夜兰"
+          },
+          {
+            "name": "纳西妲",
+            "ref": "character:纳西妲"
+          },
+          {
+            "name": "久岐忍",
+            "ref": "character:久岐忍"
+          }
+        ],
+        "text": ""
+      }
+    ]
   },
   "tags": [
     {
@@ -143,7 +200,8 @@
     {
       "title": "3. 天赋加点",
       "lines": [
-        "天赋：A1 E1 Q1"
+        "天赋：A1 E8 Q10",
+        "皇冠：Q（10）"
       ]
     },
     {
@@ -159,6 +217,13 @@
       "lines": [
         "二命",
         "六命"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：赛诺 + 芙宁娜 + 纳西妲 + 白术",
+        "可选：赛诺 + 夜兰 + 纳西妲 + 久岐忍"
       ]
     }
   ],

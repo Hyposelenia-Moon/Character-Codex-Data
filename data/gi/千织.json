@@ -124,7 +124,52 @@
         "text": ""
       }
     ],
-    "teams": []
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "娜维娅",
+            "ref": "character:娜维娅"
+          },
+          {
+            "name": "千织",
+            "ref": "character:千织"
+          },
+          {
+            "name": "香菱",
+            "ref": "character:香菱"
+          },
+          {
+            "name": "班尼特",
+            "ref": "character:班尼特"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "可选",
+        "members": [
+          {
+            "name": "荒泷一斗",
+            "ref": "character:荒泷一斗"
+          },
+          {
+            "name": "千织",
+            "ref": "character:千织"
+          },
+          {
+            "name": "五郎",
+            "ref": "character:五郎"
+          },
+          {
+            "name": "钟离",
+            "ref": "character:钟离"
+          }
+        ],
+        "text": ""
+      }
+    ]
   },
   "tags": [
     {
@@ -169,6 +214,13 @@
       "lines": [
         "二命",
         "六命"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：娜维娅 + 千织 + 香菱 + 班尼特",
+        "可选：荒泷一斗 + 千织 + 五郎 + 钟离"
       ]
     }
   ],

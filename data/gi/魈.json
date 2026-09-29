@@ -89,7 +89,8 @@
         "order": [
           {
             "name": "A",
-            "level": 1,
+            "level": 10,
+            "crown": true,
             "ref": "talent:A"
           },
           {
@@ -99,11 +100,22 @@
           },
           {
             "name": "Q",
-            "level": 1,
+            "level": 8,
             "ref": "talent:Q"
           }
         ],
-        "raw": "A1 E1 Q1"
+        "raw": "A10 E1 Q8"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "A",
+            "level": 10,
+            "crown": true,
+            "ref": "talent:A"
+          }
+        ]
       }
     ],
     "panels": [
@@ -130,7 +142,52 @@
         "text": ""
       }
     ],
-    "teams": []
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "魈",
+            "ref": "character:魈"
+          },
+          {
+            "name": "芙宁娜",
+            "ref": "character:芙宁娜"
+          },
+          {
+            "name": "珐露珊",
+            "ref": "character:珐露珊"
+          },
+          {
+            "name": "闲云",
+            "ref": "character:闲云"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "可选",
+        "members": [
+          {
+            "name": "魈",
+            "ref": "character:魈"
+          },
+          {
+            "name": "班尼特",
+            "ref": "character:班尼特"
+          },
+          {
+            "name": "珐露珊",
+            "ref": "character:珐露珊"
+          },
+          {
+            "name": "钟离",
+            "ref": "character:钟离"
+          }
+        ],
+        "text": ""
+      }
+    ]
   },
   "tags": [
     {
@@ -161,7 +218,8 @@
     {
       "title": "3. 天赋加点",
       "lines": [
-        "天赋：A1 E1 Q1"
+        "天赋：A10 E1 Q8",
+        "皇冠：A（10）"
       ]
     },
     {
@@ -176,6 +234,13 @@
       "lines": [
         "二命",
         "六命"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：魈 + 芙宁娜 + 珐露珊 + 闲云",
+        "可选：魈 + 班尼特 + 珐露珊 + 钟离"
       ]
     }
   ],

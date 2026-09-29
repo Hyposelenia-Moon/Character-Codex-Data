@@ -87,16 +87,28 @@
           },
           {
             "name": "E",
-            "level": 1,
+            "level": 8,
             "ref": "talent:E"
           },
           {
             "name": "Q",
-            "level": 1,
+            "level": 10,
+            "crown": true,
             "ref": "talent:Q"
           }
         ],
-        "raw": "A1 E1 Q1"
+        "raw": "A1 E8 Q10"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "Q",
+            "level": 10,
+            "crown": true,
+            "ref": "talent:Q"
+          }
+        ]
       }
     ],
     "panels": [
@@ -123,7 +135,52 @@
         "text": ""
       }
     ],
-    "teams": []
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "瓦雷莎",
+            "ref": "character:瓦雷莎"
+          },
+          {
+            "name": "芙宁娜",
+            "ref": "character:芙宁娜"
+          },
+          {
+            "name": "伊安珊",
+            "ref": "character:伊安珊"
+          },
+          {
+            "name": "闲云",
+            "ref": "character:闲云"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "可选",
+        "members": [
+          {
+            "name": "魈",
+            "ref": "character:魈"
+          },
+          {
+            "name": "芙宁娜",
+            "ref": "character:芙宁娜"
+          },
+          {
+            "name": "珐露珊",
+            "ref": "character:珐露珊"
+          },
+          {
+            "name": "闲云",
+            "ref": "character:闲云"
+          }
+        ],
+        "text": ""
+      }
+    ]
   },
   "tags": [
     {
@@ -153,7 +210,8 @@
     {
       "title": "3. 天赋加点",
       "lines": [
-        "天赋：A1 E1 Q1"
+        "天赋：A1 E8 Q10",
+        "皇冠：Q（10）"
       ]
     },
     {
@@ -168,6 +226,13 @@
       "lines": [
         "二命",
         "六命"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：瓦雷莎 + 芙宁娜 + 伊安珊 + 闲云",
+        "可选：魈 + 芙宁娜 + 珐露珊 + 闲云"
       ]
     }
   ],

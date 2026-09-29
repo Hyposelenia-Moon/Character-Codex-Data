@@ -131,7 +131,7 @@
         "order": [
           {
             "name": "A",
-            "level": 1,
+            "level": 8,
             "ref": "talent:A"
           },
           {
@@ -141,11 +141,23 @@
           },
           {
             "name": "Q",
-            "level": 1,
+            "level": 10,
+            "crown": true,
             "ref": "talent:Q"
           }
         ],
-        "raw": "A1 E1 Q1"
+        "raw": "A8 E1 Q10"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "Q",
+            "level": 10,
+            "crown": true,
+            "ref": "talent:Q"
+          }
+        ]
       }
     ],
     "panels": [],
@@ -161,7 +173,52 @@
         "text": ""
       }
     ],
-    "teams": []
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "赛索斯",
+            "ref": "character:赛索斯"
+          },
+          {
+            "name": "菲谢尔",
+            "ref": "character:菲谢尔"
+          },
+          {
+            "name": "绮良良",
+            "ref": "character:绮良良"
+          },
+          {
+            "name": "砂糖",
+            "ref": "character:砂糖"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "可选",
+        "members": [
+          {
+            "name": "赛索斯",
+            "ref": "character:赛索斯"
+          },
+          {
+            "name": "菲谢尔",
+            "ref": "character:菲谢尔"
+          },
+          {
+            "name": "纳西妲",
+            "ref": "character:纳西妲"
+          },
+          {
+            "name": "希诺宁",
+            "ref": "character:希诺宁"
+          }
+        ],
+        "text": ""
+      }
+    ]
   },
   "tags": [
     {
@@ -194,7 +251,8 @@
     {
       "title": "3. 天赋加点",
       "lines": [
-        "天赋：A1 E1 Q1"
+        "天赋：A8 E1 Q10",
+        "皇冠：Q（10）"
       ]
     },
     {
@@ -202,6 +260,13 @@
       "lines": [
         "二命",
         "六命"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：赛索斯 + 菲谢尔 + 绮良良 + 砂糖",
+        "可选：赛索斯 + 菲谢尔 + 纳西妲 + 希诺宁"
       ]
     }
   ],

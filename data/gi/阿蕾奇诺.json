@@ -139,7 +139,52 @@
         "text": ""
       }
     ],
-    "teams": []
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "阿蕾奇诺",
+            "ref": "character:阿蕾奇诺"
+          },
+          {
+            "name": "夜兰",
+            "ref": "character:夜兰"
+          },
+          {
+            "name": "行秋",
+            "ref": "character:行秋"
+          },
+          {
+            "name": "枫原万叶",
+            "ref": "character:枫原万叶"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "可选",
+        "members": [
+          {
+            "name": "阿蕾奇诺",
+            "ref": "character:阿蕾奇诺"
+          },
+          {
+            "name": "菲谢尔",
+            "ref": "character:菲谢尔"
+          },
+          {
+            "name": "夏沃蕾",
+            "ref": "character:夏沃蕾"
+          },
+          {
+            "name": "班尼特",
+            "ref": "character:班尼特"
+          }
+        ],
+        "text": ""
+      }
+    ]
   },
   "tags": [
     {
@@ -186,6 +231,13 @@
       "lines": [
         "二命",
         "六命"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：阿蕾奇诺 + 夜兰 + 行秋 + 枫原万叶",
+        "可选：阿蕾奇诺 + 菲谢尔 + 夏沃蕾 + 班尼特"
       ]
     }
   ],

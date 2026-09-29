@@ -78,12 +78,13 @@
         "order": [
           {
             "name": "A",
-            "level": 1,
+            "level": 10,
+            "crown": true,
             "ref": "talent:A"
           },
           {
             "name": "E",
-            "level": 1,
+            "level": 8,
             "ref": "talent:E"
           },
           {
@@ -92,7 +93,18 @@
             "ref": "talent:Q"
           }
         ],
-        "raw": "A1 E1 Q1"
+        "raw": "A10 E8 Q1"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "A",
+            "level": 10,
+            "crown": true,
+            "ref": "talent:A"
+          }
+        ]
       }
     ],
     "panels": [
@@ -129,7 +141,52 @@
         "text": ""
       }
     ],
-    "teams": []
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "胡桃",
+            "ref": "character:胡桃"
+          },
+          {
+            "name": "行秋",
+            "ref": "character:行秋"
+          },
+          {
+            "name": "夜兰",
+            "ref": "character:夜兰"
+          },
+          {
+            "name": "钟离",
+            "ref": "character:钟离"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "可选",
+        "members": [
+          {
+            "name": "胡桃",
+            "ref": "character:胡桃"
+          },
+          {
+            "name": "行秋",
+            "ref": "character:行秋"
+          },
+          {
+            "name": "芙宁娜",
+            "ref": "character:芙宁娜"
+          },
+          {
+            "name": "希诺宁",
+            "ref": "character:希诺宁"
+          }
+        ],
+        "text": ""
+      }
+    ]
   },
   "tags": [
     {
@@ -159,7 +216,8 @@
     {
       "title": "3. 天赋加点",
       "lines": [
-        "天赋：A1 E1 Q1"
+        "天赋：A10 E8 Q1",
+        "皇冠：A（10）"
       ]
     },
     {
@@ -176,6 +234,13 @@
       "lines": [
         "二命",
         "六命"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：胡桃 + 行秋 + 夜兰 + 钟离",
+        "可选：胡桃 + 行秋 + 芙宁娜 + 希诺宁"
       ]
     }
   ],

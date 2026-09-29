@@ -128,7 +128,52 @@
         "text": ""
       }
     ],
-    "teams": []
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "克洛琳德",
+            "ref": "character:克洛琳德"
+          },
+          {
+            "name": "菲谢尔",
+            "ref": "character:菲谢尔"
+          },
+          {
+            "name": "托马",
+            "ref": "character:托马"
+          },
+          {
+            "name": "夏沃蕾",
+            "ref": "character:夏沃蕾"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "可选",
+        "members": [
+          {
+            "name": "克洛琳德",
+            "ref": "character:克洛琳德"
+          },
+          {
+            "name": "八重神子",
+            "ref": "character:八重神子"
+          },
+          {
+            "name": "纳西妲",
+            "ref": "character:纳西妲"
+          },
+          {
+            "name": "钟离",
+            "ref": "character:钟离"
+          }
+        ],
+        "text": ""
+      }
+    ]
   },
   "tags": [
     {
@@ -174,6 +219,13 @@
       "lines": [
         "二命",
         "六命"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：克洛琳德 + 菲谢尔 + 托马 + 夏沃蕾",
+        "可选：克洛琳德 + 八重神子 + 纳西妲 + 钟离"
       ]
     }
   ],

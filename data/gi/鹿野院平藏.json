@@ -119,12 +119,13 @@
         "order": [
           {
             "name": "A",
-            "level": 1,
+            "level": 8,
             "ref": "talent:A"
           },
           {
             "name": "E",
-            "level": 1,
+            "level": 10,
+            "crown": true,
             "ref": "talent:E"
           },
           {
@@ -133,7 +134,18 @@
             "ref": "talent:Q"
           }
         ],
-        "raw": "A1 E1 Q1"
+        "raw": "A8 E10 Q1"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "E",
+            "level": 10,
+            "crown": true,
+            "ref": "talent:E"
+          }
+        ]
       }
     ],
     "panels": [],
@@ -149,7 +161,52 @@
         "text": ""
       }
     ],
-    "teams": []
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "鹿野院平藏",
+            "ref": "character:鹿野院平藏"
+          },
+          {
+            "name": "夜兰",
+            "ref": "character:夜兰"
+          },
+          {
+            "name": "八重神子",
+            "ref": "character:八重神子"
+          },
+          {
+            "name": "久岐忍",
+            "ref": "character:久岐忍"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "可选",
+        "members": [
+          {
+            "name": "鹿野院平藏",
+            "ref": "character:鹿野院平藏"
+          },
+          {
+            "name": "行秋",
+            "ref": "character:行秋"
+          },
+          {
+            "name": "菲谢尔",
+            "ref": "character:菲谢尔"
+          },
+          {
+            "name": "北斗",
+            "ref": "character:北斗"
+          }
+        ],
+        "text": ""
+      }
+    ]
   },
   "tags": [
     {
@@ -182,7 +239,8 @@
     {
       "title": "3. 天赋加点",
       "lines": [
-        "天赋：A1 E1 Q1"
+        "天赋：A8 E10 Q1",
+        "皇冠：E（10）"
       ]
     },
     {
@@ -190,6 +248,13 @@
       "lines": [
         "二命",
         "六命"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：鹿野院平藏 + 夜兰 + 八重神子 + 久岐忍",
+        "可选：鹿野院平藏 + 行秋 + 菲谢尔 + 北斗"
       ]
     }
   ],

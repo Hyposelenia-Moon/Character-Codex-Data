@@ -132,7 +132,52 @@
         "text": ""
       }
     ],
-    "teams": []
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "林尼",
+            "ref": "character:林尼"
+          },
+          {
+            "name": "芙宁娜",
+            "ref": "character:芙宁娜"
+          },
+          {
+            "name": "希诺宁",
+            "ref": "character:希诺宁"
+          },
+          {
+            "name": "班尼特",
+            "ref": "character:班尼特"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "可选",
+        "members": [
+          {
+            "name": "林尼",
+            "ref": "character:林尼"
+          },
+          {
+            "name": "枫原万叶",
+            "ref": "character:枫原万叶"
+          },
+          {
+            "name": "钟离",
+            "ref": "character:钟离"
+          },
+          {
+            "name": "班尼特",
+            "ref": "character:班尼特"
+          }
+        ],
+        "text": ""
+      }
+    ]
   },
   "tags": [
     {
@@ -178,6 +223,13 @@
       "lines": [
         "二命",
         "六命"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：林尼 + 芙宁娜 + 希诺宁 + 班尼特",
+        "可选：林尼 + 枫原万叶 + 钟离 + 班尼特"
       ]
     }
   ],
