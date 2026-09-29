@@ -131,47 +131,8 @@
     "teams": [
       {
         "label": "首选",
-        "members": [
-          {
-            "name": "娜维娅",
-            "ref": "character:娜维娅"
-          },
-          {
-            "name": "旅行者·岩",
-            "ref": "character:旅行者·岩"
-          },
-          {
-            "name": "香菱",
-            "ref": "character:香菱"
-          },
-          {
-            "name": "班尼特",
-            "ref": "character:班尼特"
-          }
-        ],
-        "text": ""
-      },
-      {
-        "label": "可选",
-        "members": [
-          {
-            "name": "魈",
-            "ref": "character:魈"
-          },
-          {
-            "name": "旅行者·岩",
-            "ref": "character:旅行者·岩"
-          },
-          {
-            "name": "珐露珊",
-            "ref": "character:珐露珊"
-          },
-          {
-            "name": "钟离",
-            "ref": "character:钟离"
-          }
-        ],
-        "text": ""
+        "members": [],
+        "text": "摔门"
       }
     ]
   },
@@ -214,8 +175,7 @@
     {
       "title": "6. 配队推荐",
       "lines": [
-        "首选：娜维娅 + 旅行者·岩 + 香菱 + 班尼特",
-        "可选：魈 + 旅行者·岩 + 珐露珊 + 钟离"
+        "首选：摔门"
       ]
     }
   ],

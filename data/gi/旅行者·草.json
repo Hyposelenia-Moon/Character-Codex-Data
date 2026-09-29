@@ -140,47 +140,8 @@
     "teams": [
       {
         "label": "首选",
-        "members": [
-          {
-            "name": "达达利亚",
-            "ref": "character:达达利亚"
-          },
-          {
-            "name": "菲谢尔",
-            "ref": "character:菲谢尔"
-          },
-          {
-            "name": "旅行者·草",
-            "ref": "character:旅行者·草"
-          },
-          {
-            "name": "久岐忍",
-            "ref": "character:久岐忍"
-          }
-        ],
-        "text": ""
-      },
-      {
-        "label": "可选",
-        "members": [
-          {
-            "name": "神里绫人",
-            "ref": "character:神里绫人"
-          },
-          {
-            "name": "雷电将军",
-            "ref": "character:雷电将军"
-          },
-          {
-            "name": "旅行者·草",
-            "ref": "character:旅行者·草"
-          },
-          {
-            "name": "班尼特",
-            "ref": "character:班尼特"
-          }
-        ],
-        "text": ""
+        "members": [],
+        "text": "减抗位"
       }
     ]
   },
@@ -227,8 +188,7 @@
     {
       "title": "6. 配队推荐",
       "lines": [
-        "首选：达达利亚 + 菲谢尔 + 旅行者·草 + 久岐忍",
-        "可选：神里绫人 + 雷电将军 + 旅行者·草 + 班尼特"
+        "首选：减抗位"
       ]
     }
   ],
