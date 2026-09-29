@@ -74,16 +74,28 @@
           },
           {
             "name": "E",
-            "level": 1,
+            "level": 8,
             "ref": "talent:E"
           },
           {
             "name": "Q",
-            "level": 1,
+            "level": 10,
+            "crown": true,
             "ref": "talent:Q"
           }
         ],
-        "raw": "A1 E1 Q1"
+        "raw": "A1 E8 Q10"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "Q",
+            "level": 10,
+            "crown": true,
+            "ref": "talent:Q"
+          }
+        ]
       }
     ],
     "panels": [],
@@ -94,7 +106,52 @@
         "text": "额外灵刃"
       }
     ],
-    "teams": []
+    "teams": [
+      {
+        "label": "融化",
+        "members": [
+          {
+            "name": "罗莎莉亚",
+            "ref": "character:罗莎莉亚"
+          },
+          {
+            "name": "香菱",
+            "ref": "character:香菱"
+          },
+          {
+            "name": "重云",
+            "ref": "character:重云"
+          },
+          {
+            "name": "班尼特",
+            "ref": "character:班尼特"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "冻结",
+        "members": [
+          {
+            "name": "凯亚",
+            "ref": "character:凯亚"
+          },
+          {
+            "name": "行秋",
+            "ref": "character:行秋"
+          },
+          {
+            "name": "重云",
+            "ref": "character:重云"
+          },
+          {
+            "name": "枫原万叶",
+            "ref": "character:枫原万叶"
+          }
+        ],
+        "text": ""
+      }
+    ]
   },
   "tags": [
     {
@@ -124,13 +181,21 @@
     {
       "title": "3. 天赋加点",
       "lines": [
-        "天赋：A1 E1 Q1"
+        "天赋：A1 E8 Q10",
+        "皇冠：Q（10）"
       ]
     },
     {
       "title": "5. 命座推荐",
       "lines": [
         "六命——额外灵刃"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "融化：罗莎莉亚 + 香菱 + 重云 + 班尼特",
+        "冻结：凯亚 + 行秋 + 重云 + 枫原万叶"
       ]
     }
   ],
