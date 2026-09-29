@@ -2,9 +2,12 @@
   "schema": 2,
   "name": "埃洛伊",
   "game": "gi",
+  "freeModules": [
+    "constellations"
+  ],
   "meta": {
-    "建议等级": "___级",
-    "定位": "___",
+    "建议等级": "81-90级",
+    "定位": "主c",
     "100级提升": "___%"
   },
   "v2": {
@@ -206,11 +209,11 @@
   },
   "tags": [
     {
-      "text": "建议等级：___级",
+      "text": "建议等级：81-90级",
       "style": "level"
     },
     {
-      "text": "定位：___",
+      "text": "定位：主c",
       "style": "role"
     }
   ],
@@ -257,8 +260,5 @@
   ],
   "source": {
     "guide": "原神·角色攻略"
-  },
-  "freeModules": [
-    "constellations"
-  ]
+  }
 }
