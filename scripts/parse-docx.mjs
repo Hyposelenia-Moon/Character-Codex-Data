@@ -795,8 +795,24 @@ function main () {
   if (!dry) {
     if (!fs.existsSync(giDir)) fs.mkdirSync(giDir, { recursive: true })
     fs.writeFileSync(path.join(dataDir, '_parse-report.json'), JSON.stringify(report, null, 2) + '\n', 'utf8')
-    // 展示顺序按文档出现顺序重建（文档顺序 = 图鉴发布时间从远到近）
-    const order = report.characters.map(c => c.name)
+    // 展示顺序按文档出现顺序重建（文档顺序 = 图鉴发布时间从远到近）；
+    // ⚠ data/gi 里有、文档里还没有的角色（「从图鉴添加」建出来但还没填内容的空档模板）
+    // 必须保留在末尾 —— 否则一次 parse-docx 就把新角色从 _order.json 里抹掉（编辑器里直接消失）。
+    const parsedNames = report.characters.map(c => c.name)
+    const prevOrder = (() => {
+      try {
+        const doc = JSON.parse(fs.readFileSync(path.join(giDir, '_order.json'), 'utf8'))
+        return Array.isArray(doc) ? doc.map(String) : []
+      } catch { return [] }
+    })()
+    const files = fs.readdirSync(giDir)
+      .filter(f => f.endsWith('.json') && !f.startsWith('_'))
+      .map(f => f.slice(0, -'.json'.length))
+    const rest = [
+      ...prevOrder.filter(n => files.includes(n) && !parsedNames.includes(n)),
+      ...files.filter(n => !parsedNames.includes(n) && !prevOrder.includes(n)).sort()
+    ]
+    const order = [...parsedNames, ...rest]
     fs.writeFileSync(path.join(giDir, '_order.json'), JSON.stringify(order, null, 2) + '\n', 'utf8')
   }
   console.log(`文档：${docFile}`)

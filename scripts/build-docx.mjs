@@ -174,17 +174,39 @@ export function characterLines (data) {
  * @returns {string[]}
  */
 export function documentLines (bundle) {
-  // 抬头的角色数**按本次数据算**：以前写死「共 129 名角色」，增删角色后文档会写一句假话。
-  // 当前 data/gi 正好 129 个，所以生成的文本与以前逐字一致。
-  const total = bundle.names.length
+  // 抬头按本次数据算：`_order.json` 总数 + 其中写了正文的数量。
+  // 空档角色（没内容）不写块，所以「均已填入内容」只在真的没有空档时才说。
+  const filled = bundle.names.length
+  const total = bundle.totalNames ?? filled
+  const empty = Math.max(0, total - filled)
   const out = HEAD_LINES.map(line =>
-    /^共 \d+ 名角色/.test(line) ? `共 ${total} 名角色：${total} 名均已填入内容。` : line)
+    /^共 \d+ 名角色/.test(line)
+      ? (empty
+          ? `共 ${total} 名角色：${filled} 名已有内容，${empty} 名仅保留栏位待补充。`
+          : `共 ${total} 名角色：${filled} 名均已填入内容。`)
+      : line)
   bundle.names.forEach((name, i) => {
     if (i > 0) out.push(SEPARATOR)
     out.push(...characterLines(bundle.docs[i]))
   })
   // 最后一个角色块之后不再补分隔段：文档以角色块收尾（与现有主文档一致）
   return out
+}
+
+/**
+ * 角色是不是有正文内容（决定要不要写进主文档）。
+ *
+ * 「从图鉴添加」建出来的空档模板（meta 三项空、v2 六个数组空）没有正文可写：
+ * 它的块只有一行 `名字 —— 建议等级：`，回读时 `meta.建议等级` 会被解析成 `undefined`，
+ * 与 JSON 里的空串对不上 —— 以前会让 `--write-main` 直接拒绝写主文档（连带每天的自动回写）。
+ * 所以空档角色**不进主文档**（与「空档角色不进 guide.html」同一口径），填了内容再写。
+ * @param {object} doc 角色 JSON
+ * @returns {boolean}
+ */
+export function isFilledCharacter (doc) {
+  const meta = doc?.meta ?? {}
+  if (Object.values(meta).some(v => String(v ?? '').trim())) return true
+  return deriveSections(doc).some(sec => (sec.lines ?? []).length > 0)
 }
 
 /** 读取 data/gi/_order.json + 全部角色 JSON */
@@ -199,6 +221,18 @@ export function loadCharacters () {
   })
   const byName = new Map(names.map((n, i) => [n, docs[i]]))
   return { names, docs, byName }
+}
+
+/** 只保留有正文的角色（`totalNames` 记住 _order.json 的总数，抬头要用） */
+export function loadDocxCharacters () {
+  const all = loadCharacters()
+  const kept = all.names.map((n, i) => [n, all.docs[i]]).filter(([, doc]) => isFilledCharacter(doc))
+  return {
+    names: kept.map(x => x[0]),
+    docs: kept.map(x => x[1]),
+    byName: new Map(kept),
+    totalNames: all.names.length
+  }
 }
 
 /* ------------------------------------------------------------------ *
@@ -348,7 +382,7 @@ export async function build (opts = {}) {
   const useMark = opts.mark !== false
   if (!fs.existsSync(template)) throw new Error(`找不到模板文档：${template}`)
 
-  const bundle = loadCharacters()
+  const bundle = loadDocxCharacters()
   const jsonSnapshot = snapshotJson() // 校验时用来识别「被并发改动」的角色
   // 冻结 data/gi 快照：往返校验用它与内存 bundle 比对，
   // 避免「校验期间别的进程改了 data/gi」造成假失败（parse-docx 支持 DSH_GI_DIR）

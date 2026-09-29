@@ -8,6 +8,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseToJson, parseDry } from './mark-docx.mjs'
+import { isFilledCharacter } from './build-docx.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '..')
@@ -59,11 +60,15 @@ console.log('文档回读统计：', JSON.stringify(dry.stats))
 const parsed = parseToJson(docx, path.join(tmp, 'out'), process.env.DSH_GI_DIR ? { giDir: giDir } : {})
 const files = fs.readdirSync(giDir).filter(f => f.endsWith('.json') && !f.startsWith('_')).sort()
 const jsonNames = readJson(path.join(giDir, '_order.json'))
-const bundle = jsonNames.map(n => ({ name: n, doc: readJson(path.join(giDir, `${n}.json`)) }))
+const allEntries = jsonNames.map(n => ({ name: n, doc: readJson(path.join(giDir, `${n}.json`)) }))
+// 空档角色（「从图鉴添加」建的空模板）**不进主文档**，所以不参与比对 —— 与 build-docx 同一口径
+const skipped = allEntries.filter(x => !isFilledCharacter(x.doc)).map(x => x.name)
+const bundle = allEntries.filter(x => isFilledCharacter(x.doc))
+const comparable = bundle.map(x => x.name)
 
-console.log(`角色数：文档 ${parsed.names.length} / JSON ${bundle.length}`)
-const onlyDoc = parsed.names.filter(n => !jsonNames.includes(n))
-const onlyJson = jsonNames.filter(n => !parsed.names.includes(n))
+console.log(`角色数：文档 ${parsed.names.length} / JSON ${bundle.length}${skipped.length ? `（另有 ${skipped.length} 个空档未进文档：${skipped.join('、')}）` : ''}`)
+const onlyDoc = parsed.names.filter(n => !comparable.includes(n))
+const onlyJson = comparable.filter(n => !parsed.names.includes(n))
 if (onlyDoc.length) console.log('只在文档里的角色：', onlyDoc.join('、'))
 if (onlyJson.length) console.log('只在 JSON 里的角色：', onlyJson.join('、'))
 
