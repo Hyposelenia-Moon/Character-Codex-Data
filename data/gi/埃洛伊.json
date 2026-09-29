@@ -156,18 +156,7 @@
         "v": "160%"
       }
     ],
-    "constellations": [
-      {
-        "name": "二命",
-        "index": 2,
-        "text": ""
-      },
-      {
-        "name": "六命",
-        "index": 6,
-        "text": ""
-      }
-    ],
+    "constellations": [],
     "teams": [
       {
         "label": "首选",
@@ -259,13 +248,6 @@
       ]
     },
     {
-      "title": "5. 命座推荐",
-      "lines": [
-        "二命",
-        "六命"
-      ]
-    },
-    {
       "title": "6. 配队推荐",
       "lines": [
         "首选：埃洛伊 + 香菱 + 枫原万叶 + 班尼特",
@@ -275,5 +257,8 @@
   ],
   "source": {
     "guide": "原神·角色攻略"
-  }
+  },
+  "freeModules": [
+    "constellations"
+  ]
 }
