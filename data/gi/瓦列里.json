@@ -1,0 +1,23 @@
+{
+  "schema": 2,
+  "name": "瓦列里",
+  "game": "gi",
+  "meta": {
+    "建议等级": "",
+    "定位": "",
+    "100级提升": ""
+  },
+  "v2": {
+    "weapons": [],
+    "artifacts": [],
+    "talents": [],
+    "panels": [],
+    "constellations": [],
+    "teams": []
+  },
+  "tags": [],
+  "sections": [],
+  "source": {
+    "guide": "原神·角色攻略"
+  }
+}
