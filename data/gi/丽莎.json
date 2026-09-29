@@ -2,6 +2,11 @@
   "schema": 2,
   "name": "丽莎",
   "game": "gi",
+  "freeModules": [
+    "talents",
+    "panels",
+    "constellations"
+  ],
   "meta": {
     "建议等级": "81级"
   },

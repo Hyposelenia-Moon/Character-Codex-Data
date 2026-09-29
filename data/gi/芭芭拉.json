@@ -2,6 +2,9 @@
   "schema": 2,
   "name": "芭芭拉",
   "game": "gi",
+  "freeModules": [
+    "panels"
+  ],
   "meta": {
     "建议等级": "81-90级",
     "定位": "奶位"
@@ -88,16 +91,16 @@
           },
           {
             "name": "E",
-            "level": 1,
+            "level": 6,
             "ref": "talent:E"
           },
           {
             "name": "Q",
-            "level": 1,
+            "level": 6,
             "ref": "talent:Q"
           }
         ],
-        "raw": "A1 E1 Q1"
+        "raw": "A1 E6 Q6"
       }
     ],
     "panels": [],
@@ -150,7 +153,7 @@
     {
       "title": "3. 天赋加点",
       "lines": [
-        "天赋：A1 E1 Q1"
+        "天赋：A1 E6 Q6"
       ]
     },
     {

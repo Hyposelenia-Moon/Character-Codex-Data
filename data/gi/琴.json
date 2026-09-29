@@ -2,6 +2,9 @@
   "schema": 2,
   "name": "琴",
   "game": "gi",
+  "freeModules": [
+    "talents"
+  ],
   "meta": {
     "建议等级": "81级",
     "定位": "减抗奶辅"
