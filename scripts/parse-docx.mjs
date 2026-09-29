@@ -246,15 +246,25 @@ const SET_PLUS_RE = /\s*[+＋＆&]\s*/
  * 渲染器按 sep 连接条目，所以 sep 里的分隔符必须带空格（' / '、' + '）。
  * `A / B + C` 这种「份间用 /、份内用 +」的混用写法归一成 `' / + '`，
  * 与仓库既有 JSON 里的混合 sep 写法一致，保证 before/after 往返 sep 逐字不变。
- * 纯 `/` 与纯 `+` 各自归一成 `' / '`、`' + '`。
+ * 纯 `/`、纯 `+`、纯 `>`、纯 `≥` 各自归一成 `' / '`、`' + '`、`' > '`、`' ≥ '`。
+ *
+ * ⚠ `>` / `≥`（档位优先级）**必须留在 token 列表里**：圣遗物行同样支持 `首选：A > B`
+ * （编辑器与显示层都认），少了这两个符号，回读会把 ' > ' 拍成 ' / '，
+ * data → docx → data 就对不上、`--write-main` 直接拒绝写主文档（2026-09-30 踩过）。
+ * 混合写法**保留逐档顺序**（`A + B > C` → `' + > '`），不再一律拍成 `' / + '`。
  */
 const canonicalSep = (s) => {
   const toks = []
-  for (const m of String(s).matchAll(/[/／]|[+＋＆&]/g)) toks.push(/[/／]/.test(m[0]) ? '/' : '+')
+  for (const m of String(s).matchAll(/[/／]|[+＋＆&]|[>＞]|[≥]/g)) {
+    toks.push(/[/／]/.test(m[0]) ? '/' : /[+＋＆&]/.test(m[0]) ? '+' : /[≥]/.test(m[0]) ? '≥' : '>')
+  }
   if (!toks.length) return String(s).replace(/\s+/g, ' ').trim()
   const uniq = [...new Set(toks)]
-  if (uniq.length > 1) return ' / + '
-  return uniq[0] === '/' ? ' / ' : ' + '
+  if (uniq.length === 1) return ` ${uniq[0]} `
+  // 混合：折叠连续重复，但保留逐档顺序（sep 本身就是「逐档分隔符」列表）
+  const out = []
+  for (const t of toks) if (out[out.length - 1] !== t) out.push(t)
+  return ` ${out.join(' ')} `
 }
 
 /**
