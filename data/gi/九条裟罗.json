@@ -72,16 +72,28 @@
           },
           {
             "name": "E",
-            "level": 1,
+            "level": 10,
+            "crown": true,
             "ref": "talent:E"
           },
           {
             "name": "Q",
-            "level": 1,
+            "level": 8,
             "ref": "talent:Q"
           }
         ],
-        "raw": "A1 E1 Q1"
+        "raw": "A1 E10 Q8"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "E",
+            "level": 10,
+            "crown": true,
+            "ref": "talent:E"
+          }
+        ]
       }
     ],
     "panels": [
@@ -113,7 +125,52 @@
         "text": ""
       }
     ],
-    "teams": []
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "雷电将军",
+            "ref": "character:雷电将军"
+          },
+          {
+            "name": "枫原万叶",
+            "ref": "character:枫原万叶"
+          },
+          {
+            "name": "九条裟罗",
+            "ref": "character:九条裟罗"
+          },
+          {
+            "name": "班尼特",
+            "ref": "character:班尼特"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "可选",
+        "members": [
+          {
+            "name": "雷电将军",
+            "ref": "character:雷电将军"
+          },
+          {
+            "name": "香菱",
+            "ref": "character:香菱"
+          },
+          {
+            "name": "九条裟罗",
+            "ref": "character:九条裟罗"
+          },
+          {
+            "name": "班尼特",
+            "ref": "character:班尼特"
+          }
+        ],
+        "text": ""
+      }
+    ]
   },
   "tags": [
     {
@@ -142,7 +199,8 @@
     {
       "title": "3. 天赋加点",
       "lines": [
-        "天赋：A1 E1 Q1"
+        "天赋：A1 E10 Q8",
+        "皇冠：E（10）"
       ]
     },
     {
@@ -158,6 +216,13 @@
       "lines": [
         "二命",
         "六命"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：雷电将军 + 枫原万叶 + 九条裟罗 + 班尼特",
+        "可选：雷电将军 + 香菱 + 九条裟罗 + 班尼特"
       ]
     }
   ],

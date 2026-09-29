@@ -93,7 +93,8 @@
         "order": [
           {
             "name": "A",
-            "level": 1,
+            "level": 10,
+            "crown": true,
             "ref": "talent:A"
           },
           {
@@ -103,11 +104,22 @@
           },
           {
             "name": "Q",
-            "level": 1,
+            "level": 8,
             "ref": "talent:Q"
           }
         ],
-        "raw": "A1 E1 Q1"
+        "raw": "A10 E1 Q8"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "A",
+            "level": 10,
+            "crown": true,
+            "ref": "talent:A"
+          }
+        ]
       }
     ],
     "panels": [
@@ -139,7 +151,52 @@
         "text": ""
       }
     ],
-    "teams": []
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "提纳里",
+            "ref": "character:提纳里"
+          },
+          {
+            "name": "八重神子",
+            "ref": "character:八重神子"
+          },
+          {
+            "name": "纳西妲",
+            "ref": "character:纳西妲"
+          },
+          {
+            "name": "白术",
+            "ref": "character:白术"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "可选",
+        "members": [
+          {
+            "name": "提纳里",
+            "ref": "character:提纳里"
+          },
+          {
+            "name": "菲谢尔",
+            "ref": "character:菲谢尔"
+          },
+          {
+            "name": "纳西妲",
+            "ref": "character:纳西妲"
+          },
+          {
+            "name": "钟离",
+            "ref": "character:钟离"
+          }
+        ],
+        "text": ""
+      }
+    ]
   },
   "tags": [
     {
@@ -170,7 +227,8 @@
     {
       "title": "3. 天赋加点",
       "lines": [
-        "天赋：A1 E1 Q1"
+        "天赋：A10 E1 Q8",
+        "皇冠：A（10）"
       ]
     },
     {
@@ -186,6 +244,13 @@
       "lines": [
         "二命",
         "六命"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：提纳里 + 八重神子 + 纳西妲 + 白术",
+        "可选：提纳里 + 菲谢尔 + 纳西妲 + 钟离"
       ]
     }
   ],

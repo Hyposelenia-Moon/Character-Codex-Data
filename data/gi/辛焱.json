@@ -113,7 +113,8 @@
         "order": [
           {
             "name": "A",
-            "level": 1,
+            "level": 10,
+            "crown": true,
             "ref": "talent:A"
           },
           {
@@ -123,11 +124,22 @@
           },
           {
             "name": "Q",
-            "level": 1,
+            "level": 8,
             "ref": "talent:Q"
           }
         ],
-        "raw": "A1 E1 Q1"
+        "raw": "A10 E1 Q8"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "A",
+            "level": 10,
+            "crown": true,
+            "ref": "talent:A"
+          }
+        ]
       }
     ],
     "panels": [],
@@ -143,7 +155,52 @@
         "text": "防御转模"
       }
     ],
-    "teams": []
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "辛焱",
+            "ref": "character:辛焱"
+          },
+          {
+            "name": "菲谢尔",
+            "ref": "character:菲谢尔"
+          },
+          {
+            "name": "罗莎莉亚",
+            "ref": "character:罗莎莉亚"
+          },
+          {
+            "name": "班尼特",
+            "ref": "character:班尼特"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "可选",
+        "members": [
+          {
+            "name": "辛焱",
+            "ref": "character:辛焱"
+          },
+          {
+            "name": "菲谢尔",
+            "ref": "character:菲谢尔"
+          },
+          {
+            "name": "行秋",
+            "ref": "character:行秋"
+          },
+          {
+            "name": "砂糖",
+            "ref": "character:砂糖"
+          }
+        ],
+        "text": ""
+      }
+    ]
   },
   "tags": [
     {
@@ -176,7 +233,8 @@
     {
       "title": "3. 天赋加点",
       "lines": [
-        "天赋：A1 E1 Q1"
+        "天赋：A10 E1 Q8",
+        "皇冠：A（10）"
       ]
     },
     {
@@ -184,6 +242,13 @@
       "lines": [
         "二命——提升暴击",
         "六命——防御转模"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：辛焱 + 菲谢尔 + 罗莎莉亚 + 班尼特",
+        "可选：辛焱 + 菲谢尔 + 行秋 + 砂糖"
       ]
     }
   ],

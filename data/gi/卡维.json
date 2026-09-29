@@ -134,7 +134,7 @@
         "order": [
           {
             "name": "A",
-            "level": 1,
+            "level": 8,
             "ref": "talent:A"
           },
           {
@@ -144,11 +144,23 @@
           },
           {
             "name": "Q",
-            "level": 1,
+            "level": 10,
+            "crown": true,
             "ref": "talent:Q"
           }
         ],
-        "raw": "A1 E1 Q1"
+        "raw": "A8 E1 Q10"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "Q",
+            "level": 10,
+            "crown": true,
+            "ref": "talent:Q"
+          }
+        ]
       }
     ],
     "panels": [],
@@ -164,7 +176,52 @@
         "text": ""
       }
     ],
-    "teams": []
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "卡维",
+            "ref": "character:卡维"
+          },
+          {
+            "name": "行秋",
+            "ref": "character:行秋"
+          },
+          {
+            "name": "妮露",
+            "ref": "character:妮露"
+          },
+          {
+            "name": "白术",
+            "ref": "character:白术"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "可选",
+        "members": [
+          {
+            "name": "卡维",
+            "ref": "character:卡维"
+          },
+          {
+            "name": "行秋",
+            "ref": "character:行秋"
+          },
+          {
+            "name": "纳西妲",
+            "ref": "character:纳西妲"
+          },
+          {
+            "name": "珊瑚宫心海",
+            "ref": "character:珊瑚宫心海"
+          }
+        ],
+        "text": ""
+      }
+    ]
   },
   "tags": [
     {
@@ -197,7 +254,8 @@
     {
       "title": "3. 天赋加点",
       "lines": [
-        "天赋：A1 E1 Q1"
+        "天赋：A8 E1 Q10",
+        "皇冠：Q（10）"
       ]
     },
     {
@@ -205,6 +263,13 @@
       "lines": [
         "二命",
         "六命"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：卡维 + 行秋 + 妮露 + 白术",
+        "可选：卡维 + 行秋 + 纳西妲 + 珊瑚宫心海"
       ]
     }
   ],

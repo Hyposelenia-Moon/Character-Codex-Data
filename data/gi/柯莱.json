@@ -69,16 +69,28 @@
           },
           {
             "name": "E",
-            "level": 1,
+            "level": 8,
             "ref": "talent:E"
           },
           {
             "name": "Q",
-            "level": 1,
+            "level": 10,
+            "crown": true,
             "ref": "talent:Q"
           }
         ],
-        "raw": "A1 E1 Q1"
+        "raw": "A1 E8 Q10"
+      },
+      {
+        "kind": "crown",
+        "items": [
+          {
+            "name": "Q",
+            "level": 10,
+            "crown": true,
+            "ref": "talent:Q"
+          }
+        ]
       }
     ],
     "panels": [
@@ -110,7 +122,52 @@
         "text": ""
       }
     ],
-    "teams": []
+    "teams": [
+      {
+        "label": "首选",
+        "members": [
+          {
+            "name": "提纳里",
+            "ref": "character:提纳里"
+          },
+          {
+            "name": "菲谢尔",
+            "ref": "character:菲谢尔"
+          },
+          {
+            "name": "柯莱",
+            "ref": "character:柯莱"
+          },
+          {
+            "name": "久岐忍",
+            "ref": "character:久岐忍"
+          }
+        ],
+        "text": ""
+      },
+      {
+        "label": "可选",
+        "members": [
+          {
+            "name": "克洛琳德",
+            "ref": "character:克洛琳德"
+          },
+          {
+            "name": "纳西妲",
+            "ref": "character:纳西妲"
+          },
+          {
+            "name": "柯莱",
+            "ref": "character:柯莱"
+          },
+          {
+            "name": "枫原万叶",
+            "ref": "character:枫原万叶"
+          }
+        ],
+        "text": ""
+      }
+    ]
   },
   "tags": [
     {
@@ -139,7 +196,8 @@
     {
       "title": "3. 天赋加点",
       "lines": [
-        "天赋：A1 E1 Q1"
+        "天赋：A1 E8 Q10",
+        "皇冠：Q（10）"
       ]
     },
     {
@@ -155,6 +213,13 @@
       "lines": [
         "二命",
         "六命"
+      ]
+    },
+    {
+      "title": "6. 配队推荐",
+      "lines": [
+        "首选：提纳里 + 菲谢尔 + 柯莱 + 久岐忍",
+        "可选：克洛琳德 + 纳西妲 + 柯莱 + 枫原万叶"
       ]
     }
   ],
