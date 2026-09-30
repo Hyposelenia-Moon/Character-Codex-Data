@@ -73,6 +73,103 @@ export function parseRef (ref) {
   return { type: s.slice(0, i).trim(), name: s.slice(i + 1).trim() }
 }
 
+/* --------------------------------------------------------------- 圣遗物 2 件套写法 */
+
+/**
+ * 2 件套效果**就等于四条通用预设**的套装（用户定稿 2026-09-30）：
+ * 写在 2+2 组合里时一律用 `2攻击` / `2生命` / `2精通` / `2充能`，
+ * 不写套装名、也不写 `2角斗` 这种套装简称（2+2 只看效果，不看是哪套）。
+ * 清单按图鉴后端的 2 件套描述整理（攻击力 18% / 生命值 20% / 元素精通 80 / 充能效率 20%）。
+ */
+const TWO_PIECE_PRESET = {
+  '2攻击': ['行者之心', '勇士之心', '角斗士的终幕礼', '追忆之注连', '辰砂往生录', '来歆余响',
+    '回声之林夜话', '谐律异想断章', '未竟的遐思', '风起之日', '影中沉凝的幻灭', '血红之证', '炉火融炼之心'],
+  '2生命': ['千岩牢固', '花海甘露之光'],
+  '2精通': ['教官', '流浪大地的乐团', '饰金之梦', '乐园遗落之花', '穹境示现之夜', '晨星与月的晓歌'],
+  '2充能': ['流放者', '学士', '绝缘之旗印', '纺月的夜歌', '天之美赐']
+}
+
+/**
+ * 其余套装的 2 件套简称（社区通用叫法；`染血` / `冰套` / `水套` / `天美` / `草套` / `猎人` /
+ * `流星` / `勇者` 按用户 2026-09-30 口述）。
+ * ⚠ **四条预设优先**：`TWO_PIECE_PRESET` 里的套装永远写 `2攻击` / `2生命` / `2精通` / `2充能`，
+ *   这里的同名条目会被覆盖（例如 `影中沉凝的幻灭` / `血红之证` 的 2 件套就是攻击 → `2攻击`，
+ *   用户 2026-09-30 更正）。判定由 `node scripts/audit-2pc-table.mjs` 按图鉴后端的
+ *   2 件套描述跑一遍（当前与表 0 不一致）。
+ * 认不出的套装**不硬凑** —— `twoPieceName` 返回空串，那种 2+2 保持全名，
+ * 由 `scan-separators.mjs` 列出来提醒补表。
+ */
+const TWO_PIECE_ABBR = {
+  炽烈的炎之魔女: '2魔女', 渡过烈火的贤人: '2渡火', 如雷的盛怒: '2如雷', 平息鸣雷的尊者: '2平雷',
+  昔日宗室之仪: '2宗室', 被怜爱的少女: '2少女', 苍白之火: '2苍白', 染血的骑士道: '2染血',
+  冰风迷途的勇士: '2冰套', 沉沦之心: '2水套', 水仙之梦: '2水仙', 翠绿之影: '2风套',
+  悠古的磐岩: '2磐岩', 逆飞的流星: '2流星', 海染砗磲: '2海染', 华馆梦醒形骸记: '2华馆',
+  深林的记忆: '2草套', 黄金剧团: '2剧团', 逐影猎人: '2猎人', 长夜之誓: '2长夜',
+  昔时之歌: '2昔时', 黑曜秘典: '2黑曜', 烬城勇者绘卷: '2勇者', 沙上楼阁史话: '2楼阁',
+  深廊终曲: '2深廊', 武人: '2武人', 战狂: '2战狂', 天之美赐: '2天美'
+}
+
+/** 套装名 → 2 件套写法（四条预设优先于套装简称） */
+export const ARTIFACT_2PC = (() => {
+  const map = { ...TWO_PIECE_ABBR }
+  for (const [word, list] of Object.entries(TWO_PIECE_PRESET)) for (const n of list) map[n] = word
+  return map
+})()
+
+/** `2X` / `4X` = 件数简写（`2精通` / `2魔女`），是效果描述不是套装名 */
+export function isPieceShorthandName (name) {
+  return /^[24][^\d\s]/.test(String(name ?? '').trim())
+}
+
+/**
+ * 套装名 → 2 件套写法；已经是简写的原样返回；查不到返回空串。
+ * @param {string} name
+ * @returns {string}
+ */
+export function twoPieceName (name) {
+  const s = String(name ?? '').trim()
+  if (!s) return ''
+  if (isPieceShorthandName(s)) return s
+  return ARTIFACT_2PC[s] ?? ''
+}
+
+/**
+ * 把圣遗物档位行里 `+` 连接的 **恰好两条** 组合改写成 `2X + 2Y`（用户定稿 2026-09-30：
+ * 「今后添加 2+2 后自动改为简写，不再写全称」）。就地改 `sets[i].name` / `.ref`，返回改了几条。
+ *
+ * ⚠ 只动两条的组合：`2生命 + 2生命 + 教官` 那种三条的（第三套其实是 4 件套选项）不碰 ——
+ * 三条简写会被显示层并成**一个** chip（= 6 个部位）。
+ * ⚠ 两条里只要有一条查不到写法（新套装没进表），整组不动，保持原样并交给扫描提醒。
+ * @param {{sets?: object[], sep?: string}} row
+ * @returns {number}
+ */
+export function shortenTwoPiece (row) {
+  const sets = Array.isArray(row?.sets) ? row.sets : []
+  if (sets.length < 2) return 0
+  const toks = String(row.sep ?? '').trim().split(/\s+/).filter(Boolean)
+  const tok = (i) => String(toks[i] ?? toks[toks.length - 1] ?? '/').trim()
+  let changed = 0
+  let i = 0
+  while (i < sets.length) {
+    let j = i
+    while (j < sets.length - 1 && ['+', '＋', '&', '＆'].includes(tok(j))) j++
+    const group = sets.slice(i, j + 1)
+    if (group.length === 2) {
+      const names = group.map(s => twoPieceName(s?.name))
+      if (names[0] && names[1]) {
+        group.forEach((s, k) => {
+          if (String(s?.name ?? '').trim() === names[k] && s.ref === makeRef('artifact', names[k])) return
+          s.name = names[k]
+          s.ref = makeRef('artifact', names[k])
+          changed++
+        })
+      }
+    }
+    i = j + 1
+  }
+  return changed
+}
+
 /** 去掉文本里的标记，只留名称（用于旧版 sections / 纯文本输出） */
 export function stripMarks (text) {
   return String(text ?? '').replace(MARK_RE, '$2')
@@ -672,7 +769,8 @@ export function validate (data, index = {}) {
     if (!ref) return
     const { type, name } = parseRef(ref)
     if (type === 'weapon' && w.size && !w.has(name)) issues.push({ where, ref, reason: '武器名不在图鉴' })
-    else if (type === 'artifact' && a.size && !a.has(name)) issues.push({ where, ref, reason: '圣遗物名不在图鉴' })
+    // 圣遗物的 `2X` / `4X` 是**件数简写**（`2精通` / `2魔女`），图鉴里当然没有 —— 不算问题
+    else if (type === 'artifact' && a.size && !a.has(name) && !isPieceShorthandName(name)) issues.push({ where, ref, reason: '圣遗物名不在图鉴' })
     else if (type === 'character' && c.size && !c.has(name)) issues.push({ where, ref, reason: '角色名不在图鉴' })
     else if (type === 'talent' && !/^[AEQ]$/i.test(name)) issues.push({ where, ref, reason: '天赋应为 A/E/Q' })
     else if (type === 'constellation' && !/^\d$/.test(name)) issues.push({ where, ref, reason: '命座应为 1-6' })

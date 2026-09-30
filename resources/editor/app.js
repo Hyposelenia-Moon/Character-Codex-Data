@@ -483,6 +483,8 @@ function normalizeData (data) {
         return row
       }),
       talents: foldCrownRows(asArray(v2.talents).map(function (r) {
+        // 段末备注行（文档里渲染成 `注：…`）：只带 text，别掉进皇冠行分支
+        if (r && r.kind === 'note') return { kind: 'note', text: str(r.text) }
         if (r && r.kind === 'priority') {
           // 天赋等级：固定三格 A → E → Q，每格一个等级（1..10，10 = 皇冠）。
           // 界面只认这一份数据，皇冠由 level 决定（不再单独编辑皇冠行）。
@@ -505,6 +507,8 @@ function normalizeData (data) {
         }
       })),
       panels: asArray(v2.panels).map(function (r) {
+        // 段末备注行（`注：…`）：只带 text（否则会被当成说明行）
+        if (r && r.kind === 'note') return { kind: 'note', text: str(r.text) }
         // ① 已经是键值对：把「键」归一到面板属性词表，数值也**当场归一**（去尾部 `+`、补 `%`）——
         //    落盘（buildBody）本来就归一，界面不归一就会「输入框里还是 `240%+`、预览里已是 `240%`」
         if (r && hasText(str(r.k))) {
@@ -525,7 +529,8 @@ function normalizeData (data) {
         return { label: str(r && r.label), text: text }
       }),
       constellations: asArray(v2.constellations).map(function (r) {
-        return { name: str(r && r.name), text: str(r && r.text) }
+        // `top` = 命座「强烈推荐」标记（显示层把「命之座x」标红加粗；docx 不写字，解析按 index 保留）
+        return { name: str(r && r.name), text: str(r && r.text), top: !!(r && r.top === true) }
       }),
       teams: asArray(v2.teams).map(function (r) {
         // 段末备注行：整行就是备注（`{kind:'note', text}`），渲染层按它画一行
@@ -541,6 +546,8 @@ function normalizeData (data) {
     legacy: d.v2 == null,
     // 模块级「无需填写」标记（角色 JSON 顶层）：只影响左栏未填与攻略页那一行说明，不进表单
     freeModules: asArray(d.freeModules).map(function (k) { return str(k) }).filter(Boolean),
+    // 命座「强烈推荐」：顶层序号数组（docx 不写字；显示层把「命之座x」标红加粗）
+    topConstellations: asArray(d.topConstellations).map(Number).filter(function (n) { return n >= 1 && n <= 6 }),
     _raw: { source: d.source, highlight: d.highlight, meta: d.meta, game: d.game, schema: d.schema, unparsed: d.unparsed }
   }
   // 皇冠行条目的**原顺序**（A/E/Q 之外的写法，如 Q 在 A 前）：保存时照原样写回，
@@ -877,6 +884,8 @@ var FIT_MAX = { name: 260, note: 88, stat: 150 }
 var SLOT_PLACEHOLDER = { 时之沙: '攻击力', 空之杯: '元素伤害', 理之冠: '暴击率' }
 /** 武器行「同级」最多几把（用户定稿 2026-09-21：上限 4 把，名字长了就只放得下 3 把） */
 var WEAPON_ROW_CAP = 4
+/** 圣遗物档位行「同级」最多几种带法（用户定稿 2026-09-30：最多 3 种，`+` 组合算一种） */
+var ARTIFACT_BUILD_CAP = 3
 
 /** 量文本宽度的隐藏 span（用**控件自己的字体**量真实渲染宽度：canvas 的 font 串一旦不被
  *  识别就会默默沿用上一次的字体，量出来偏小 → 输入框偏窄、文字被裁） */
@@ -1190,6 +1199,33 @@ function rowSepTokens (rowPath, count) {
 /** 兼容旧名（副词条）：与 `rowSepTokens` 同一个实现 */
 function subSepTokens (rowPath, count) { return rowSepTokens(rowPath, count) }
 
+/**
+ * 圣遗物档位行的「带法」数（同一档里并列的几种搭配）。
+ *
+ * 与显示层 `resolveSetItems` **同一口径**（`scripts/lib/guide-display.mjs`）：
+ *   - `/` 断开两种带法；
+ *   - `+` **只有两侧都是件数简写**（`2生命 + 2充能`）才算同一种带法的 2+2 组合，
+ *     全套装名之间的 `+` 是同级选项（显示成 `/`，用户 2026-09-20 定稿）。
+ * 用途：一行最多 `ARTIFACT_BUILD_CAP` 种带法，超了就不再让「＋ 套装」加条目。
+ * @param {string} rowPath 形如 `v2.artifacts.0`
+ * @param {object} row
+ * @returns {number} 带法数（没有套装名 → 0）
+ */
+function artifactBuildCount (rowPath, row) {
+  var sets = asArray(row && row.sets)
+    .map(function (s) { return str(s && s.name != null ? s.name : s).trim() })
+    .filter(Boolean)
+  if (!sets.length) return 0
+  var toks = rowSepTokens(rowPath, sets.length)
+  var isShort = function (n) { return /^[24][^\d\s]/.test(n) }
+  var count = 1
+  for (var i = 1; i < sets.length; i++) {
+    var plus = toks[i - 1] === '+' || toks[i - 1] === '＋'
+    if (!(plus && isShort(sets[i - 1]) && isShort(sets[i]))) count++   // 不是 2+2 组合 → 另起一种带法
+  }
+  return count
+}
+
 /** 逐档 token → 行上的 `sep` 字符串（全同 → 单 token，否则逐档拼接，两侧各一个空格） */
 function subSepCanonical (tokens) {
   var list = asArray(tokens).filter(Boolean)
@@ -1281,6 +1317,84 @@ function setWeaponSep (rowPath, gap, token) {
   return true
 }
 
+/* ------------------------------------------------- 圣遗物：同级 `/` ↔ 2+2 `+` */
+
+/**
+ * 套装名 → 2 件套写法（`2攻击` / `2魔女`…）。表由服务端给（`/api/index` 的 `artifact2pc`，
+ * 源头是 `scripts/lib/schema.mjs` 的 `ARTIFACT_2PC`）；已经是简写的原样返回，查不到返回空串。
+ * @param {string} name
+ * @returns {string}
+ */
+function twoPieceName (name) {
+  var s = str(name).trim()
+  if (!s) return ''
+  if (/^[24][^\d\s]/.test(s)) return s
+  var map = (state.index && state.index.artifact2pc) || {}
+  return map[s] || ''
+}
+
+/**
+ * 把圣遗物档位行里 `+` 连接的**恰好两条**改写成简写（用户定稿 2026-09-30）。
+ * 口径与 `scripts/lib/schema.mjs` 的 `shortenTwoPiece` 一致（保存时服务端还会再兜一道）。
+ * 两条里只要有一条查不到写法，整组不动，返回 0。
+ * @param {string} rowPath
+ * @param {object} row
+ * @returns {number} 改写了几条
+ */
+function shortenRowTwoPiece (rowPath, row) {
+  var sets = asArray(row && row.sets)
+  if (sets.length < 2) return 0
+  var toks = rowSepTokens(rowPath, sets.length)
+  var isPlus = function (t) { return t === '+' || t === '＋' || t === '&' || t === '＆' }
+  var changed = 0
+  var i = 0
+  while (i < sets.length) {
+    var j = i
+    while (j < sets.length - 1 && isPlus(toks[j])) j++
+    var group = sets.slice(i, j + 1)
+    if (group.length === 2) {
+      var names = group.map(function (s) { return twoPieceName(s && s.name) })
+      if (names[0] && names[1]) {
+        group.forEach(function (s, k) {
+          if (str(s && s.name).trim() === names[k] && s.ref === 'artifact:' + names[k]) return
+          s.name = names[k]
+          s.ref = 'artifact:' + names[k]
+          changed++
+        })
+      }
+    }
+    i = j + 1
+  }
+  return changed
+}
+
+/** 圣遗物档位行：改两件之间的分隔符（`/` = 同级另一种带法；`+` = 与上一件搭成 2+2） */
+function setSetSep (rowPath, gap, token) {
+  var row = getPath(state.model, rowPath)
+  if (!row || typeof row !== 'object') return false
+  var list = asArray(row.sets)
+  var gaps = Math.max(0, list.length - 1)
+  if (gap < 0 || gap >= gaps) return false
+  var toks = rowSepTokens(rowPath, list.length)
+  toks[gap] = token === '+' ? '+' : '/'
+  row.sep = subSepCanonical(toks)
+  return true
+}
+
+/** 两件之间的分隔符选择器（`/` 同级 / `+` 2+2；旧数据里的别的 token 也列出来，别丢） */
+function setSepSelect (rowPath, gap, token) {
+  var cur = str(token).trim()
+  var opts = [{ v: '/', t: '/ 同级' }, { v: '+', t: '+ 2+2' }]
+  if (cur && cur !== '/' && cur !== '+') opts.unshift({ v: cur, t: cur })
+  var pick = (cur === '+' || cur === '/') ? cur : (opts[0] && opts[0].v === cur ? cur : '/')
+  return '<select class="mv-sep set-sep" data-set-sep="' + esc(rowPath) + '" data-set-gap="' + gap + '"' +
+    ' title="这两件的关系：`/` = 同级（另一种带法）；`+` = 2+2（会自动写成 2X + 2Y 简写）">' +
+    opts.map(function (o) {
+      return '<option value="' + esc(o.v) + '"' + (o.v === pick ? ' selected' : '') + '>' + esc(o.t) + '</option>'
+    }).join('') +
+    '</select>'
+}
+
 /* ============================================================ 渲染：各区块 */
 
 function renderBasic () {
@@ -1356,6 +1470,10 @@ function renderArtifacts () {
       selectBox(p + '.kind', row.kind, ARTIFACT_KINDS, 'w-sm') +
       (row.kind === 'main' ? '' : '<input type="text" class="w-sm" data-path="' + p + '.label" value="' + esc(row.label) + '" placeholder="标签（可空）" title="' + esc(LABEL_TIP) + '">' +
         resolvedHint(row, artifactKindWord(row.kind))) +
+      // 档位行的「带法」计数（同级上限 3 种）：到上限时点「＋ 套装」会被挡下，这里先让它可见
+      (row.kind === 'main' || row.kind === 'sub' || row.kind === 'note' || row.kind === 'text' ? '' :
+        '<span class="muted" style="font-size:12px" title="同级最多 ' + ARTIFACT_BUILD_CAP +
+        ' 种带法（`2X + 2X` 的 `+` 组合算一种）">' + artifactBuildCount(p, row) + ' / ' + ARTIFACT_BUILD_CAP + ' 种带法</span>') +
       '<span class="spacer"></span>' +
       actBtn('move-row-up', 'v2.artifacts', '↑', 'btn mini', '上移', i) +
       actBtn('move-row-down', 'v2.artifacts', '↓', 'btn mini', '下移', i) +
@@ -1396,12 +1514,15 @@ function renderArtifacts () {
       body2 = '<div class="field"><span>文本</span>' +
         '<textarea data-path="' + p + '.text" placeholder="自由文本，会原样出现在旧版输出里">' + esc(row.text) + '</textarea></div>'
     } else {
+      var sepToks = rowSepTokens(p, (row.sets || []).length)
       var sets = (row.sets || []).map(function (set, j) {
         var q = p + '.sets.' + j
         var prev = j > 0 ? row.sets[j - 1] : null
         // 件数（`（2件套）`）**不再显示、也不再提供输入**（用户定稿：圣遗物旁边不要件数；
         // 2+2 直接写 `2精通 + 2精通` 这类简写）。旧数据里的 `pieces` 保存时原样带回，不丢。
-        return '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
+        // 两件之间的 `/` ↔ `+` 可切：切成 `+` 就是 2+2，会当场把名字改成简写（用户定稿 2026-09-30）。
+        return (j ? setSepSelect(p, j - 1, sepToks[j - 1]) : '') +
+          '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-left:' + (j ? '26px' : '0') + '">' +
           refField('artifact', set.name, q + '.name', { compact: true }) +
           (prev ? actBtn('copy-prev', q + '.name', '⧉', 'btn mini', '复制上一条的套装名' + (prev.name ? '（' + prev.name + '）' : '')) : '') +
           actBtn('del-item', p + '.sets', '×', 'row-del', '删除这个套装', j) +
@@ -1456,7 +1577,15 @@ function renderTalents () {
     '<span class="box-title">A / E / Q</span>' + rawHint + '<span class="spacer"></span>' +
     '<span class="muted" style="font-size:12px">数字 = 等级（1–10，留空按 1）· 点皇冠 = 10</span>' +
     '</div><div class="talent-slots">' + slotHtml + '</div></div>'
-  return card('天赋加点', s.talents.length + ' 行', body, true, false, 'talents')
+  // 段末备注行（`注：…`）：天赋也能写备注，**标记「无需填写」时同样可以**（在正文最后一行之后渲染）
+  var tNotes = asArray(s.talents).map(function (r, i) { return { r: r, i: i } }).filter(function (e) { return e.r && e.r.kind === 'note' })
+  var tNoteHtml = tNotes.map(function (e) {
+    return '<div class="field"><span>备注（注：）</span>' +
+      '<input type="text" data-path="v2.talents.' + e.i + '.text" value="' + esc(e.r.text) + '" placeholder="该段末尾的一行「注：…」，多条用「；」分隔">' +
+      '<div class="muted" style="font-size:12px">渲染在该段正文最后一行之后；不填就没有这一行</div></div>'
+  }).join('')
+  var tAddNote = tNotes.length ? '' : actBtn('add-note', 'v2.talents', '＋ 备注（注：）', 'btn mini')
+  return card('天赋加点', s.talents.length + ' 行', body + tNoteHtml + tAddNote, true, false, 'talents')
 }
 
 function renderPanels () {
@@ -1505,7 +1634,15 @@ function renderPanels () {
       (PANEL_VALUE_HINTS[a] || []).map(function (v) { return '<option value="' + esc(v) + '"></option>' }).join('') +
       '</datalist>'
   }).join('')
-  return card('毕业面板参考', s.panels.length + ' 行', body + lists, true, false, 'panels')
+  // 段末备注行（`注：…`）：面板同样可以写备注（标记「无需填写」时也可以）
+  var pNotes = asArray(s.panels).map(function (r, i) { return { r: r, i: i } }).filter(function (e) { return e.r && e.r.kind === 'note' })
+  var pNoteHtml = pNotes.map(function (e) {
+    return '<div class="field"><span>备注（注：）</span>' +
+      '<input type="text" data-path="v2.panels.' + e.i + '.text" value="' + esc(e.r.text) + '" placeholder="该段末尾的一行「注：…」，多条用「；」分隔">' +
+      '<div class="muted" style="font-size:12px">渲染在该段正文最后一行之后；不填就没有这一行</div></div>'
+  }).join('')
+  var pAddNote = pNotes.length ? '' : actBtn('add-note', 'v2.panels', '＋ 备注（注：）', 'btn mini')
+  return card('毕业面板参考', s.panels.length + ' 行', body + lists + pNoteHtml + pAddNote, true, false, 'panels')
 }
 
 function renderConstellations () {
@@ -1519,6 +1656,10 @@ function renderConstellations () {
       constellationField(row.name, p + '.name') +
       (idx ? '<span class="muted" style="font-size:12px">序号 ' + idx + '</span>' : '') +
       nameWarn +
+      // 「强烈推荐」：点一下切换顶层 topConstellations（只影响显示：攻略页把「命之座x」标红加粗）
+      (idx ? '<button type="button" class="btn mini' + (asArray(state.model.topConstellations).map(Number).indexOf(idx) >= 0 ? ' primary' : '') + '"' +
+        ' data-act="toggle-top" data-path="' + esc(p) + '" title="标为「强烈推荐」：攻略页这一行的「命之座x」标红加粗（再点取消）">' +
+        (asArray(state.model.topConstellations).map(Number).indexOf(idx) >= 0 ? '★ 强烈推荐' : '☆ 强烈推荐') + '</button>' : '') +
       '<span class="spacer"></span>' +
       actBtn('move-row-up', 'v2.constellations', '↑', 'btn mini', '上移', i) +
       actBtn('move-row-down', 'v2.constellations', '↓', 'btn mini', '下移', i) +
@@ -2322,6 +2463,8 @@ function refreshIndex () {
       weapons: asArray(data.weapons),
       artifacts: asArray(data.artifacts),
       characters: asArray(data.characters),
+      // 套装 → 2 件套写法（`2魔女` / `2攻击`…）：服务端给的，源头是 scripts/lib/schema.mjs 的 ARTIFACT_2PC
+      artifact2pc: (data.artifact2pc && typeof data.artifact2pc === 'object') ? data.artifact2pc : {},
       talents: TALENTS.slice(),
       constellations: ['1', '2', '3', '4', '5', '6']
     }
@@ -2527,6 +2670,8 @@ function buildBody () {
 
   var talents = []
   mv2.talents.forEach(function (row) {
+    // 段末备注行：原样提交（顺序即下标，服务端按下标合并）
+    if (row.kind === 'note') { talents.push({ kind: 'note', text: str(row.text).trim() }); return }
     if (row.kind !== 'priority') return
     // 数据里没有天赋行的角色：界面会补一行空三格（有地方填），但**没填就不落盘**，
     // 否则「打开再保存」会凭空多出一行 A1 E1 Q1（还会多出一个「3. 天赋加点」段）。
@@ -2567,6 +2712,8 @@ function buildBody () {
 
   var panels = mv2.panels.map(function (row) {
     if (row && row.__deleted === true) return { __deleted: true }
+    // 段末备注行：必须显式提交 kind + text，否则会被下面的说明行分支写成 text 行
+    if (row.kind === 'note') return { kind: 'note', text: str(row.text).trim() }
     var label = hasText(row.label) ? row.label.trim() : null
     if (hasText(row.k)) {
       var attr = panelAttrOf(row.k) || String(row.k).trim()
@@ -2582,11 +2729,14 @@ function buildBody () {
   var constellations = mv2.constellations.map(function (row) {
     if (row && row.__deleted === true) return { __deleted: true }
     // 名字为空 → 提交 null（占着下标，服务器按「没有名字」丢掉）
-    return {
+    var out = {
       name: hasText(row.name) ? row.name.trim() : null,
       index: constellationIndex(row.name),
       text: str(row.text).trim()
     }
+    // ⚠ 命座「强烈推荐」标记**不放 v2**：`parse-docx` 的校验路径在克隆目录里跑、拿不到上一份 JSON，
+    //   写在 v2 里的行级字段会被 diagnose 判成「文档缺失」。改法见 `.dsh/TODO-next.md`（顶层 `topConstellations`）。
+    return out
   })
 
   var teams = mv2.teams.map(function (row) {
@@ -2607,6 +2757,8 @@ function buildBody () {
   return {
     name: state.current,
     game: state.model.game || 'gi',
+    // 「强烈推荐」是顶层字段（与 freeModules 同套）：**总是提交**（空数组 = 全部取消）
+    topConstellations: asArray(m.topConstellations).map(Number).filter(function (n) { return n >= 1 && n <= 6 }),
     meta: {
       '建议等级': str(m.meta['建议等级']).trim(),
       '定位': str(m.meta['定位']).trim(),
@@ -2751,9 +2903,13 @@ function saveAndPublish () {
       // 用户定稿 2026-09-26：成功只显示一句「保存并发布成功」（提交摘要仍可用下方的「复制提交信息」取）；
       // 有失败步骤 / 三方校验没过 / 提交失败时照旧把明细摊开
       if (failed.length || blocked || res.commitError) {
+        // 失败侧：把失败明细（含各步骤报错）整段带走 —— 「复制报错信息」直接粘给下一个接手的人
+        var failText = failed.length
+          ? failed.map(function (st) { return st.step + '：' + st.detail }).join('\n')
+          : (blocked ? ('三方校验未通过：' + (res.detail || '')) : ('自动提交失败：' + (res.commitError || '')))
         toast(failed.length ? '保存并发布失败' : (blocked ? '保存并发布：三方校验未通过' : '保存并发布成功，但自动提交失败'),
           lines, (failed.length || blocked) ? 'error' : 'warn',
-          { text: s.markdown, label: '复制提交信息', title: s.suggestedMessage || s.title })
+          { text: failText, label: '复制报错信息', title: '报错信息' })
         showStatus(failed.length
           ? ('保存并发布失败：' + failed.map(function (st) { return st.step + ' — ' + st.detail }).join('；'))
           : blocked
@@ -2761,15 +2917,17 @@ function saveAndPublish () {
             : ('保存并发布成功，但自动提交失败：' + res.commitError),
         (failed.length || blocked) ? 'error' : 'warn', true)
       } else {
-        toast('保存并发布成功', null, 'ok', { text: s.markdown, label: '复制提交信息', title: s.suggestedMessage || s.title })
+        // 成功侧（用户定稿 2026-09-30）：提交信息**只给标题**，明细留在 out/_commit-summary.md 里备查
+        var commitMsg = s.suggestedMessage || s.title || ''
+        toast('保存并发布成功', null, 'ok', { text: commitMsg, label: '复制提交信息', title: commitMsg })
         showStatus('保存并发布成功', 'ok')
-        showChanges(asArray(s.characterChanges), '保存并发布成功', { text: s.markdown, suggested: s.suggestedMessage || s.title })
+        showChanges(asArray(s.characterChanges), '保存并发布成功', { text: commitMsg, suggested: commitMsg })
       }
       return res
     })
   }).catch(function (e) {
     showStatus('保存并发布失败：' + e.message, 'error', true)
-    toast('保存并发布失败', [e.message], 'error')
+    toast('保存并发布失败', [e.message], 'error', { text: e.message, label: '复制报错信息', title: '报错信息' })
     return null
   })
 }
@@ -2983,6 +3141,21 @@ function handleAction (act, path, i, el) {
       target = getPath(model, listPath)
       if (!Array.isArray(target)) return false
     }
+    // 同级上限（用户定稿 2026-09-30）：武器行最多 4 把、圣遗物档位行最多 3 种带法。
+    // 以前只是行头一行灰字提示，照样能加出第 5 把 / 第 4 种带法（用户报「检测不生效，超格了依旧显示」），
+    // 现在直接挡下并说清楚原因。
+    if (listPath.indexOf('v2.weapons') === 0 && asArray(target).length >= WEAPON_ROW_CAP) {
+      showStatus('这一行已经有 ' + WEAPON_ROW_CAP + ' 把（同级上限 ' + WEAPON_ROW_CAP + ' 把）：先删一把再加', 'warn')
+      return false
+    }
+    if (/^v2\.artifacts\.\d+\.sets$/.test(listPath)) {
+      var buildRowPath = listPath.replace(/\.sets$/, '')
+      if (artifactBuildCount(buildRowPath, getPath(model, buildRowPath)) >= ARTIFACT_BUILD_CAP) {
+        showStatus('这一行已经有 ' + ARTIFACT_BUILD_CAP + ' 种带法（同级上限 ' + ARTIFACT_BUILD_CAP +
+          ' 种）：先删一种，或把要加的套装并进已有的 `+` 组合里', 'warn')
+        return false
+      }
+    }
     if (listPath.indexOf('v2.weapons') === 0) target.push({ name: '', note: '' })
     else if (listPath.indexOf('v2.artifacts') === 0) {
       if (/\.sets$/.test(listPath)) target.push({ name: '' })
@@ -3013,6 +3186,19 @@ function handleAction (act, path, i, el) {
       cslot.level = (talentLevelText(cslot.level) === '10' && cslot.crown) ? '1' : '10'
       cslot.crown = cslot.level === '10'
       if (crownRow.kind === 'priority') crownRow.raw = ''
+    }
+  } else if (act === 'add-note') {
+    // 段末备注行：`{kind:'note', text}` 追加到该段数组末尾（天赋 / 面板用）
+    target.push({ kind: 'note', text: '' })
+  } else if (act === 'toggle-top') {
+    // 命座「强烈推荐」：改**顶层数组** `topConstellations`（不是 v2 行内 —— 行内过不了 diagnose）
+    var topIdx = constellationIndex(getPath(model, path) && getPath(model, path).name)
+    if (topIdx) {
+      var list = asArray(state.model.topConstellations).map(Number)
+      var at = list.indexOf(topIdx)
+      if (at >= 0) list.splice(at, 1); else list.push(topIdx)
+      list.sort(function (a, b) { return a - b })
+      state.model.topConstellations = list
     }
   } else if (act === 'toggle-free') {
     // 模块级「无需填写」：改的是角色 JSON 顶层 freeModules（不是 v2 内容），走独立接口
@@ -3221,6 +3407,10 @@ function formEvents () {
     if (el.getAttribute('data-level')) {
       setTalentSlotLevel(state.model, el.getAttribute('data-path'), el.value)
       markDirty(true)
+      // 输入框里写 10 = 皇冠：**当场**把「已皇冠」的视觉状态同步到 DOM ——
+      // 以前只有点皇冠徽标才会重绘，输入 10 看着像「没激活」（用户 2026-09-30 报）
+      var slotEl = el.closest ? el.closest('.talent-slot') : null
+      if (slotEl && slotEl.classList) slotEl.classList.toggle('crowned', String(Number(el.value || 1)) === '10')
       return
     }
     var path = el.getAttribute('data-path')
@@ -3343,6 +3533,27 @@ function formEvents () {
       var count = isWeapon ? asArray(row.items).length : asArray(row.stats).length
       showStatus('已更新关系：' + rowSepTokens(rowPath, count)
         .map(function (t) { return SEP_GLYPH[t] || t }).join(' '), 'ok')
+    }
+  })
+
+  // 圣遗物档位行：`/`（同级另一种带法）↔ `+`（2+2）。切成 `+` 时当场把这一对写成简写
+  // （用户定稿 2026-09-30：「今后添加 2+2 后自动改为简写，不再写全称」）
+  form.addEventListener('change', function (e) {
+    var el = e.target
+    if (!el || !el.getAttribute || el.getAttribute('data-set-sep') == null) return
+    var setRowPath = el.getAttribute('data-set-sep')
+    var setGap = Number(el.getAttribute('data-set-gap'))
+    if (!setSetSep(setRowPath, setGap, el.value)) return
+    var setRow = getPath(state.model, setRowPath) || {}
+    var changed = el.value === '+' ? shortenRowTwoPiece(setRowPath, setRow) : 0
+    markDirty(true)
+    renderForm()
+    if (el.value === '+') {
+      showStatus(changed
+        ? '2+2 已写成简写：' + asArray(setRow.sets).map(function (s) { return str(s && s.name) }).filter(Boolean).join(' + ')
+        : '这两套没有 2 件套写法（或已经是简写）：名字保持不变，保存时服务端会再试一次', changed ? 'ok' : 'warn')
+    } else {
+      showStatus('已改为同级（另一种带法）', 'ok')
     }
   })
 
@@ -4185,6 +4396,19 @@ window.__editor = {
   SEP_GLYPH: SEP_GLYPH,
   subSepTokens: subSepTokens,
   rowSepTokens: rowSepTokens,
+  artifactBuildCount: artifactBuildCount,
+  ARTIFACT_BUILD_CAP: ARTIFACT_BUILD_CAP,
+  // 2 件套写法（`2魔女` / `2攻击`…）：表由服务端给，这里只做查表与「`+` 组合自动简写」
+  twoPieceName: twoPieceName,
+  shortenRowTwoPiece: shortenRowTwoPiece,
+  setSetSep: setSetSep,
+  setSepSelect: setSepSelect,
+  /** 供自动化检查：注入 2 件套写法表（浏览器里来自 `/api/index` 的 `artifact2pc`） */
+  setArtifact2pcForTest: function (map) {
+    state.index = state.index || {}
+    state.index.artifact2pc = map && typeof map === 'object' ? map : {}
+    return Object.keys(state.index.artifact2pc).length
+  },
   sepSelect: sepSelect,
   setWeaponSep: setWeaponSep,
   normSepToken: normSepToken,

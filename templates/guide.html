@@ -153,6 +153,9 @@
         text-align: center;
     }
     .row-value { min-width: 0; overflow-wrap: break-word; }
+    /* 专属武器：`sig` 红（严格专武）/ `sig-alt` 绿（实际专属武器），与排在第几档无关（用户定稿 2026-09-30） */
+    .rank-item.sig, .row-value.sig, .rank-text.sig { color: #c0392b; font-weight: 800; }
+    .rank-item.sig-alt, .row-value.sig-alt, .rank-text.sig-alt { color: #1f7a3d; font-weight: 800; }
     /* 档位序列：条目 + 分隔符（推荐 › 可选 › 过渡） */
     .rank-list { display: inline; }
     .rank-unit { display: inline; white-space: nowrap; }
@@ -197,6 +200,10 @@
         color: #2f2f2f;
         text-align: center;
     }
+    /* 天赋满级（10 = 皇冠）：数字加粗标红，和 1–9 一眼区分（用户 2026-09-30 定稿） */
+    .level-num.level-max { color: #c0392b; font-weight: 800; }
+    /* 命座「强烈推荐」：整行标签「命之座x」标红加粗（编辑器点出来的标记，docx 不写字） */
+    .row-label--top { color: #c0392b; font-weight: 800; }
     /* 主词条：并列三槽靠排版分隔（不写字面 `｜`）——每条占一行，槽名加粗 */
     .rank-list.main-slots { display: flex; flex-direction: column; gap: 2px; }
     .rank-unit.main-slot { width: 100%; }

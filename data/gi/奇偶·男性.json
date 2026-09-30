@@ -2,6 +2,11 @@
   "schema": 2,
   "name": "奇偶·男性",
   "game": "gi",
+  "freeModules": [
+    "panels",
+    "constellations",
+    "teams"
+  ],
   "meta": {
     "建议等级": "81-90级",
     "定位": "___",
@@ -189,10 +194,5 @@
   ],
   "source": {
     "guide": "原神·角色攻略"
-  },
-  "freeModules": [
-    "panels",
-    "constellations",
-    "teams"
-  ]
+  }
 }

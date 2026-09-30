@@ -9,17 +9,20 @@
  *     所以这里当错误拦下来。
  *   - 主词条行还在用 `note` / `noteSlot` 字段的**当错误拦下来**：那种形状写进 docx 读不回来，
  *     `build-docx` 往返校验不过、「保存并发布」会失败（编辑器保存时已经折进值里了）。
+ *   - 同级条数超过上限的（**只提醒**）：武器行最多 4 把、圣遗物档位行最多 3 种带法
+ *     （用户定稿 2026-09-30；编辑器里点「＋」已经直接挡下，这里把老数据扫出来）。
  *
  * 用法：node scripts/scan-separators.mjs [--json]
  *   退出码：有悬挂分隔符 / 非法同级对 / 主词条字段写法 → 1，没有 → 0
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { pathToFileURL, fileURLToPath } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '..')
 const giDir = path.join(root, 'data', 'gi')
+const { twoPieceName, isPieceShorthandName } = await import(pathToFileURL(path.join(root, 'scripts', 'lib', 'schema.mjs')).href)
 
 const readJson = (f) => JSON.parse(fs.readFileSync(f, 'utf8').replace(/^\uFEFF/, ''))
 
@@ -53,6 +56,47 @@ const parenHits = []
  * 这里把漏网的老数据扫出来。
  */
 const legacyNoteHits = []
+/**
+ * 同级条数超过上限的（**只提醒，不影响退出码**）。
+ *
+ * 用户定稿 2026-09-30：武器行同级最多 **4 把**（行头那行「可加入 N 把」是按实际宽度算的软提示，
+ * 这里是硬上限）、圣遗物档位行同级最多 **3 种带法**。编辑器点「＋」时已经直接挡下，
+ * 这个扫描负责把**老数据**里已经超标的行列出来。
+ */
+const capHits = []
+const WEAPON_ROW_CAP = 4
+const ARTIFACT_BUILD_CAP = 3
+/**
+ * 2+2（`+` 连接的**恰好两条**）里还在写全名的（**只提醒，不影响退出码**）。
+ *
+ * 用户定稿 2026-09-30：「今后添加 2+2 后自动改为简写，不再写全称」。
+ * `parse-docx` / 编辑器保存都会自动改写，所以这里报出来的只剩两种情况：
+ *   · 表里没有这个套装的 2 件套写法（`scripts/lib/schema.mjs` 的 `TWO_PIECE_ABBR` 要补一行）；
+ *   · 老数据没走过解析 / 保存（编辑器打开保存一次就好）。
+ */
+const twoPieceHits = []
+/** `2X` / `4X` = 圣遗物件数简写（与显示层 `isPieceShorthand` 同口径） */
+const pieceShort = (n) => /^[24][^\d\s]/.test(String(n ?? '').trim())
+/**
+ * 圣遗物档位行的「带法」数 —— 与显示层 `resolveSetItems` 同一口径：
+ * `/` 断开两种带法，`+` 只有**两侧都是件数简写**才算同一种带法的 2+2 组合
+ * （全套装名之间的 `+` 是同级选项，显示成 `/`，用户 2026-09-20 定稿）。
+ * @param {object} row 圣遗物档位行
+ * @returns {number}
+ */
+const artifactBuildCount = (row) => {
+  const sets = (row?.sets ?? []).map(s => String(s?.name ?? '').trim()).filter(Boolean)
+  if (!sets.length) return 0
+  const raw = String(row?.sep ?? '').trim()
+  const toks = raw ? raw.split(/\s+/).filter(Boolean) : []
+  const at = (i) => toks[i] || toks[toks.length - 1] || '>'
+  let n = 1
+  for (let i = 1; i < sets.length; i++) {
+    const plus = ['+', '＋', '&', '＆'].includes(at(i - 1))
+    if (!(plus && pieceShort(sets[i - 1]) && pieceShort(sets[i]))) n++
+  }
+  return n
+}
 /** 显示后仍是「暴击率 / 暴击伤害」这一对？ */
 const isCritPair = (a, b) => {
   const x = String(a ?? '').trim()
@@ -92,6 +136,11 @@ for (const f of files) {
   }
   // 名字里含分隔符（武器条目 / 套装名）：写回文档会被切成两条 → 往返不一致
   for (const w of (d.v2?.weapons ?? [])) {
+    const named = (w?.items ?? []).filter(it => String(it?.name ?? '').trim())
+    if (named.length > WEAPON_ROW_CAP) {
+      capHits.push(`${name} 武器第 ${w?.tier ?? '?'} 档：${named.length} 把（上限 ${WEAPON_ROW_CAP}）—— ` +
+        named.map(it => String(it.name).trim()).join(' > '))
+    }
     for (const it of (w.items ?? [])) {
       const nm = String(it?.name ?? '')
       if (/[/／｜]/.test(nm)) nameHits.push(`${name} 武器「${nm}」`)
@@ -99,6 +148,31 @@ for (const f of files) {
     }
   }
   for (const a of (d.v2?.artifacts ?? [])) {
+    if (['preferred', 'optional', 'transition'].includes(a?.kind)) {
+      const builds = artifactBuildCount(a)
+      if (builds > ARTIFACT_BUILD_CAP) {
+        capHits.push(`${name} 圣遗物 ${a.label || a.kind}：${builds} 种带法（上限 ${ARTIFACT_BUILD_CAP}）—— ` +
+          (a.sets ?? []).map(s => String(s?.name ?? '').trim()).filter(Boolean).join(' / '))
+      }
+      // 2+2 理应写成简写：只看**恰好两条**的 `+` 组合（三条的第三套是 4 件套选项，见 shortenTwoPiece）
+      const sets = (a.sets ?? []).map(s => String(s?.name ?? '').trim()).filter(Boolean)
+      const raw = String(a.sep ?? '').trim()
+      const toks = raw ? raw.split(/\s+/).filter(Boolean) : []
+      const at = (i) => String(toks[i] || toks[toks.length - 1] || '>').trim()
+      const isPlus = (t) => t === '+' || t === '＋'
+      for (let i = 0; i < sets.length; i++) {
+        let j = i
+        while (j < sets.length - 1 && isPlus(at(j))) j++
+        const group = sets.slice(i, j + 1)
+        if (group.length === 2 && !group.every(isPieceShorthandName)) {
+          const unknown = group.filter(n => !isPieceShorthandName(n) && !twoPieceName(n))
+          twoPieceHits.push(unknown.length
+            ? `${name} ${a.label || a.kind}：2+2 里有表里没有的套装 ${unknown.map(n => `「${n}」`).join('、')}（补 schema.mjs 的 TWO_PIECE_ABBR）`
+            : `${name} ${a.label || a.kind}：2+2 还是全名 ${group.join(' + ')}（打开编辑器保存一次就会变简写）`)
+        }
+        i = j
+      }
+    }
     if (a?.kind === 'main' && (a.note !== undefined || a.noteSlot !== undefined)) {
       legacyNoteHits.push(`${name} 主词条 note=${JSON.stringify(a.note)} noteSlot=${JSON.stringify(a.noteSlot)}`)
     }
@@ -159,6 +233,18 @@ if (process.argv.includes('--json')) {
   } else {
     console.log(`主词条还在用 note / noteSlot 字段：${legacyNoteHits.length} 处（写回文档后读不回字段 → 往返失败、「保存并发布」会被挡下）`)
     for (const h of legacyNoteHits.slice(0, 20)) console.log(`  · ${h}`)
+  }
+  if (!capHits.length) {
+    console.log(`同级条数上限（武器 ${WEAPON_ROW_CAP} 把 / 圣遗物 ${ARTIFACT_BUILD_CAP} 种带法）：0 处 ✅`)
+  } else {
+    console.log(`[!] 同级条数超上限：${capHits.length} 处（编辑器点「＋」会直接挡下，这些是已有的行）`)
+    for (const h of capHits.slice(0, 20)) console.log(`  · ${h}`)
+  }
+  if (!twoPieceHits.length) {
+    console.log('2+2 写法（应是 `2X + 2Y` 简写）：0 处 ✅')
+  } else {
+    console.log(`[!] 2+2 还在写全名：${twoPieceHits.length} 处`)
+    for (const h of twoPieceHits.slice(0, 20)) console.log(`  · ${h}`)
   }
 }
 process.exit(hits.length || critHits.length || legacyNoteHits.length ? 1 : 0)

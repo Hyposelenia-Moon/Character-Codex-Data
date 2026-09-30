@@ -42,7 +42,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { deriveSections, deriveTags, validate, parseRef, itemText, foldMainNoteIntoStats, normalizeFreeModules, MODULE_KEYS } from './lib/schema.mjs'
+import { deriveSections, deriveTags, validate, parseRef, itemText, foldMainNoteIntoStats, normalizeFreeModules, MODULE_KEYS, shortenTwoPiece, ARTIFACT_2PC } from './lib/schema.mjs'
 import { renderGuideSectionsHtml, renderGuideSectionsText, characterSections, renderCard } from './build-html.mjs'
 import { verifyThreeWay, snapshotMainDoc, sha1File } from './lib/publish-verify.mjs'
 import { buildIndex, readAtlasCharacters } from './build-index.mjs'
@@ -85,7 +85,7 @@ const MIME = {
 }
 
 const V2_KEYS = ['weapons', 'artifacts', 'talents', 'panels', 'constellations', 'teams']
-const KEEP_KEYS = ['source', 'highlight', 'freeModules', 'meta', 'unparsed']
+const KEEP_KEYS = ['source', 'highlight', 'freeModules', 'topConstellations', 'meta', 'unparsed']
 
 /* ---------------------------------------------------------------- 基础工具 */
 
@@ -115,7 +115,7 @@ const MODULE_LABELS = {
  * @returns {object}
  */
 function orderTopLevel (data) {
-  const order = ['schema', 'name', 'game', 'highlight', 'freeModules', 'meta', 'v2', 'unparsed', 'tags', 'sections', 'source']
+  const order = ['schema', 'name', 'game', 'highlight', 'freeModules', 'topConstellations', 'meta', 'v2', 'unparsed', 'tags', 'sections', 'source']
   const out = {}
   for (const key of order) if (data[key] !== undefined) out[key] = data[key]
   for (const key of Object.keys(data)) if (!(key in out)) out[key] = data[key]
@@ -223,10 +223,12 @@ function readIndex () {
       generatedAt: doc?.generatedAt ?? null,
       weapons: asArray(doc?.weapons).map(String),
       characters: asArray(doc?.characters).map(String),
-      artifacts: asArray(doc?.artifacts).map(String)
+      artifacts: asArray(doc?.artifacts).map(String),
+      // 套装 → 2 件套写法（`2魔女` / `2攻击`…）：编辑器把分隔符切成 `+` 时当场用简称写名字
+      artifact2pc: ARTIFACT_2PC
     }
   } catch {
-    return { generatedAt: null, weapons: [], characters: [], artifacts: [] }
+    return { generatedAt: null, weapons: [], characters: [], artifacts: [], artifact2pc: ARTIFACT_2PC }
   }
 }
 
@@ -457,6 +459,12 @@ export function normalizeV2 (v2) {
       const r = { kind, label }
       if (hasText(row.sep)) r.sep = row.sep
       if (hasText(row.title)) r.title = row.title.trim()
+      // 2+2（`+` 连接的恰好两条）一律写简写（`2攻击 + 2精通`，用户定稿 2026-09-30）：
+      // 保存时兜一道，编辑器里把分隔符切成 `+`、或从文档读进来还没改过的行，都会被改写
+      if (kind === 'preferred' || kind === 'optional' || kind === 'transition') {
+        const tmp = { sets, sep: hasText(r.sep) ? r.sep : ' / ' }
+        shortenTwoPiece(tmp)
+      }
       r.sets = sets
       return r
     })
@@ -625,6 +633,14 @@ function buildCharacter (body, name, prev = {}) {
   // freeModules（该模块无需填写）：编辑器**不认识**它、也不从表单提交，只在原文件与开关接口之间流转
   const free = normalizeFreeModules(prev.freeModules ?? body.freeModules)
   if (free.length) data.freeModules = free
+  // 命座「强烈推荐」（顶层序号数组，docx 表达不了 → 与 freeModules 同一套：显式提交才写、空数组就删）
+  if ('topConstellations' in (body ?? {})) {
+    const tops = [...new Set(asArray(body.topConstellations).map(Number).filter(n => n >= 1 && n <= 6))].sort((a, b) => a - b)
+    if (tops.length) data.topConstellations = tops
+    else delete data.topConstellations
+  } else if (Array.isArray(prev.topConstellations) && prev.topConstellations.length) {
+    data.topConstellations = prev.topConstellations
+  }
 
   data.meta = {}
   const meta = body.meta && typeof body.meta === 'object' && !Array.isArray(body.meta) ? body.meta : {}
@@ -663,7 +679,37 @@ function buildCharacter (body, name, prev = {}) {
   return data
 }
 
-/** 空白模板（新建角色用）：meta 三项空、v2 六个数组为空 */
+/**
+ * 角色 → 专属武器表（`data/gi/_signature.json`）：给新建的模板自动填一把专武用。
+ *
+ * 用户定稿 2026-09-30：「五星角色的专属武器，添加模板后自动填入一个」
+ * （例：米提亚的模板自动填 `秘典星谕`）。只取 `专武`（红字那把）的第一把；
+ * 表里没有条目的角色（四星 / 旅行者 / 琴·七七·莫娜…）就还是空模板。
+ * @returns {Record<string, {专武?: string|string[], 实际?: string|string[]}>}
+ */
+export function loadSignatureTable () {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(giDir, '_signature.json'), 'utf8').replace(/^\uFEFF/, ''))
+  } catch {
+    return {}
+  }
+}
+
+/** 该角色的专武（第一把）：没有就返回 '' */
+export function signatureWeaponFor (name) {
+  const spec = loadSignatureTable()[name]
+  const v = typeof spec === 'string' ? spec : spec?.['专武']
+  const first = Array.isArray(v) ? v.find(x => String(x ?? '').trim()) : v
+  return String(first ?? '').trim()
+}
+
+/**
+ * 空白模板（新建角色用）：meta 三项空、v2 六个数组为空。
+ *
+ * ⚠ 五星角色的**专武**会**自动填进武器段第一行**（用户定稿 2026-09-30：
+ * 「五星角色的专属武器，添加模板后自动填入一个」，例：米提亚 → 秘典星谕）；
+ * 专武表里没有条目的（四星 / 旅行者 / 琴·七七·莫娜…）保持全空。
+ */
 export function emptyCharacter (name) {
   const data = {
     schema: 2,
@@ -674,6 +720,12 @@ export function emptyCharacter (name) {
     tags: [],
     sections: [],
     source: { guide: '原神·角色攻略' }
+  }
+  const sig = signatureWeaponFor(name)
+  if (sig) {
+    // 武器档位的**文档词**是 `第一档`：v2 里写 `label: null + tier: 1`（`label` 非空会被当成自定义标签词，
+    // 回读就变成 `tier: null` → 往返校验不过，2026-09-30 踩过）
+    data.v2.weapons = [{ label: null, tier: 1, sep: ' > ', items: [{ name: sig, ref: `weapon:${sig}` }] }]
   }
   data.tags = deriveTags(data)
   data.sections = deriveSections(data)
@@ -1106,7 +1158,8 @@ export function filledModules (v2) {
     return asArray(r?.stats).some(hasText)
   })
   // 天赋：真投入才算填（等级 > 1 或皇冠，皇冠行有内容，或写了说明文本）
-  const talentsFilled = asArray(v.talents).some(r => {
+  // 段末备注行（`注：…`）**不算内容**：「无需填写」时也能写备注，标了标记仍算空
+  const talentsFilled = asArray(v.talents).filter(r => !isNoteRow(r)).some(r => {
     if (r?.kind === 'priority') {
       return asArray(r?.order).some(it => Number(it?.level) > 1 || it?.crown === true)
     }
@@ -1117,7 +1170,7 @@ export function filledModules (v2) {
     weapons: anyNamed(v.weapons, 'items'),
     artifacts: anyNamed(v.artifacts, 'sets') || statsFilled(v.artifacts),
     talents: talentsFilled,
-    panels: asArray(v.panels).some(r => hasText(r?.k) || hasText(r?.text)),
+    panels: asArray(v.panels).filter(r => !isNoteRow(r)).some(r => hasText(r?.k) || hasText(r?.text)),
     constellations: asArray(v.constellations).some(r => hasText(r?.name)),
     teams: anyNamed(v.teams, 'members') || asArray(v.teams).some(r => hasText(r?.text))
   }
@@ -2538,7 +2591,17 @@ async function apiPreview (req, res) {
   }
   // 与保存走同一套规范化：mergeV2 按位置合并 + normalizeV2 去空行 + tags/sections 回推
   const data = buildCharacter(body?.character ?? body, name, prev)
-  const html = renderGuideSectionsHtml(data, { indent: 2 })
+  // 预览顶部的 hero 区（建议等级 / 定位 / 100级提升）：**只显示字段名**，空值不填占位（用户 2026-09-30 定稿）
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+  const meta = data.meta ?? {}
+  const hero = '<div style="padding:10px 12px;border:1px solid #e8edf5;border-radius:8px;background:#fcfdff;margin-bottom:10px">' +
+    `<div style="font-size:18px;font-weight:700;color:#2b4c7e;margin-bottom:6px">${esc(name)}</div>` +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12.5px;color:#4a5568">' +
+    `<span>建议等级：${esc(meta['建议等级'] ?? '')}</span>` +
+    `<span>定位：${esc(meta['定位'] ?? '')}</span>` +
+    `<span>100级提升：${esc(meta['100级提升'] ?? '')}</span>` +
+    '</div></div>'
+  const html = hero + renderGuideSectionsHtml(data, { indent: 2 })
   const lines = renderGuideSectionsText(data)
   const sections = characterSections(data).map(s => ({
     badge: s.badge ?? '',

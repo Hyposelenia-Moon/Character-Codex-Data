@@ -17,7 +17,7 @@ import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
   DISPLAY_SECTIONS, TIER_BY_INDEX, EMPTY_TEXT, normalizeSections, displayText, displayLines,
-  resolveSetItems, crownedLetters, normalizePriorityRow, applyFreeHints
+  resolveSetItems, crownedLetters, normalizePriorityRow, applyFreeHints, markSignatureWeapon, markWeaponTags
 } from './lib/guide-display.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -25,6 +25,41 @@ const root = path.resolve(here, '..')
 const dataDir = path.join(root, 'data')
 const templateFile = path.join(root, 'templates/guide.html')
 const outputFile = path.join(root, 'guide.html')
+
+/**
+ * 专属武器表：`data/gi/_signature.json`（角色 → `{专武, 实际}`，兼容旧的纯字符串写法）。
+ * 武器段里命中的那一把**标色**（红 = 严格专武、绿 = 实际专属，与档位无关）；没有条目的角色不标。
+ * 面板侧同一份逻辑（`markSignatureWeapon`，镜像在 `Atlas-Plugin/model/codexIndex/display.js`）。
+ */
+let _signatureMap = null
+function signatureOf (data) {
+  try {
+    if (!_signatureMap) {
+      const file = path.join(dataDir, data?.game || 'gi', '_signature.json')
+      _signatureMap = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')) : {}
+    }
+    return _signatureMap?.[data?.name] ?? ''
+  } catch {
+    return ''
+  }
+}
+
+/** 「有正文」判据与主文档同一份（`build-docx.mjs`）：meta 全空 = 模板还没真正开始 */
+const { isFilledCharacter } = await import(pathToFileURL(path.join(here, 'build-docx.mjs')).href)
+
+/** 武器标签表（`data/gi/_weapon-tags.json`，如活动武器 `活动`）：命中条目加行内备注 */
+let _weaponTags = null
+function weaponTags () {
+  try {
+    if (!_weaponTags) {
+      const file = path.join(dataDir, 'gi', '_weapon-tags.json')
+      _weaponTags = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')) : {}
+    }
+    return _weaponTags
+  } catch {
+    return {}
+  }
+}
 
 /** 值是否为空（空串、只有占位符 ___、或只剩标点）：网页版不渲染这类待补栏位 */
 function isBlank (text) {
@@ -92,10 +127,16 @@ function readOrder (dir) {
  *
  * 判据只看 JSON 里的**原始文本行**，不看显示级归一结果 —— 归一后空段落会显示
  * 「暂无」，若拿它当判据，空档角色也会被当成「有内容」而混进网页版。
+ *
+ * ⚠ 与主文档同一口径（`build-docx.mjs` 的 `isFilledCharacter`，判据是 **meta 有没有填**）：
+ * 五星角色的模板会自动补一行专武（例：米提亚 → 秘典星谕），那种「还没真正开始的模板」
+ * **不进网页版**（用户定稿 2026-09-30）；两处判据必须一致，否则 `audit-guide-html` 会报
+ * 「卡片数 ≠ 有正文的角色数」。
  * @param {object} data
  * @returns {boolean}
  */
 function isEmptyCharacter (data) {
+  if (!isFilledCharacter(data)) return true
   const hasTags = Array.isArray(data.tags) && data.tags.length > 0
   const hasHighlight = Boolean(data.highlight)
   const hasLines = (data.sections || []).some(s => Array.isArray(s.lines) && s.lines.some(line => !isBlank(line)))
@@ -204,7 +245,7 @@ function renderBody (section, indent, dir) {
  * @param {string|null} [crownHint] 天赋优先级行的「皇冠必需字母」（来自 v2.talents 的皇冠行）
  * @returns {Array<{label: string, kind?: string, items: Array}>}
  */
-function linesToModelRows (lines, labelHints = [], crownHint = null, levelHints = null, v2SetRows = [], v2WeaponRows = []) {
+function linesToModelRows (lines, labelHints = [], crownHint = null, levelHints = null, v2SetRows = [], v2WeaponRows = [], v2ConstellationRows = []) {
   let weaponAt = 0
   const weaponRows = (v2WeaponRows ?? []).filter(r => r && typeof r === 'object' && Array.isArray(r.items) && r.items.length)
   // v2 的套装行（与派生的 sections 行**同序**，按出现顺序取）。
@@ -254,7 +295,10 @@ function linesToModelRows (lines, labelHints = [], crownHint = null, levelHints 
     const consIndex = consHit ? ({ 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6 }[consHit[1]] ?? Number(consHit[1])) : 0
     if (consIndex >= 1 && consIndex <= 6) {
       const ref = `constellation:${consIndex}`
-      out.push({ label, ref, items: [{ text: value, sepAfter: '', ref }] })
+      // 「强烈推荐」是**顶层序号数组**（`topConstellations: [2, 6]`，docx 不写字）：
+      // 命中时行上加 `top`，渲染层据此把「命之座x」标红加粗
+      const isTop = (v2ConstellationRows ?? []).some(x => Number(x) === consIndex)
+      out.push({ label, ref, ...(isTop ? { top: true } : {}), items: [{ text: value, sepAfter: '', ref }] })
       return
     }
     if (MAIN_SLOTS.some(s => value.includes(s + '：') || value.includes(s + ':'))) {
@@ -607,7 +651,8 @@ export function characterSections (data) {
     }
     const rows = linesToModelRows(lines, title === '武器' ? weaponHints : [], title === '天赋' ? crownHint : null, title === '天赋' ? levelHints : null,
       title === '圣遗物' ? (data?.v2?.artifacts ?? []) : [],
-      title === '武器' ? (data?.v2?.weapons ?? []) : [])
+      title === '武器' ? (data?.v2?.weapons ?? []) : [],
+      title === '命座' ? (data?.topConstellations ?? []) : [])
     // 主词条行的 `note` / `noteSlot`（`理之冠：…防御力（特殊）` 里的「特殊」）：
     // 面板直接读 v2 字段；网页版读的是**文档层行**，所以这里把字段里的括注补挂到对应部位的那个值上，
     // 渲染成同一份小字备注（值里已经带括注的不重复挂 —— 那种由显示层折成 note，见 guide-display）。
@@ -627,7 +672,10 @@ export function characterSections (data) {
     }
   }
   // 「该模块无需填写」（角色 JSON 的 freeModules）：空模块换一行自由说明（替代「暂无」）
-  return applyFreeHints(normalizeSections(model), data?.freeModules)
+  // 专属武器：武器段里那一把标红/标绿（`data/gi/_signature.json`，与档位无关）
+  // 武器标签（活动武器等）：命中的条目加行内备注（`data/gi/_weapon-tags.json`）
+  const marked = markSignatureWeapon(applyFreeHints(normalizeSections(model), data?.freeModules), signatureOf(data))
+  return markWeaponTags(marked, weaponTags())
 }
 /** 默认天赋行：固定三格 A → E → Q，等级取 v2（缺省 1），皇冠按皇冠行 —— 与「文档写了 `天赋：A1 E1 Q1`」同一形状 */
 function defaultTalentRow (levelHints, crownHint) {
@@ -731,7 +779,9 @@ function renderItems (row) {
   // 面板侧 codex.html 是画 `row.items[0].note` 的，这里漏了就会「网页版没有括注、面板有」。
   if (items.length === 1) {
     const note = items[0].note ? `<span class="rank-note">（${inline(items[0].note)}）</span>` : ''
-    return `<span class="row-value">${inline(items[0].text)}${note}${crownBadge(items[0])}${levelBadge(items[0])}</span>`
+    // 专属武器：`sig` 红（严格专武）/ `sig-alt` 绿（实际专属），与档位无关（用户定稿 2026-09-30）
+    const sigCls = `${items[0].sig === true ? ' sig' : ''}${items[0].sigAlt === true ? ' sig-alt' : ''}`
+    return `<span class="row-value${sigCls}">${inline(items[0].text)}${note}${crownBadge(items[0])}${levelBadge(items[0])}</span>`
   }
   const isTalent = row.kind === 'talents' || /天赋/.test(String(row.label))
   const isMain = items.some(it => it.slot)
@@ -746,7 +796,8 @@ function renderItems (row) {
     // 主词条并列三槽：靠排版分隔（不写字面 `｜`），槽名用 <b> 提亮
     const sep = it.sepAfter && !isTalent && !isMain ? `<span class="sep">${inline(it.sepAfter)}</span>` : ''
     const slotAttr = it.slot ? ` data-slot="${escapeHtml(it.slot)}"` : ''
-    const cls = ['rank-item', it.crown ? 'rank-crown' : '', it.slot ? 'main-slot' : '', isTalent ? 'talent-item' : ''].filter(Boolean).join(' ')
+    const cls = ['rank-item', it.crown ? 'rank-crown' : '', it.slot ? 'main-slot' : '', isTalent ? 'talent-item' : '',
+      it.sig === true ? 'sig' : '', it.sigAlt === true ? 'sig-alt' : ''].filter(Boolean).join(' ')
     const unitCls = ['rank-unit', it.slot ? 'main-slot' : '', isTalent ? 'talent' : ''].filter(Boolean).join(' ')
     const text = isTalent ? `<span class="rank-text">${inline(it.text)}</span>` : inline(it.text)
     return `<span class="${unitCls}"${slotAttr}><span class="${cls}">${text}${crownBadge(it)}${levelBadge(it)}${note}</span>${sep}</span>`
@@ -761,7 +812,9 @@ function renderItems (row) {
 function levelBadge (item) {
   const lv = Number(item?.level)
   if (!Number.isInteger(lv) || lv < 1 || lv > 10) return ''
-  return `<span class="level-num" title="天赋等级 ${lv}">${lv}</span>`
+  // 满级（10 = 皇冠）数字加粗标红，和 1–9 区分开（用户 2026-09-30 定稿）
+  const cls = lv === 10 ? 'level-num level-max' : 'level-num'
+  return `<span class="${cls}" title="天赋等级 ${lv}">${lv}</span>`
 }
 
 /**
@@ -874,7 +927,7 @@ export function renderDisplaySection (section, indent, dir) {
   // （网页版 guide.html 不打包图鉴图片资源，运行时由面板解析；取不到图标就纯文字，不留空位）
   const rowIconRef = row.ref && String(row.ref).startsWith('constellation:') ? row.ref : ''
   const iconAttr = rowIconRef ? ` data-icon-ref="${escapeHtml(rowIconRef)}"` : ''
-  const label = row.label ? `<span class="row-label">${inline(row.label)}</span>` : ''
+  const label = row.label ? `<span class="row-label${row.top === true ? ' row-label--top' : ''}">${inline(row.label)}</span>` : ''
   out.push(`${pad}        <div class="row${row.label ? '' : ' row-nolabel'}${rowIconRef ? ' row-constellation' : ''}"${iconAttr}>${label}${renderItems(row)}</div>`)
     }
     out.push(`${pad}    </div>`)

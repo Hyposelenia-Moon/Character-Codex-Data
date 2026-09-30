@@ -14,7 +14,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { readDocx, SEPARATOR } from './lib/docx.mjs'
-import { makeRef, parseRef, deriveSections, deriveTags, validate, constellationIndex, extractMarks, stripMarks, MARK_RE, parseNoteLine, resolveNoteText, artifactStatPool, isNoteRow } from './lib/schema.mjs'
+import { makeRef, parseRef, deriveSections, deriveTags, validate, constellationIndex, extractMarks, stripMarks, MARK_RE, parseNoteLine, resolveNoteText, artifactStatPool, isNoteRow, shortenTwoPiece } from './lib/schema.mjs'
 import { warn, getWarnings, resetWarnings, setWarnContext } from './lib/parse-warnings.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -593,6 +593,8 @@ function parseBlock (lines, index) {
         const { items, sep } = splitItems(setRow[2])
         if (items.length) {
           const row = buildSetRow(items, sep, parseSetItem)
+          // 2+2 一律写简写（`2攻击 + 2精通`，用户定稿 2026-09-30）：文档里写成全名也当场改掉，回写就是简写
+          shortenTwoPiece(row)
           // label 原样存下（首选 / 次选 / 可选 / 过渡 / 套装），build-docx 写回时逐字还原
           data.v2.artifacts.push({ kind, label: setRow[1], sep: row.sep, sets: row.sets })
           continue
@@ -603,6 +605,7 @@ function parseBlock (lines, index) {
         const { items, sep } = splitItems(labeled[2])
         if (items.length) {
           const row = buildSetRow(items, sep, parseSetItem)
+          shortenTwoPiece(row)   // 同上：2+2 写简写
           data.v2.artifacts.push({ kind: 'preferred', label: labeled[1].trim(), sep: row.sep, sets: row.sets })
           continue
         }
@@ -769,6 +772,9 @@ function main () {
       ...(prev.highlight ? { highlight: prev.highlight } : {}),
       // 模块级「无需填写」标记：文档表达不了它，从上一份 JSON 原样带过来（与 highlight 同一套做法）
       ...(prev.freeModules ? { freeModules: prev.freeModules } : {}),
+      // 命座「强烈推荐」标记（顶层序号数组，如 `[2, 6]`）：docx 行里不写字（显示层只把「命之座x」标红加粗），
+      // 与 freeModules / highlight 同一套 —— 放**顶层**而不是 v2 行内，验收路径才看不到差异
+      ...(prev.topConstellations ? { topConstellations: prev.topConstellations } : {}),
       meta: parsed.meta,
       v2: parsed.v2,
       tags: [],

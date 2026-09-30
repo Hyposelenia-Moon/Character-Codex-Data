@@ -217,6 +217,19 @@ function isSingleName (name) {
   return true
 }
 
+/**
+ * 常用「两件套」简写（编辑器预设，用户 2026-09-30 定稿）：`2攻击` / `2生命` / `2精通` / `2充能`。
+ *
+ * 它们**不是套装名**，而是"带这个 2 件套效果的那两套"的写法，图鉴后端里没有 —— 这里显式列出来、
+ * 破例编进索引白名单，于是：
+ *   - 编辑器「圣遗物套装」候选（名称库 `▾` / 输入框 datalist）把这四个**固定排在最前**，点一下就填；
+ *   - `validate()` 以索引为白名单，所以编辑器不再挂「圣遗物名不在图鉴」的 ⚠，
+ *     `parse-docx` 的 `_parse-report.json` 也不再记这几条。
+ * ⚠ 只放行这一份清单：其余数字开头的口语写法（`88爆伤` 之类）照旧被 `isSingleName` 拒掉、照旧挂 ⚠ ——
+ *   别把「不报错」扩大成「什么名字都收」。
+ */
+export const ARTIFACT_PIECE_PRESETS = ['2攻击', '2生命', '2精通', '2充能']
+
 /** 递归收集一份角色 JSON 里所有 ref 的名字（按类型分组） */
 function collectRefNames (value, into) {
   if (!value) return
@@ -289,6 +302,10 @@ export function buildIndex (opts = {}) {
     characters: characters.length - before.characters,
     artifacts: artifacts.length - before.artifacts
   }
+
+  // 常用 2 件套预设固定排在候选最前（编辑器 ▾ 选择器 / datalist / 名称库都吃这个顺序）：
+  // 归一那一步按拼音排序，所以要排完再插到前面。
+  artifacts = [...ARTIFACT_PIECE_PRESETS, ...artifacts.filter(n => !ARTIFACT_PIECE_PRESETS.includes(n))]
 
   const index = { generatedAt: new Date().toISOString(), weapons, characters, artifacts }
   let wrote = false

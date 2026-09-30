@@ -8,7 +8,19 @@
     "100级提升": ""
   },
   "v2": {
-    "weapons": [],
+    "weapons": [
+      {
+        "label": null,
+        "tier": 1,
+        "sep": " > ",
+        "items": [
+          {
+            "name": "秘典星谕",
+            "ref": "weapon:秘典星谕"
+          }
+        ]
+      }
+    ],
     "artifacts": [],
     "talents": [],
     "panels": [],
@@ -16,7 +28,14 @@
     "teams": []
   },
   "tags": [],
-  "sections": [],
+  "sections": [
+    {
+      "title": "1. 武器推荐",
+      "lines": [
+        "第一档：秘典星谕"
+      ]
+    }
+  ],
   "source": {
     "guide": "原神·角色攻略"
   }

@@ -2,6 +2,9 @@
   "schema": 2,
   "name": "旅行者·岩",
   "game": "gi",
+  "freeModules": [
+    "panels"
+  ],
   "meta": {
     "建议等级": "81级"
   },
@@ -181,8 +184,5 @@
   ],
   "source": {
     "guide": "原神·角色攻略"
-  },
-  "freeModules": [
-    "panels"
-  ]
+  }
 }

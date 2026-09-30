@@ -262,6 +262,14 @@ push('配队：候选拆分', fn('memberCandidates')('迪奥娜 / 阿罗夏'), [
   push('filledModules：配队只有空成员 → 配队未填', filledModules({ teams: [{ members: [{ name: '' }], text: '' }] }).teams, false)
   push('filledModules：整行备注算配队有内容', filledModules({ teams: [{ kind: 'note', text: '二命' }] }).teams, true)
   push('filledModules：六个键都在', Object.keys(filledModules({})).join(','), 'weapons,artifacts,talents,panels,constellations,teams')
+  // 保存时服务端也要把 2+2 写成简写（编辑器切了 `+` 但没等界面改写、或旧页面缓存提交全名时兜一道）
+  const normalized = normalizeV2({
+    artifacts: [{
+      kind: 'preferred', label: '推荐', sep: ' + ',
+      sets: [{ name: '染血的骑士道', ref: 'artifact:染血的骑士道' }, { name: '角斗士的终幕礼', ref: 'artifact:角斗士的终幕礼' }]
+    }]
+  })
+  push('服务端 normalizeV2：2+2 落盘就是简写', normalized.artifacts[0].sets.map(s => s.name).join(' + '), '2染血 + 2攻击')
   // 天赋：**三格全 1 不算填**（用户定稿 2026-09-24：默认 111 只是「界面按 111 正常显示」的占位，
   // 补过默认行的角色在目录里依旧要显示「未填：… 天 …」）
   const pri = (levels, crown) => ({ kind: 'priority', raw: levels.join(''), order: levels.map((lv, i) => ({ name: 'AEQ'[i], level: lv, crown: lv === 10 || crown === true })) })
@@ -560,6 +568,79 @@ push('配队：候选拆分', fn('memberCandidates')('迪奥娜 / 阿罗夏'), [
   fn('handleAction')('del-item', 'v2.weapons.0.items', 2, null)
   fn('handleAction')('del-item', 'v2.weapons.0.items', 1, null)
   push('sep 同步：只剩一条 → 回落单 token 写法', fn('toJson')().v2.weapons[0].sep, ' > ')
+}
+
+/* 5h-2. 同级上限（用户定稿 2026-09-30）：武器行最多 4 把、圣遗物档位行最多 3 种带法。
+ *       以前只提示不拦，能加到第 5 把 / 第 4 种带法（用户报「武器行的检测不生效，超格了依旧显示」）。 */
+{
+  // 「带法」口径与显示层一致：`+` 只在两侧都是件数简写时算同一种带法
+  const twoPlusTwo = ctx.__editor.internals.normalizeData(mkData({
+    artifacts: [{ kind: 'preferred', label: '推荐', sep: ' / + ', sets: [{ name: '昔日宗室之仪' }, { name: '2生命' }, { name: '2充能' }] }]
+  }))
+  api.setModelForTest(twoPlusTwo)
+  push('带法数：`宗室 / 2生命 + 2充能` = 2 种', fn('artifactBuildCount')('v2.artifacts.0', twoPlusTwo.v2.artifacts[0]), 2)
+  const fullNames = ctx.__editor.internals.normalizeData(mkData({
+    artifacts: [{ kind: 'preferred', label: '推荐', sep: ' / + ', sets: [{ name: '优菈甲' }, { name: '优菈乙' }, { name: '优菈丙' }] }]
+  }))
+  api.setModelForTest(fullNames)
+  push('带法数：全套装名之间的 `+` 仍算同级 → 3 种', fn('artifactBuildCount')('v2.artifacts.0', fullNames.v2.artifacts[0]), 3)
+  // 已到 3 种带法 → 「＋ 套装」被挡下
+  fn('handleAction')('add-item', 'v2.artifacts.0.sets', undefined, null)
+  push('圣遗物：3 种带法时加第 4 条被挡下', fullNames.v2.artifacts[0].sets.length, 3)
+  // 只有 2 种带法 → 还能加
+  api.setModelForTest(twoPlusTwo)
+  fn('handleAction')('add-item', 'v2.artifacts.0.sets', undefined, null)
+  push('圣遗物：2 种带法时第 3 条可以加', twoPlusTwo.v2.artifacts[0].sets.length, 4)
+  // 武器行已满 4 把 → 第 5 把被挡下
+  const w4 = ctx.__editor.internals.normalizeData(mkData({
+    weapons: [{ label: '推荐', tier: 1, sep: ' > ', items: [{ name: '甲枪' }, { name: '乙枪' }, { name: '丙枪' }, { name: '丁枪' }] }]
+  }))
+  api.setModelForTest(w4)
+  fn('handleAction')('add-item', 'v2.weapons.0.items', undefined, null)
+  push('武器行：4 把时加第 5 把被挡下', w4.v2.weapons[0].items.length, 4)
+}
+
+/* 5h-3. 2+2 自动简写（用户定稿 2026-09-30：「今后添加 2+2 后自动改为简写，不再写全称」）。
+ *       表由服务端给（`/api/index` 的 `artifact2pc`），浏览器只负责查表 + 改写。 */
+{
+  api.setArtifact2pcForTest({
+    苍白之火: '2苍白', 染血的骑士道: '2染血', 角斗士的终幕礼: '2攻击', 昔日宗室之仪: '2宗室',
+    被怜爱的少女: '2少女'
+  })
+  push('2 件套写法：套装名 → 简写', fn('twoPieceName')('角斗士的终幕礼'), '2攻击')
+  push('2 件套写法：已经是简写 → 原样', fn('twoPieceName')('2精通'), '2精通')
+  push('2 件套写法：查不到 → 空串（不硬凑）', fn('twoPieceName')('彩云之荫'), '')
+  const data = mkData({
+    artifacts: [{
+      kind: 'preferred', label: '推荐', sep: ' / + ',
+      sets: [{ name: '苍白之火', ref: 'artifact:苍白之火' }, { name: '染血的骑士道', ref: 'artifact:染血的骑士道' }, { name: '角斗士的终幕礼', ref: 'artifact:角斗士的终幕礼' }]
+    }]
+  })
+  const model = ctx.__editor.internals.normalizeData(data)
+  api.setModelForTest(model)
+  push('2+2：`+` 那两条改写成简写', fn('shortenRowTwoPiece')('v2.artifacts.0', model.v2.artifacts[0]), 2)
+  push('2+2：名字与 ref 都跟着改',
+    model.v2.artifacts[0].sets.map(s => s.name + '|' + s.ref).slice(1).join(' , '),
+    '2染血|artifact:2染血 , 2攻击|artifact:2攻击')
+  push('2+2：同级那一件不动', model.v2.artifacts[0].sets[0].name, '苍白之火')
+  // 三条的 `+` 组合不动（第三套其实是 4 件套选项；三条简写会被并成一个 chip）
+  const three = ctx.__editor.internals.normalizeData(mkData({
+    artifacts: [{ kind: 'preferred', label: '推荐', sep: ' + ', sets: [{ name: '2生命', ref: 'artifact:2生命' }, { name: '2生命', ref: 'artifact:2生命' }, { name: '教官', ref: 'artifact:教官' }] }]
+  }))
+  api.setModelForTest(three)
+  push('2+2：三条的组合不动', fn('shortenRowTwoPiece')('v2.artifacts.0', three.v2.artifacts[0]), 0)
+  push('2+2：三条的名字也没变', three.v2.artifacts[0].sets[2].name, '教官')
+  // 一条查不到写法 → 整组不动
+  const unknown = ctx.__editor.internals.normalizeData(mkData({
+    artifacts: [{ kind: 'preferred', label: '推荐', sep: ' + ', sets: [{ name: '彩云之荫', ref: 'artifact:彩云之荫' }, { name: '角斗士的终幕礼', ref: 'artifact:角斗士的终幕礼' }] }]
+  }))
+  api.setModelForTest(unknown)
+  push('2+2：有一条查不到 → 整组不动', fn('shortenRowTwoPiece')('v2.artifacts.0', unknown.v2.artifacts[0]), 0)
+  // 分隔符 `/` ↔ `+`
+  api.setModelForTest(model)
+  push('分隔符：`/` → `+`', fn('setSetSep')('v2.artifacts.0', 0, '+'), true)
+  push('分隔符：写回 sep（全同 → 收成单 token）', model.v2.artifacts[0].sep, ' + ')
+  push('分隔符：选择器带当前档位', /data-set-sep="v2\.artifacts\.0"/.test(fn('setSepSelect')('v2.artifacts.0', 0, '+')), true)
 }
 
 /* 5i. 点皇冠回退（取消皇冠）必须能保存 —— 用户 2026-09-26 报「点皇冠回退，保存不生效」。

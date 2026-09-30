@@ -200,13 +200,17 @@ export function documentLines (bundle) {
  * 它的块只有一行 `名字 —— 建议等级：`，回读时 `meta.建议等级` 会被解析成 `undefined`，
  * 与 JSON 里的空串对不上 —— 以前会让 `--write-main` 直接拒绝写主文档（连带每天的自动回写）。
  * 所以空档角色**不进主文档**（与「空档角色不进 guide.html」同一口径），填了内容再写。
+ *
+ * ⚠ 判据就是 **meta 有没有填**（用户定稿 2026-09-30）：五星角色的模板会自动补一行专武
+ * （`emptyCharacter` 里，例：米提亚 → 秘典星谕），若按「有 sections 就算填」会把这种
+ * **还没真正开始的模板**也写进主文档，往返立刻卡在 `meta.建议等级: JSON="" ≠ 文档=undefined`。
+ * 主文档每个角色块都有 `建议等级 / 定位 / 100级提升`，所以 meta 全空 = 模板还没开始。
  * @param {object} doc 角色 JSON
  * @returns {boolean}
  */
 export function isFilledCharacter (doc) {
   const meta = doc?.meta ?? {}
-  if (Object.values(meta).some(v => String(v ?? '').trim())) return true
-  return deriveSections(doc).some(sec => (sec.lines ?? []).length > 0)
+  return Object.values(meta).some(v => String(v ?? '').trim())
 }
 
 /** 读取 data/gi/_order.json + 全部角色 JSON */
