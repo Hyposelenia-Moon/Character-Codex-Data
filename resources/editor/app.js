@@ -4,7 +4,7 @@
 /* ============================================================ 常量 / 状态 */
 
 var TALENTS = ['A', 'E', 'Q']
-var TIERS = [1, 2, 3, 4, 5, 6]
+var TIERS = [1, 2, 3]
 var CN_NUM = { 1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: '六' }
 
 /**
@@ -18,8 +18,8 @@ var CN_NUM = { 1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: '六' }
  */
 var ARTIFACT_KINDS = [
   { value: 'preferred', label: '推荐' },
-  { value: 'transition', label: '过渡' },
   { value: 'optional', label: '可选' },
+  { value: 'transition', label: '过渡' },
   { value: 'main', label: '主词条' },
   { value: 'sub', label: '副词条' },
   { value: 'text', label: '文本' },
@@ -30,12 +30,13 @@ var ARTIFACT_KINDS = [
  * 圣遗物档位词 ↔ `kind`（**与 parse-docx 的 setRow 映射、`schema.renderArtifactRow` 同一份**）。
  *
  * 文档里一行**只有一个标签词**，所以 `label`（文档里的原词）与 `kind` 必须互相吻合：
- * `首选`/`套装`→preferred、`可选`/`次选`→optional、`过渡`→transition；
+ * `推荐`→preferred、`可选`→optional、`过渡`→transition；
+ * 旧写法 `首选`/`套装`→preferred、`次选`→optional 仍然认（历史数据兼容）；
  * 认不出的自定义词（`输出向`）走 parse-docx 的兜底 → `kind: 'preferred'`。
  * 编辑器按同一规则联动下拉，保证「保存 → 写文档 → 再解析」不会漂移。
  */
-var ARTIFACT_WORD_KIND = { 首选: 'preferred', 套装: 'preferred', 可选: 'optional', 次选: 'optional', 过渡: 'transition' }
-var ARTIFACT_KIND_WORD = { preferred: '首选', transition: '过渡', optional: '可选' }
+var ARTIFACT_WORD_KIND = { 推荐: 'preferred', 首选: 'preferred', 套装: 'preferred', 可选: 'optional', 次选: 'optional', 过渡: 'transition' }
+var ARTIFACT_KIND_WORD = { preferred: '推荐', transition: '过渡', optional: '可选' }
 
 /**
  * 武器档位下拉：与面板 / 网页版同一套术语 —— 1/2/3 → 推荐 / 可选 / 过渡。
@@ -1562,7 +1563,7 @@ function renderTeams () {
     }).join('')
     return '<div class="box"' + rowAttr(rowId) + '><div class="box-head">' +
       '<span class="box-title">行 ' + (i + 1) + '</span>' +
-      '<input type="text" class="w-sm" data-path="' + p + '.label" value="' + esc(row.label) + '" placeholder="标签（如 首选）" title="界面按显示层显示：首选 → 推荐、其他 → 可选（只改显示，不改数据）">' + labelHint(row.label) +
+      '<input type="text" class="w-sm" data-path="' + p + '.label" value="' + esc(row.label) + '" placeholder="标签（如 推荐）" title="界面按显示层显示：首选 → 推荐、其他 → 可选（只改显示，不改数据）">' + labelHint(row.label) +
       '<span class="spacer"></span>' +
       actBtn('move-row-up', 'v2.teams', '↑', 'btn mini', '上移', i) +
       actBtn('move-row-down', 'v2.teams', '↓', 'btn mini', '下移', i) +

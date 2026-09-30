@@ -587,9 +587,9 @@ function parseBlock (lines, index) {
         if (stats.length) data.v2.artifacts.push({ kind: 'sub', stats, sep: gapSepOf(full, sub[1]) })
         continue
       }
-      const setRow = line.match(/^(首选|次选|可选|过渡|套装)[:：]\s*(.*)$/)
+      const setRow = line.match(/^(推荐|首选|次选|可选|过渡|套装)[:：]\s*(.*)$/)
       if (setRow) {
-        const kind = { 首选: 'preferred', 过渡: 'transition', 次选: 'optional', 可选: 'optional', 套装: 'preferred' }[setRow[1]]
+        const kind = { 推荐: 'preferred', 首选: 'preferred', 过渡: 'transition', 次选: 'optional', 可选: 'optional', 套装: 'preferred' }[setRow[1]]
         const { items, sep } = splitItems(setRow[2])
         if (items.length) {
           const row = buildSetRow(items, sep, parseSetItem)
