@@ -14,8 +14,19 @@
  *     · 数据里出现过的 ref 名（只收「单个实体名」，带 +、/、=、空格等组合/说明的不收）→ 对应清单
  *
  * 输出：data/_index.json（UTF-8 无 BOM、2 空格缩进、末尾换行）
- *   { "generatedAt": "ISO", "weapons": [...], "characters": [...], "artifacts": [...] }
+ *   {
+ *     "generatedAt": "ISO",
+ *     "weapons": [...], "characters": [...], "artifacts": [...],   // 合并清单（权威 + 来自数据的本地候选）
+ *     "authoritative": { "weapons": [], "characters": [], "artifacts": [] },  // 只为图鉴后端 + data/gi 角色文件名
+ *     "localOnly":     { "weapons": [], "characters": [], "artifacts": [] }   // 合并清单 − 权威清单
+ *   }
  * 编辑器（scripts/editor.mjs）用它做名称候选与校验；scripts/parse-docx.mjs 也会读它。
+ *
+ * ⚠ 三个旧数组（weapons / characters / artifacts）**语义与内容都不变**（编辑器 datalist、名称库、
+ *   批量替换的「在不在清单里」提示、类型判定都在用），仍含「图鉴里没有、只有 data/gi 在用」的名字；
+ *   **校验（schema.mjs 的 validate）只读 authoritative** —— 否则把错名写进 data 再保存，
+ *   错名会被并进白名单，该角色的 issue 从 1 变 0（自我合法化，审核 #8）。
+ *   两者之差即 localOnly，由 scripts/audit-dup-items.mjs 当门禁（非空即失败）。
  *
  * 用法：
  *   node scripts/build-index.mjs [后端目录]
@@ -203,6 +214,11 @@ function readCharacterFiles () {
  *   - 口语/规格说明：数字开头（2充能、88爆伤），或含 任意 / 其他 / 主C / 武器 / 套装 /
  *     散搭 / 白值 / 辅助 等词（任意674白值武器、其他辅助武器、任意攻击主C、角斗士的终幕礼两件套）
  *   - 明显是短句：≥ 8 字
+ *
+ * ⚠ 黑名单式过滤天然会漏（想到哪个符号才挡哪个），这里至少把已知的复合名分隔符挡掉：
+ *   `\`（`若水\阿莫斯`：7 字、汉字开头，加反斜杠前能整条混进白名单）、`\u3000` 全角空格。
+ *   （`\u3000` 其实已被正则里的 `\s` 覆盖、也会被 trim 掉，这里显式列出只为把「全角空格也算分隔符」写明。）
+ *   真要彻底解决，得改成白名单式判据（只收「图鉴里出现过」），那属于审核 #8 之后的另一件事。
  * @param {string} name
  */
 const NON_ENTITY_WORDS = /任意|其他|主[cCＣ]|武器|套装|散搭|白值|辅助/
@@ -212,7 +228,7 @@ function isSingleName (name) {
   if (!s) return false
   if (s.length >= 8) return false                                   // 短句
   if (!/^[\u4e00-\u9fa5]/.test(s)) return false                     // 数字/字母开头 = 口语写法
-  if (/[+＋/／=＝>＞<＜＆&、，,；;：:（）()\[\]「」【】\s·]/.test(s)) return false   // 组合/并列
+  if (/[+＋/／=＝>＞<＜＆&、，,；;：:（）()\[\]「」【】\s·\\\u3000]/.test(s)) return false // 组合/并列（含 \ 与全角空格）
   if (NON_ENTITY_WORDS.test(s)) return false                        // 泛称/说明
   return true
 }
@@ -275,6 +291,9 @@ function readRefNamesFromData () {
  * @param {string} [opts.backend] 图鉴后端目录（默认 DEFAULT_BACKEND）
  * @param {string} [opts.outFile] 输出文件（默认 data/_index.json；传 null 只返回不写盘）
  * @returns {{index: object, outFile: string|null, weapons: number, characters: number, artifacts: number,
+ *            authoritative: {weapons: number, characters: number, artifacts: number},
+ *            localOnly: {weapons: number, characters: number, artifacts: number},
+ *            localOnlyNames: {weapons: string[], characters: string[], artifacts: string[]},
  *            artifactFiles: number, badFiles: string[], added: object, fromFiles: number, wrote: boolean}}
  */
 export function buildIndex (opts = {}) {
@@ -285,18 +304,32 @@ export function buildIndex (opts = {}) {
   }
 
   const map = readMapNames(backend)
-  let weapons = map.weapons
-  let characters = map.characters
   const art = readArtifactNames(backend)
-  let artifacts = art.names
-
-  // 并入 data/gi 里实际在用的名字：文件名 + 数据里的 ref 名
-  const fromData = readRefNamesFromData()
   const fromFiles = readCharacterFiles()
-  const before = { weapons: weapons.length, characters: characters.length, artifacts: artifacts.length }
-  weapons = normalizeNames([...weapons, ...fromData.weapon])
-  artifacts = normalizeNames([...artifacts, ...fromData.artifact])
-  characters = normalizeNames([...characters, ...fromData.character, ...fromFiles])
+
+  // ① 权威清单：武器/圣遗物**只来自图鉴后端**；角色除 map.json 外还必须含 data/gi 的文件名
+  //    （编辑器「从图鉴添加新角色」刚建出来的文件要立刻通过校验 —— validate 读的就是这一份）。
+  const authoritative = {
+    weapons: normalizeNames(map.weapons),
+    characters: normalizeNames([...map.characters, ...fromFiles]),
+    artifacts: normalizeNames(art.names)
+  }
+  const authSets = {
+    weapons: new Set(authoritative.weapons),
+    characters: new Set(authoritative.characters),
+    artifacts: new Set(authoritative.artifacts)
+  }
+
+  // ② 合并清单（旧字段）：权威 + data/gi 里实际在用的名字（文件名 + 数据里的 ref 名）。
+  const fromData = readRefNamesFromData()
+  const before = {
+    weapons: authoritative.weapons.length,
+    characters: authoritative.characters.length,
+    artifacts: authoritative.artifacts.length
+  }
+  const weapons = normalizeNames([...authoritative.weapons, ...fromData.weapon])
+  const characters = normalizeNames([...authoritative.characters, ...fromData.character])
+  let artifacts = normalizeNames([...authoritative.artifacts, ...fromData.artifact])
   const added = {
     weapons: weapons.length - before.weapons,
     characters: characters.length - before.characters,
@@ -307,7 +340,23 @@ export function buildIndex (opts = {}) {
   // 归一那一步按拼音排序，所以要排完再插到前面。
   artifacts = [...ARTIFACT_PIECE_PRESETS, ...artifacts.filter(n => !ARTIFACT_PIECE_PRESETS.includes(n))]
 
-  const index = { generatedAt: new Date().toISOString(), weapons, characters, artifacts }
+  // ③ localOnly = 合并清单 − 权威清单 = 「图鉴后端里没有、只有 data/gi 在用」的名字。
+  //    它们在合并清单里（UI 候选照旧能看到），但**不在权威清单里** —— 于是 validate 不会再替错名背书。
+  //    顺序沿用合并清单的顺序（圣遗物这边会带上排在最前的 2 件套预设，见 audit-dup-items 的豁免说明）。
+  const localOnly = {
+    weapons: weapons.filter(n => !authSets.weapons.has(n)),
+    characters: characters.filter(n => !authSets.characters.has(n)),
+    artifacts: artifacts.filter(n => !authSets.artifacts.has(n))
+  }
+
+  const index = {
+    generatedAt: new Date().toISOString(),
+    weapons,
+    characters,
+    artifacts,
+    authoritative,
+    localOnly
+  }
   let wrote = false
   if (out) {
     if (!fs.existsSync(path.dirname(out))) fs.mkdirSync(path.dirname(out), { recursive: true })
@@ -321,6 +370,17 @@ export function buildIndex (opts = {}) {
     weapons: weapons.length,
     characters: characters.length,
     artifacts: artifacts.length,
+    authoritative: {
+      weapons: authoritative.weapons.length,
+      characters: authoritative.characters.length,
+      artifacts: authoritative.artifacts.length
+    },
+    localOnly: {
+      weapons: localOnly.weapons.length,
+      characters: localOnly.characters.length,
+      artifacts: localOnly.artifacts.length
+    },
+    localOnlyNames: localOnly,
     artifactFiles: art.files,
     badFiles: art.badFiles,
     added,
@@ -354,6 +414,26 @@ function main () {
 
   console.log(`武器 ${info.weapons} 条 / 角色 ${info.characters} 条 / 圣遗物套装 ${info.artifacts} 条（来自 ${info.artifactFiles} 个文件）`)
   console.log(`其中来自 data/gi 的补充：武器 +${info.added.weapons} / 角色 +${info.added.characters}（含 ${info.fromFiles} 个文件名）/ 圣遗物 +${info.added.artifacts}`)
+
+  // 「图鉴后端里没有、只有 data/gi 在用」的名字必须暴露在日志里 —— 它们是审核 #8 的病根，
+  // 以前会被并进白名单、让该角色的 issue 从 1 变 0；现在 validate 只认 authoritative，它们不再被背书。
+  const A = info.authoritative
+  const L = info.localOnly
+  const lo = info.localOnlyNames
+  console.log(`权威：武器 ${A.weapons} / 角色 ${A.characters} / 圣遗物 ${A.artifacts}；来自数据的本地候选：武器 ${L.weapons} / 角色 ${L.characters} / 圣遗物 ${L.artifacts}`)
+  const list = (arr) => arr.slice(0, 20).join('、') + (arr.length > 20 ? ` …（共 ${arr.length} 个，只列前 20）` : '')
+  const loLines = []
+  if (lo.weapons.length) loLines.push(`  · 武器（${lo.weapons.length}）：${list(lo.weapons)}`)
+  if (lo.characters.length) loLines.push(`  · 角色（${lo.characters.length}）：${list(lo.characters)}`)
+  if (lo.artifacts.length) loLines.push(`  · 圣遗物（${lo.artifacts.length}）：${list(lo.artifacts)}`)
+  if (loLines.length) {
+    console.log('本地候选清单（在合并清单里、但不在权威清单里 —— 图鉴后端没有这些名字）：')
+    for (const line of loLines) console.log(line)
+    const presetHit = lo.artifacts.filter(n => ARTIFACT_PIECE_PRESETS.includes(n))
+    if (presetHit.length) console.log(`  注：其中 ${presetHit.join(' / ')} 是编辑器「2 件套」预设（ARTIFACT_PIECE_PRESETS），不是 data/gi 里出现的名字`)
+  } else {
+    console.log('本地候选清单：空（data/gi 里没有图鉴后端不认识的名字）')
+  }
   console.log(`已写入 ${path.relative(root, outFile)}`)
 }
 

@@ -198,43 +198,6 @@ function imageSrc (dir, image) {
 }
 
 /**
- * 渲染段落正文：lines / items / fields 三选一，可附 image
- * @param {object} section
- * @param {number} indent - 行首缩进
- * @param {string} dir - JSON 文件所在目录
- * @returns {string} HTML
- */
-function renderBody (section, indent, dir) {
-  const pad = ' '.repeat(indent)
-  const lines = []
-
-  if (Array.isArray(section.lines)) {
-    const body = section.lines.filter(line => !isBlank(line))
-    if (body.length) {
-      lines.push(`${pad}<div class="text-block">`)
-      lines.push(body.map(line => `${pad}    ${inline(line)}`).join('<br>\n'))
-      lines.push(`${pad}</div>`)
-    }
-  } else if (Array.isArray(section.items)) {
-    lines.push(`${pad}<ul class="content-list">`)
-    for (const item of section.items) {
-      const desc = item.desc ? `<br>${inline(item.desc)}` : ''
-      lines.push(`${pad}    <li>${inline(item.name)}${desc}</li>`)
-    }
-    lines.push(`${pad}</ul>`)
-  } else if (Array.isArray(section.fields)) {
-    for (const field of section.fields) {
-      lines.push(`${pad}<div class="field-line"><span class="field-label">${inline(field.label)}</span>${inline(field.value)}</div>`)
-    }
-  }
-
-  if (section.image) {
-    lines.push(`${pad}<img class="codex-img" src="${escapeHtml(imageSrc(dir, section.image))}"/>`)
-  }
-  return lines.join('\n')
-}
-
-/**
  * 数据里的 `sections[].lines` → 渲染模型的行
  *
  * 网页版的「文本行 → 模型」最小实现：只做**结构解析**（拆出标签 / 条目 / 分隔符）
@@ -548,14 +511,48 @@ function weaponLabelHints (data) {
 }
 
 /**
+ * 段落正文的历史写法检测（审核 #16）：`items` / `fields` / `image` 已停用
+ *
+ * 契约只有一条：`sections[].正文` = `lines`。这三种是 v2 之前的历史写法，
+ * 渲染模型里**没有任何通路**读它们 —— 静默忽略等于「整段被判空成暂无、内容直接丢」，
+ * 所以这里**显式拒绝**（宁可构建失败，也不要悄悄丢内容）。
+ *
+ * 覆盖面：**所有段落**，不只六个模块 —— 标题匹配不上模块关键字的段落本来就会被丢掉，
+ * 那里若还留着历史写法同样属于静默丢内容（真实数据 131 个角色 JSON / 763 段全部命中六模块，
+ * 非空的历史写法 0 处，所以这条不会误伤现状）。
+ * @param {object} data
+ * @throws {Error} 错误信息含角色名、段标题与字段名
+ */
+function assertNoLegacySectionBody (data) {
+  const name = String(data?.name ?? '').trim() || '（未具名角色）'
+  const legacy = ['items', 'fields', 'image']
+  for (const section of data?.sections ?? []) {
+    const title = String(section?.title ?? '（无标题段落）')
+    for (const field of legacy) {
+      const v = section?.[field]
+      const used = Array.isArray(v) ? v.length > 0 : Boolean(v)
+      if (!used) continue
+      throw new Error(
+        `角色「${name}」的段落「${title}」用了已停用的写法 \`${field}\`：` +
+        `旧写法已停用，只支持 \`lines\`（段落正文只有 lines 一种写法）。` +
+        `请把该段改成 \`lines\`（文本行数组），或删掉 \`${field}\`；` +
+        '否则这段内容不会进 guide.html（会被判空成「暂无」）。'
+      )
+    }
+  }
+}
+
+/**
  * 角色 JSON → 六个模块的渲染模型（顺序固定，空模块保留并标 empty）
  *
  * 编号徽标（1…6）与面板侧 `section.badge` 同一套：按固定模块顺序取 1..6，
  * 与原「1. 武器推荐」的编号一致，所以图标/徽标不会因为标题改成简称而错位。
  * @param {object} data
  * @returns {object[]}
+ * @throws {Error} 段落用了 `items` / `fields` / `image` 历史写法时抛错（见 assertNoLegacySectionBody）
  */
 export function characterSections (data) {
+  assertNoLegacySectionBody(data)
   const byKeyword = new Map()
   for (const section of data?.sections ?? []) {
     const title = String(section?.title ?? '')

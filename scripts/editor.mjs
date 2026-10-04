@@ -10,6 +10,10 @@
  * 页面与静态资源：resources/editor/（`/` → index.html）
  * API（全部 JSON、UTF-8 无 BOM）：
  *   GET    /api/index                  → data/_index.json（不存在时返回空清单）
+ *                                        weapons/characters/artifacts 是「权威 + 来自数据的本地候选」的合并清单
+ *                                        （UI 候选、名称库、批量替换提示照旧）；
+ *                                        另有 authoritative（只含图鉴后端 + data/gi 角色文件名）与 localOnly
+ *                                        —— validate() 只认 authoritative，见 readIndex() 注释
  *   GET    /api/characters             → { order, items:[{name,weapons,artifacts,filled,hasUnparsed,broken}], missing }
  *                                        `filled` = 六个模块各自有没有真内容（目录右侧显示「未填：武 圣」用）
  *   GET    /api/character?name=X       → 角色 JSON + issues（validate 结果）
@@ -217,15 +221,36 @@ function listCharacterNames () {
     .filter(isValidName)
 }
 
-/** 读取图鉴索引（容错：不存在或损坏都返回带 generatedAt 的空结构） */
+/**
+ * 读取图鉴索引（容错：不存在或损坏都返回带 generatedAt 的空结构）
+ *
+ * `weapons / characters / artifacts` 是**合并清单**（权威 + 来自数据的本地候选），
+ * 语义没变：datalist、名称库、批量替换的「在不在清单里」提示、`nameKindInIndex()` 的类型判定都用它。
+ *
+ * `authoritative` / `localOnly` 是 build-index.mjs 新加的两份清单，这里**原样透传**：
+ *   · `validate()`（scripts/lib/schema.mjs）优先读 `index.authoritative`，只看图鉴后端的权威名 ——
+ *     这样「把错名写进 data → 保存（保存会重建索引）→ 错名并进合并清单」不会再让 issue 从 1 变 0；
+ *   · 旧索引文件里没有 `authoritative` 时**整个字段不出现**（不要补成空数组！）——
+ *     validate 里的 `index.authoritative?.weapons ?? index.weapons` 会因此回退到合并清单，
+ *     若补成 `{weapons: []}` 会让 `w.size === 0`，校验被静默跳过、什么都不报了。
+ * @returns {object}
+ */
 function readIndex () {
   try {
     const doc = readJson(indexPath)
+    const nameList = (src) => ({
+      weapons: asArray(src?.weapons).map(String),
+      characters: asArray(src?.characters).map(String),
+      artifacts: asArray(src?.artifacts).map(String)
+    })
     return {
       generatedAt: doc?.generatedAt ?? null,
       weapons: asArray(doc?.weapons).map(String),
       characters: asArray(doc?.characters).map(String),
       artifacts: asArray(doc?.artifacts).map(String),
+      // 只在索引里确实有这两份清单时才透传（见上：缺失 = 让 validate 回退到合并清单）
+      ...(doc?.authoritative ? { authoritative: nameList(doc.authoritative) } : {}),
+      ...(doc?.localOnly ? { localOnly: nameList(doc.localOnly) } : {}),
       // 套装 → 2 件套写法（`2魔女` / `2攻击`…）：编辑器把分隔符切成 `+` 时当场用简称写名字
       artifact2pc: ARTIFACT_2PC
     }

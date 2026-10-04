@@ -754,20 +754,35 @@ export function renderArtifactRow (row) {
 
 /**
  * 校验所有 ref 是否命中图鉴标准名
+ *
+ * 白名单优先读 `index.authoritative`（只含图鉴后端）：`index.weapons / characters / artifacts`
+ * 是「**权威清单 + 来自 data/ 的本地候选**」的合并结果，拿它当「图鉴里到底有没有」的证据
+ * 会形成自证循环 —— 本地新加的名字自己把自己证明成合法，报不出「图鉴里没有」。
+ * 没有新字段时退回旧行为（读扁平字段），老索引文件 / 老调用方不受影响。
  * @param {object} data
- * @param {{weapons?: Iterable<string>, artifacts?: Iterable<string>, characters?: Iterable<string>}} index
+ * @param {{weapons?: Iterable<string>, artifacts?: Iterable<string>, characters?: Iterable<string>, authoritative?: object}} index
  * @returns {Array<{where: string, ref: string, reason: string}>}
  */
 export function validate (data, index = {}) {
-  const w = new Set(index.weapons ?? [])
-  const a = new Set(index.artifacts ?? [])
-  const c = new Set(index.characters ?? [])
+  const auth = index.authoritative ?? index
+  const w = new Set(auth.weapons ?? [])
+  const a = new Set(auth.artifacts ?? [])
+  const c = new Set(auth.characters ?? [])
   const issues = []
   const check = (where, item) => {
     if (isNoteRow(item)) return
     const ref = typeof item === 'string' ? item : item?.ref
     if (!ref) return
     const { type, name } = parseRef(ref)
+    // 武器条目里用 `\` 写的多把武器是**等价候选**（与 `=` 同义，用户定稿 2026-10-04）：
+    // 逐个部件去图鉴里核对，只报真正缺失的那部分 —— 拿整串比对会把合法写法（`遗祀玉珑\千夜浮梦`）
+    // 一并误报成「武器名不在图鉴」。
+    if (type === 'weapon' && w.size && name.includes('\\')) {
+      for (const part of name.split('\\').map(s => s.trim()).filter(Boolean)) {
+        if (!w.has(part)) issues.push({ where, ref: `weapon:${part}`, reason: '武器名不在图鉴' })
+      }
+      return
+    }
     if (type === 'weapon' && w.size && !w.has(name)) issues.push({ where, ref, reason: '武器名不在图鉴' })
     // 圣遗物的 `2X` / `4X` 是**件数简写**（`2精通` / `2魔女`），图鉴里当然没有 —— 不算问题
     else if (type === 'artifact' && a.size && !a.has(name) && !isPieceShorthandName(name)) issues.push({ where, ref, reason: '圣遗物名不在图鉴' })
@@ -782,6 +797,18 @@ export function validate (data, index = {}) {
   for (const row of data?.v2?.talents ?? []) {
     if (row.kind === 'priority') (row.order ?? []).forEach(it => check('天赋加点', it))
     if (row.kind === 'crown') (row.items ?? []).forEach(it => check('天赋加点', it))
+  }
+  // 段落正文的历史写法（审核 #16）：`items` / `fields` / `image` 已停用，只有 `lines` 会被渲染。
+  // 这里只**提示**（编辑器保存时就能看到 ⚠，不至于到构建 guide.html 才发现）；
+  // 拒绝进渲染模型那一步在 build-html.mjs 的 characterSections（那里会直接抛错）。
+  // `where` 用段标题、`ref` 用字段名，和上面 ref 检查共用同一个 issue 形状。
+  for (const section of data?.sections ?? []) {
+    const title = String(section?.title ?? '')
+    for (const field of ['items', 'fields', 'image']) {
+      const v = section?.[field]
+      const used = Array.isArray(v) ? v.length > 0 : Boolean(v)
+      if (used) issues.push({ where: title, ref: field, reason: '旧写法已停用，只有 lines 会被渲染，内容会丢失' })
+    }
   }
   return issues
 }

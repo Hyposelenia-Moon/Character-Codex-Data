@@ -533,3 +533,164 @@ console.log('\n================ guide.md 抬头「100级提升」（审核 #12�
   console.log(`100级提升抬头断言：${checks.length - bad.length}/${checks.length}${bad.length ? ' ← 有失败' : ' 全通过'}`)
   if (bad.length) process.exitCode = 1
 }
+
+/* ---------- sections[].items / fields / image 已停用（审核 #16） ---------- */
+console.log('\n================ 段落正文历史写法已停用（审核 #16） ================')
+{
+  const { characterSections } = await import(pathToFileURL(path.join(root, 'scripts/build-html.mjs')).href)
+  const { validate } = await import(pathToFileURL(path.join(root, 'scripts/lib/schema.mjs')).href)
+  const checks = []
+  const push = (what, got, want) => checks.push({ what, got, want, ok: JSON.stringify(got) === JSON.stringify(want) })
+  /** 与真实 JSON 同形状：角色名固定「自检」，段标题用能命中模块关键字的真实标题 */
+  const mk = section => ({ schema: 2, name: '自检', game: 'gi', meta: {}, v2: {}, sections: [section] })
+  /** 跑一段「预期抛错」的样例，返回错误信息（没抛就返回空串，交给断言报错） */
+  const errOf = section => {
+    try {
+      characterSections(mk(section))
+      return ''
+    } catch (e) {
+      return String(e?.message ?? e)
+    }
+  }
+  const ITEMS = [{ name: '天赋名', desc: '说明' }]
+  const FIELDS = [{ label: '暴击率', value: '70%' }]
+
+  // ① `lines` 是唯一写法，照旧正常
+  push('lines 正常：能建出六个模块的渲染模型', characterSections(mk({ title: '1. 武器推荐', lines: ['第一档：A枪 > B枪'] })).length, 6)
+  push('lines 正常：内容照旧进模型（第一档两把枪）',
+    (characterSections(mk({ title: '1. 武器推荐', lines: ['第一档：A枪 > B枪'] })).find(s => s.title === '武器')?.rows ?? [])
+      .flatMap(r => (r.items ?? []).map(it => it.text + (it.sepAfter || ''))).join(''),
+    'A枪＞B枪')
+
+  // ② `items` / `fields` / `image` 非空 → **显式拒绝**（不能再静默忽略）
+  const eItems = errOf({ title: '1. 武器推荐', items: ITEMS })
+  const eFields = errOf({ title: '4. 毕业面板', fields: FIELDS })
+  const eImage = errOf({ title: '1. 武器推荐', image: 'images/pic.png' })
+  push('items 非空 → characterSections 抛错', Boolean(eItems), true)
+  push('fields 非空 → characterSections 抛错', Boolean(eFields), true)
+  push('image 非空 → characterSections 抛错', Boolean(eImage), true)
+  // 错误信息必须能定位：角色名 + 段标题 + 是哪个字段 + 「只支持 lines」
+  for (const [field, msg, title] of [['items', eItems, '1. 武器推荐'], ['fields', eFields, '4. 毕业面板'], ['image', eImage, '1. 武器推荐']]) {
+    push(`${field} 的错误信息含角色名「自检」`, msg.includes('自检'), true)
+    push(`${field} 的错误信息含段标题「${title}」`, msg.includes(title), true)
+    push(`${field} 的错误信息含字段名 \`${field}\``, msg.includes(field), true)
+    push(`${field} 的错误信息说明只支持 lines`, msg.includes('只支持 `lines`'), true)
+  }
+
+  // ③ 空数组 / 空串 / false 不算用旧写法（与「非空才算用」同口径，不误报）
+  push('items: [] 空数组不报错', errOf({ title: '1. 武器推荐', lines: ['第一档：A枪'], items: [] }), '')
+  push('fields: [] 空数组不报错', errOf({ title: '4. 毕业面板', lines: ['暴击率：70%'], fields: [] }), '')
+  push('image: "" 空串不报错', errOf({ title: '1. 武器推荐', lines: ['第一档：A枪'], image: '' }), '')
+
+  // ④ `validate()` 对这三种各报一条 issue（编辑器保存时就能看到 ⚠），where=段标题、ref=字段名
+  const one = (section) => {
+    const issues = validate(mk(section), {})
+    return issues.length === 1 ? { where: issues[0].where, ref: issues[0].ref, reason: issues[0].reason } : { issues }
+  }
+  const WANT_REASON = '旧写法已停用，只有 lines 会被渲染，内容会丢失'
+  push('validate：items 报一条（where/ref/reason）', one({ title: '1. 武器推荐', items: ITEMS }), { where: '1. 武器推荐', ref: 'items', reason: WANT_REASON })
+  push('validate：fields 报一条（where/ref/reason）', one({ title: '4. 毕业面板', fields: FIELDS }), { where: '4. 毕业面板', ref: 'fields', reason: WANT_REASON })
+  push('validate：image 报一条（where/ref/reason）', one({ title: '1. 武器推荐', image: 'images/pic.png' }), { where: '1. 武器推荐', ref: 'image', reason: WANT_REASON })
+  push('validate：lines 正常段落不报 issue', validate(mk({ title: '1. 武器推荐', lines: ['第一档：A枪'] }), {}).length, 0)
+  // 三种同时出现 → 三条 issue（不是只报第一条）
+  push('validate：三种同段同时出现报三条', validate(mk({ title: '1. 武器推荐', items: ITEMS, fields: FIELDS, image: 'x.png' }), {}).length, 3)
+
+  // ⑤ `validate()` 的图鉴白名单：有 authoritative 时**只用权威清单**，
+  //    index.weapons 是「权威 + 本地候选」的合并清单，混进来会自证循环
+  const refData = mk({ title: '1. 武器推荐', lines: ['第一档：甲 > 乙'] })
+  refData.v2 = { weapons: [{ label: '第一档', tier: 1, sep: ' > ', items: [{ name: '甲', ref: 'weapon:甲' }, { name: '乙', ref: 'weapon:乙' }] }] }
+  const merged = { weapons: ['甲'], artifacts: [], characters: [] }
+  const withAuth = { weapons: ['甲'], authoritative: { weapons: ['乙'], artifacts: [], characters: [] }, artifacts: [], characters: [] }
+  push('白名单：没有 authoritative → 退回旧行为，合并清单里的「甲」不报',
+    validate(refData, merged).filter(i => i.ref === 'weapon:甲').length, 0)
+  push('白名单：有 authoritative → 只用权威清单，「甲」被报（不在图鉴）',
+    validate(refData, withAuth).filter(i => i.ref === 'weapon:甲').length, 1)
+  push('白名单：有 authoritative → 权威清单里的「乙」不报',
+    validate(refData, withAuth).filter(i => i.ref === 'weapon:乙').length, 0)
+  push('白名单：有 authoritative → 只有 1 条（不多报）', validate(refData, withAuth).length, 1)
+  push('白名单：authoritative 三项都空 → 按「没有图鉴」处理，不报',
+    validate(refData, { weapons: ['甲', '乙'], authoritative: { weapons: [], artifacts: [], characters: [] }, artifacts: [], characters: [] }).length, 0)
+
+  // ⑥ 真实数据交叉核对：131 个角色 JSON / 763 段（全部命中六模块），历史写法非空 0 处
+  //    （所以上面的拒绝不会误伤现状，也不会让 guide.html 变化）
+  //    口径与 build-html 的 listCharacters 一致：只数 data/<gameId>/ 下、非 `_` 开头的 .json
+  //    （根目录的 data/_index.json 等元数据文件不算角色）
+  let jsonCount = 0
+  let sectionCount = 0
+  const legacyHits = []
+  for (const game of fs.readdirSync(path.join(root, 'data'), { withFileTypes: true }).filter(e => e.isDirectory() && !e.name.startsWith('_')).map(e => e.name)) {
+    const dir = path.join(root, 'data', game)
+    for (const file of fs.readdirSync(dir)) {
+      if (!file.endsWith('.json') || file.startsWith('_')) continue
+      jsonCount++
+      const data = readJson(path.join(dir, file))
+      for (const section of data.sections ?? []) {
+        sectionCount++
+        for (const field of ['items', 'fields', 'image']) {
+          const v = section?.[field]
+          if (Array.isArray(v) ? v.length > 0 : Boolean(v)) legacyHits.push(`${data.name || file} :: ${section?.title} :: ${field}`)
+        }
+      }
+    }
+  }
+  push('真实数据：角色 JSON 数', jsonCount, 131)
+  push('真实数据：sections 段数', sectionCount, 763)
+  push('真实数据：items/fields/image 非空命中', legacyHits, [])
+
+  const bad = checks.filter(c => !c.ok)
+  for (const c of checks) console.log(`${c.ok ? '✓' : '✗'} ${c.what}：${JSON.stringify(c.got)}${c.ok ? '' : `（期望 ${JSON.stringify(c.want)}）`}`)
+  console.log(`历史写法已停用断言：${checks.length - bad.length}/${checks.length}${bad.length ? ' ← 有失败' : ' 全通过'}`)
+  if (bad.length) process.exitCode = 1
+}
+
+/* ---------- 武器等价候选：`\` 与 `=` 等价（用户定稿 2026-10-04） ---------- */
+console.log('\n================ 武器等价候选：反斜杠 ≡ 等号（用户定稿 2026-10-04） ================')
+{
+  const { characterSections } = await import(pathToFileURL(path.join(root, 'scripts/build-html.mjs')).href)
+  const { validate } = await import(pathToFileURL(path.join(root, 'scripts/lib/schema.mjs')).href)
+  const checks = []
+  const push = (what, got, want) => checks.push({ what, got, want, ok: JSON.stringify(got) === JSON.stringify(want) })
+
+  // ① 渲染：一个条目里写的多把武器 = 等价候选，显示成 `A=B=C`，**条目数不变**（否则会撞同级 4 把上限）
+  const mara = readJson(path.join(root, 'data', 'gi', '玛拉妮.json'))
+  const maraRow0 = characterSections(mara).find(s => s.title.includes('武器')).rows[0]
+  push('渲染：玛拉妮第一档仍是 3 条（`\\` 不拆成多条）', maraRow0.items.length, 3)
+  push('渲染：`遗祀玉珑\\千夜浮梦` 显示为 `遗祀玉珑=千夜浮梦`', maraRow0.items[1].text, '遗祀玉珑=千夜浮梦')
+  push('渲染：该行没有条目文本还留着反斜杠', maraRow0.items.some(it => it.text.includes('\\')), false)
+
+  // ② 全库交叉核对：7 处反斜杠条目渲染后都不再出现反斜杠，且行内条数都没被撑大
+  const giDir = path.join(root, 'data', 'gi')
+  const index = readJson(path.join(root, 'data', '_index.json'))
+  let slashItems = 0
+  const leftover = []
+  const compositeIssues = []
+  for (const file of fs.readdirSync(giDir)) {
+    if (!file.endsWith('.json') || file.startsWith('_')) continue
+    const data = readJson(path.join(giDir, file))
+    for (const row of (data.v2?.weapons ?? [])) {
+      for (const it of (row.items ?? [])) if (String(it.name ?? '').includes('\\')) slashItems++
+    }
+    for (const section of characterSections(data)) {
+      if (!section.title.includes('武器')) continue
+      for (const row of section.rows) {
+        for (const it of (row.items ?? [])) if (it.text.includes('\\')) leftover.push(`${data.name} :: ${it.text}`)
+      }
+    }
+    for (const i of validate(data, index)) if (String(i.ref ?? '').includes('\\')) compositeIssues.push(`${data.name} :: ${i.ref}`)
+  }
+  push('真实数据：含反斜杠的武器条目数', slashItems, 7)
+  push('真实数据：渲染后仍含反斜杠的条目', leftover, [])
+  push('真实数据：复合名不再被整串误报（issue 的 ref 里不再出现反斜杠）', compositeIssues, [])
+
+  // ③ 校验：按 `\` 拆开逐个部件核对，只报真正缺失的那一把
+  const idx = { authoritative: { weapons: ['A枪', 'B枪'], artifacts: [], characters: [] } }
+  const vd = ref => validate({ v2: { weapons: [{ items: [{ ref }] }] } }, idx)
+  push('校验：两个部件都在图鉴 → 不报', vd('weapon:A枪\\B枪'), [])
+  push('校验：只报缺失的那个部件（ref 精确到部件名）', vd('weapon:A枪\\X枪'), [{ where: '武器推荐', ref: 'weapon:X枪', reason: '武器名不在图鉴' }])
+  push('校验：泛称部件照旧被报（例：精通武器）', vd('weapon:A枪\\精通武器'), [{ where: '武器推荐', ref: 'weapon:精通武器', reason: '武器名不在图鉴' }])
+
+  const bad = checks.filter(c => !c.ok)
+  for (const c of checks) console.log(`${c.ok ? '✓' : '✗'} ${c.what}：${JSON.stringify(c.got)}${c.ok ? '' : `（期望 ${JSON.stringify(c.want)}）`}`)
+  console.log(`等价候选断言：${checks.length - bad.length}/${checks.length}${bad.length ? ' ← 有失败' : ' 全通过'}`)
+  if (bad.length) process.exitCode = 1
+}

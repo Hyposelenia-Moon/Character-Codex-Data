@@ -1,0 +1,14 @@
+﻿ M README.md
+ M data/_index.json
+ M "data/gi/\350\241\214\347\247\213.json"
+ M guide.html
+ M guide.md
+ M scripts/audit-dup-items.mjs
+ M scripts/build-html.mjs
+ M scripts/build-index.mjs
+ M scripts/display-selftest.mjs
+ M scripts/editor.mjs
+ M scripts/lib/guide-display.mjs
+ M scripts/lib/schema.mjs
+ M scripts/scan-separators.mjs
+?? .tmp-baseline-status.txt
