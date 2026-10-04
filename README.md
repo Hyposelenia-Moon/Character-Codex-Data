@@ -17,32 +17,42 @@
 | 1 | `data/gi/*.json`（必要时含 `_order.json` / `_index.json`） | 数据改动走**文档层**：改主文档 → `node scripts/parse-docx.mjs`；索引 `node scripts/build-index.mjs` | 关键文件 sha256 前后 |
 | 2 | **主文档** `D:\文件\游戏\原神\原神·角色攻略.docx` | 脚本化改（跨 run 安全 + CAS + 备份 `.bak-<时间戳>`），或 `node scripts/build-docx.mjs --write-main` | 改前备份路径 + 主文档 sha1 |
 | 3 | **标记版 docx**（`out\…(标记版).docx` + `D:\…\…(标记版).docx`） | 由 `build-docx --write-main` 一并产出，无需手改 | 标记版 sha1 + "去标记后逐字一致：是" |
-| 4 | `guide.html` | `node scripts/build-html.mjs` | 卡片数 129 + `audit-guide-html` 通过 |
+| 4 | `guide.html` | `node scripts/build-html.mjs` | 卡片数 129（131 个角色文件里 2 个空档不进页）+ `audit-guide-html` 通过（与现算结果逐字节一致、残留旧写法 0） |
 | 5 | `guide.md` | `node scripts/build-doc.mjs`（**选 A 口径**：只过滤占位符，**文档词汇不变**） | `___`=0 + 文档词汇计数 + 新旧字节/行数 |
-| 6 | **编辑器**（表单文案 + `/api/preview` 预览） | `resources/editor/app.js`（文案 / 下拉 / **标签与档位联动** / **删行墓碑** / **面板一行两个控件** / **chip 宽度自适应与「放得下几把」** / **左栏未填与旅行者·奇偶豁免**）＋ `scripts/editor.mjs`（保存协议：删行墓碑、清空＝显式 `null`；**写请求带跨站防护**）；**改完必须重启编辑器进程**（长驻进程会缓存旧模块） | `/api/preview` html 与 `guide.html` **逐字节一致** ＋ `scripts/editor-selftest.mjs` 205/205 ＋ `.dsh/verify-editor-rt.mjs`（129 角色「打开→原样保存」逐字节不变 + 预览逐字节一致）＋ `.dsh/verify-editor-click.mjs`（行尾图标按钮：点按钮 / `<svg>` / `<path>` 三种点法都要能删行）＋ `.dsh/verify-panel-editor.mjs`（面板行新增 / 带标签 / 删行 / 说明行，端到端）＋ `.dsh/probe-editor-ui.mjs`（离线表单：占位截断 / 字号 / 溢出）＋ `.dsh/probe-editor-live.mjs` / `.dsh/audit-editor-ui-live.mjs`（**真实编辑器**里量同一批指标 + 武器行提示，`--zoom=2` 出放大截图） |
-| 7 | **插件面板** | `model/codexIndex/display.js`（**与 `scripts/lib/guide-display.mjs` 逐字节一致**）、`parse.js`、`resources/atlas/codex.html`、`codex.css`（武器段小字说明 = 共享的 `WEAPON_REFINE_HINT` → `.codex-hint`） | `node scripts/check-display-sync.mjs` + `audit-web-vs-panel`（含「武器段说明 129/129」）+ `test/codex-template.test.mjs`（说明落在标题与正文之间） |
+| 6 | **编辑器**（表单文案 + `/api/preview` 预览） | `resources/editor/app.js`（文案 / 下拉 / **标签与档位联动** / **删行墓碑** / **面板一行两个控件** / **chip 宽度自适应与「放得下几把」** / **左栏未填与旅行者·奇偶豁免**）＋ `scripts/editor.mjs`（保存协议：删行墓碑、清空＝显式 `null`；**写请求带跨站防护**）；**改完必须重启编辑器进程**（长驻进程会缓存旧模块） | `/api/preview` html 与 `guide.html` **逐字节一致** ＋ `scripts/editor-selftest.mjs` **241/241**（含**编辑器待保存状态 / 在途改动 / 段落正文历史写法已停用 / 武器等价候选**这些新增断言块）。⚠ 下列为**维护者本地脚本**：它们都在 `.dsh/` 下，而 `.dsh/` 已被 `.gitignore` 忽略、**不入库**，本仓库里**没有** `.dsh/` 目录，其他协作者**无法复现**，**不能当作可验收证据** —— `verify-editor-rt.mjs`（129 角色「打开→原样保存」逐字节不变 + 预览逐字节一致）、`verify-editor-click.mjs`（行尾图标按钮：点按钮 / `<svg>` / `<path>` 三种点法都要能删行）、`verify-panel-editor.mjs`（面板行新增 / 带标签 / 删行 / 说明行，端到端）、`probe-editor-ui.mjs`（离线表单：占位截断 / 字号 / 溢出）、`probe-editor-live.mjs` / `audit-editor-ui-live.mjs`（**真实编辑器**里量同一批指标 + 武器行提示，`--zoom=2` 出放大截图） |
+| 7 | **插件面板** | `model/codexIndex/display.js`（**与 `scripts/lib/guide-display.mjs` 逐字节一致**）、`parse.js`、`resources/atlas/codex.html`、`codex.css`（武器段小字说明 = 共享的 `WEAPON_REFINE_HINT` → `.codex-hint`） | `node scripts/check-display-sync.mjs` + `audit-web-vs-panel`（含「武器段说明 **131/131**」）+ `test/codex-template.test.mjs`（说明落在标题与正文之间） |
 | 8 | `README` 与 `templates/` | 改受影响的说明、词汇表、符号语义、期望值 | 本节表格与预期计数 |
 | 9 | **审计脚本的期望值** | `audit-*` / `display-*` / `check-display-sync` 的断言与合法集 | 每个审计 `exit=0` |
-| 10 | 离线脚手架 | `.dsh/` 下的脚手架**不得再读陈旧副本**：优先用 `CODEX_DIR` / `CODEX_DOCX` 环境变量、缺省读**主仓库**（现状：仍有不少 `.dsh/*.mjs` 写死绝对路径，逐个换成环境变量即可） | 离线渲染输出能反映主仓库最新数据 |
+| 10 | 离线脚手架（**维护者本地，不入库**） | `.dsh/` 已被 `.gitignore` 忽略，**本仓库里没有这个目录**；若在本地重建，脚手架**不得再读陈旧副本**：优先用 `CODEX_DIR` / `CODEX_DOCX` 环境变量、缺省读**主仓库** | 离线渲染输出能反映主仓库最新数据（其他协作者无法复现，**不作为验收证据**） |
 
-### B. 固定验收集（十四条全绿才算完成）
+### B. 固定验收集（下面每条命令都要全绿才算完成）
 
 ```bash
-node scripts/parse-docx.mjs --dry                 # 129 角色 / 未识别 0
-node scripts/build-docx.mjs --write-main          # 往返 129/129 深度相等 + 幂等
-node scripts/diagnose-docx-json.mjs               # 不一致 0
-node scripts/audit-web-vs-panel.mjs               # 真实角色 0 + 自定义档位词合成样例 3 条一致 + 武器段说明 129/129
-node scripts/audit-dup-items.mjs                  # 重复名 0/0、序列不一致 0
-node scripts/check-display-sync.mjs               # 两份显示级归一逐字节一致
-node scripts/scan-separators.mjs                  # 悬挂 0 + 副词条非法同级对 0 + 主词条 note 字段 0 + 同级超上限 0 + 2+2 全简写（`/` 只许出现在暴击对之间）
-node scripts/audit-2pc-table.mjs                   # 2 件套写法表 vs 图鉴后端 2 件套描述：判定不一致 0（四条预设优先）
-node scripts/display-selftest.mjs <角色>           # 词条写法 54/54（含天赋行无标签、副词条 `=`/`≥`、面板两控件、武器段小字说明）
-node scripts/editor-selftest.mjs                  # 编辑器规则 223/223（天赋等级 / 新增行 / 多值输入 / 标签互斥 / 配队槽位 / 面板两控件 / 武器行放得下几把 / 目录未填模块 + 旅行者·奇偶豁免 / 主词条括注折进值里 / 同级上限 / 2+2 自动简写）
+node scripts/parse-docx.mjs --dry                 # 角色块 129 / 未识别行 0 / 解析告警 0（名称校验问题 16 条属提示，不挡流程）
+node scripts/build-docx.mjs --write-main          # 往返 129/129 深度相等 + 三方校验 ok + 幂等（会写主文档；只想验证就换 --out <临时目录>\x.docx，同样跑往返校验）
+node scripts/build-docx-selftest.mjs              # 文档重建 / sectPr 44/44
+node scripts/diagnose-docx-json.mjs               # 不一致 0（文档 129 / JSON 129，另有 2 个空档未进文档）/ 输入目录未被改写
+node scripts/audit-web-vs-panel.mjs               # 真实角色 0（131 个角色 / 渲染行 1434）+ 合成样例 8 条一致 + 武器段说明 131/131
+node scripts/audit-dup-items.mjs                  # 重复名 0/0、序列不一致 0、图鉴里没有只有数据在用的名字 0（2+2 预设 4 个 + 空档模板名 1 个已豁免）
+node scripts/check-display-sync.mjs               # 两份显示级归一逐字节一致（83929 字节 / sha256 相同）
+node scripts/scan-separators.mjs                  # 悬挂 0 + 副词条非法同级对 0 + 主词条 note 字段 0 + 同级超上限 0 + 2+2 全简写（`/` 只许出现在暴击对之间）；另有反斜杠等价候选 7 处，是 `[i]` 说明不是错误
+node scripts/audit-2pc-table.mjs                   # 2 件套写法表 vs 图鉴后端 2 件套描述：判定不一致 0（四条预设优先）；覆盖 65 个套装 / 53 个有写法 / 12 个没写法
+node scripts/display-selftest.mjs <角色>           # 6 个断言块合计 128/128（自定义档位词 7/7、词条写法 62/62、纯备注判空 10/10、100 级提升抬头 7/7、历史写法已停用 33/33、武器等价候选 9/9）
+node scripts/editor-selftest.mjs                  # 编辑器规则 241/241（含编辑器待保存状态 / 在途改动 / 段落正文历史写法已停用 / 武器等价候选）
 node scripts/build-html.mjs && node scripts/build-doc.mjs   # 产物刷新
-# 编辑器 129 角色「打开→原样保存」逐字节不变 + /api/preview 与 guide.html 逐字节一致
+# 编辑器「打开→原样保存」逐字节不变 + /api/preview 与 guide.html 逐字节一致
 #   （需先 node scripts/editor.mjs --port <p> --no-open 起服务；改过共享层务必重启）
+#   ⚠ 这一条原先靠维护者本地 `.dsh/verify-editor-rt.mjs` 量，本仓库没有该脚本，本轮无法复现
 node --check <每个改过的 .mjs>                     # 全过
 ```
+
+> 上面的计数都是**本轮实跑值**（2026-10-04：主文档 129 个角色块、`data/gi` 131 个角色文件）。
+> 角色数、卡片数、`data/_index.json` 规模这类会随加角色变化的数字，**一律以脚本输出为准**，
+> README 里写的只是写下这段时的实测值。
+> 反过来，脚本内部的「自检 / 体检 N/N」（`editor-selftest` 241、`build-docx-selftest` 44、
+> `display-selftest` 各断言块）是代码里的定值，只有增删断言才会变。
+> `.dsh/` 下的脚本**不在本仓库**（被 `.gitignore` 忽略），凡是只能靠它们核对的结论都标了
+> 「维护者本地 / 无法复现」，**不能当验收证据**。
 
 ### C. 传播矩阵（每次报告都要交）
 
@@ -84,10 +94,13 @@ data/gi | 主文档 | 标记版 | guide.html | guide.md | 编辑器 | 面板 | R
 > 提交由用户本人执行；脚本与自动化只负责准备改动与文案，不代替提交。
 
 编辑器「保存并发布」会写出 `out/_commit-summary.md`，其中的**「建议提交信息」按本节规范生成**
-（标题 `<类型>: <中文简述>` ＋ 每条 `- ` 写改了什么），可直接拿来当提交信息。自查（本地工具，`.dsh/` 不入库）：
+（标题 `<类型>: <中文简述>` ＋ 每条 `- ` 写改了什么），可直接拿来当提交信息。自查本来是维护者本地工具
+`.dsh/check-editor-commit-msg.mjs`（`.dsh/` 被 `.gitignore` 忽略、**不入库**，本仓库里**没有**这个目录，
+其他协作者跑不了这一步）：
 
 ```bash
-node .dsh/check-editor-commit-msg.mjs
+# 维护者本机才有；本仓库不存在这个脚本
+# node .dsh/check-editor-commit-msg.mjs
 ```
 
 ---
@@ -398,7 +411,7 @@ node scripts/daily-docx-sync.mjs --dry                            # 只报告，
   两条链路（网页版 / 面板）都走同一个 `normalizeArtifactRows`。
   凡是要**按值精确匹配**的新代码（候选表 / 别名归一 / 审计比对）也都要先过这个函数。
 - **历史字段写法**（`kind:'main'` 的 `note` + `noteSlot`）仍能正确显示（网页版与面板都会把它
-  挂到对应部位的小字备注上），但迁移已把数据折回值里：`node .dsh/normalize-main-notes.mjs`。
+  挂到对应部位的小字备注上），但迁移已把数据折回值里：迁移脚本是维护者本地的 `.dsh/normalize-main-notes.mjs`（不入库，本仓库不存在）。
 - `scan-separators.mjs` 会检查「括注只在值末尾」（写在中间会被分隔符逻辑切开 → 文档与数据漂移）。
 
 **武器行的分隔符（用户定稿：正常武器用 `＞`）**：武器档位是**优先级链**，所以**源文档写 `/` 也显示 `＞`**：
@@ -451,10 +464,13 @@ node scripts/daily-docx-sync.mjs --dry                            # 只报告，
 `建议：第一档：西风剑` —— `parse-docx` 认不出（往返立刻不再 129/129）。
 
 断言（改动显示层 / 文档层 / 编辑器标签时都要跑）：
-`scripts/display-selftest.mjs <角色>`（54 条：词条写法 / 天赋行标签 / 副词条同级对 / 面板两控件 / 武器段说明）、
-`scripts/audit-web-vs-panel.mjs` 的合成样例（3 条）、
-`scripts/editor-selftest.mjs`（143 条：天赋等级 / 新增行可见 / 多值输入 / 标签互斥 /
-配队槽位 / 界面标记不落盘 / **删行墓碑** / **清空字段提交 null** / **面板两控件** / **武器行放得下几把** / **目录未填模块**）。
+`scripts/display-selftest.mjs <角色>`（**6 个断言块合计 128/128**：自定义档位词 7/7、词条写法 62/62、
+纯备注判空 10/10、100 级提升抬头 7/7、**段落正文历史写法已停用 33/33**、**武器等价候选 9/9**）、
+`scripts/audit-web-vs-panel.mjs` 的合成样例（**8 条**）、
+`scripts/editor-selftest.mjs`（**241 条**：天赋等级 / 新增行可见 / 多值输入 / 标签互斥 /
+配队槽位 / 界面标记不落盘 / **删行墓碑** / **清空字段提交 null** / **面板两控件** / **武器行放得下几把** / **目录未填模块** /
+**编辑器待保存状态与在途改动**）、
+`scripts/build-docx-selftest.mjs`（**44 条**：文档重建 / sectPr 保留）。
 
 **编辑器的保存协议（删行 / 清空 / 空占位行，用户 2026-09-20 定稿）**
 
@@ -473,8 +489,9 @@ node scripts/daily-docx-sync.mjs --dry                            # 只报告，
 集成验收（需要先起一个隔离实例：把仓库复制到 `.tmp/editor-rt/`，用 `--port 8799` 起同一个编辑器）：
 
 ```text
-node .dsh/verify-editor-delete.mjs   # 契约：129 角色原样保存逐字节不变 + 删行/清空/占位 11 项
-node .dsh/verify-editor-e2e.mjs      # 端到端：用真实的 buildBody 出 payload 再保存，6 项
+# ⚠ 下面两个脚本在 `.dsh/`（维护者本地、不入库），本仓库里不存在 —— 其他协作者无法复现：
+# node .dsh/verify-editor-delete.mjs   # 契约：原样保存逐字节不变 + 删行/清空/占位 11 项
+# node .dsh/verify-editor-e2e.mjs      # 端到端：用真实的 buildBody 出 payload 再保存，6 项
 ```
 
 **空值 / 占位符**：`data.tags` 与 `meta` 里**允许**留 `___级` / `___` / `___%` 这类"还没填"的占位
@@ -504,9 +521,10 @@ node .dsh/verify-editor-e2e.mjs      # 端到端：用真实的 buildBody 出 pa
 | 配队 | **头像之间 `+`**（槽位之间）；**同一槽位的可替换角色之间 `/`，且这些候选头像要并列横排**（不要上下堆叠）；**成员括注用行内全角括弧**（`叶洛亚 / 希诺宁（二命）`，与圣遗物 `千岩牢固（四件套）` 同款）；**`注：` 只给段末那条纯文字行**（`注：建议二命及以上；高金配置`），带档位词、整行就是内容的不加（`可选：自由选择`） | `codex.html` 的 `.team-plus` / `.team-alts` / `.team-slash` / `.team-member-note`；候选头像由插件 `icons.js` 的 `attachTeamIcons` 逐个解析（`member.candidates`）；`注：` 前缀由 `guide-display.mjs` 的 `normalizeTeams` 的 `notePrefix` 决定（两链路口径一致，`audit-web-vs-panel` 会逐字比前缀） |
 | Hero | 文字对比度：遮罩 0.52 + 近黑字 + 四向白色描边 | `resources/common/hero.css` 的 `.hero-bg` / `.hero-title` / `.hero-game` |
 
-面板离线核对（维护者侧，`.dsh/` 不入库）：在**插件仓库**里跑 `node .dsh/explore/codex/render.mjs <角色>`
+面板离线核对（**维护者本地脚本，不入库，也无法在本仓库复现**）：在**插件仓库**里跑 `node .dsh/explore/codex/render.mjs <角色>`
 （`FAKE_ICONS=1` 塞占位图标、`FAKE_HERO=<图片路径>` 塞名刺背景，用 Edge 无头截图看排版）；
-编辑器的界面体检在本仓库：`.dsh/probe-editor-live.mjs`（真实编辑器里量 + 截图）、`.dsh/audit-editor-ui-live.mjs`（批量清扫）。
+编辑器界面体检同样是本地脚本：`.dsh/probe-editor-live.mjs`（真实编辑器里量 + 截图）、`.dsh/audit-editor-ui-live.mjs`（批量清扫）。
+本仓库里**没有** `.dsh/` 目录，这些都属于维护者本机工具，**不作为可验收证据**。
 
 ---
 
@@ -693,7 +711,7 @@ node scripts/build-index.mjs [图鉴后端目录]
 - **`data/_index.json` 是生成物，但照样入库**：没有图鉴后端的机器跑不出索引，所以仓库里留一份最新的；
   数据变动后（编辑、重命名、删除、批量替换）编辑器会自动重建它，手工重建就用 `node scripts/build-index.mjs`
 - `data/_parse-report.json`、`out/`、`data/_trash/`、`data/_backup/`、`.tmp/` 都是本地中间产物，已在 `.gitignore` 里**不入库**
-- 当前规模：武器 284 / 角色 131 / 圣遗物套装 65（写这段时实测值；以 `data/_index.json` 为准）
+- 当前规模（`data/_index.json` 实测，随加角色变化，**以脚本输出为准**）：武器 285（权威 284 + 本地候选 1：`秘典星谕`）/ 角色 132 / 圣遗物套装 69（权威 65 + 本地候选 4：`2攻击` `2生命` `2精通` `2充能`）
 
 ### 3. 图形化编辑器：`node scripts/editor.mjs`
 
@@ -713,7 +731,7 @@ node scripts/editor.mjs [--port 8787] [--no-open] [--exit-on-idle[=<秒>]]
 
 | 栏目 | 规则 |
 |---|---|
-| 文字排版（全表单） | 控件（输入框 / 下拉 / 文本域）**统一 13px**、说明文字 12px；提示文字（placeholder）**一律不许被截断**（提示词写短，长解释放 `title`）；行尾按钮只留图标（`↑` / `↓` / 垃圾桶），文案在 `title` 里。⚠ 事件委托必须用 `closest('[data-act]')` **往上找**：图标按钮里是内联 SVG，点上去 `e.target` 是 `<path>`（没有 `data-act`），直接读 `e.target` 会让整个点击失灵（用户报过「编辑器无法删除面板的某行」）—— 回归脚本 `.dsh/verify-editor-click.mjs` 会分别点按钮本身 / `<svg>` / `<path>` 各一遍 |
+| 文字排版（全表单） | 控件（输入框 / 下拉 / 文本域）**统一 13px**、说明文字 12px；提示文字（placeholder）**一律不许被截断**（提示词写短，长解释放 `title`）；行尾按钮只留图标（`↑` / `↓` / 垃圾桶），文案在 `title` 里。⚠ 事件委托必须用 `closest('[data-act]')` **往上找**：图标按钮里是内联 SVG，点上去 `e.target` 是 `<path>`（没有 `data-act`），直接读 `e.target` 会让整个点击失灵（用户报过「编辑器无法删除面板的某行」）—— 回归脚本本来是维护者本地的 `.dsh/verify-editor-click.mjs`（**不入库、本仓库不存在，无法复现**），它会分别点按钮本身 / `<svg>` / `<path>` 各一遍 |
 | 角色目录（左栏） | 每行 = 角色名 + 右侧「**未填：武 圣**」（单个汉字：武 / 圣 / 天 / 面 / 命 / 配 = 六模块，顺序即文档顺序；全填的角色不显示）。**标记了「无需填写」（角色 JSON `freeModules`）的模块不算未填**，也不参与下面的排序；改动还没保存的角色带「待保存」小标（当前角色 + 切走时暂存的）。**旅行者（各元素）与奇偶（男 / 女）不显示未填**（用户定稿 2026-09-26）：这两族的攻略按形态拆成多份，缺的模块没有参考价值，`unfilledExempt()` 判据按名字族豁免（`^(旅行者\|奇偶)(·\|$)`），它们同时也不参与「未填优先」排序（落到已填那一组），悬停提示写明「旅行者 / 奇偶不显示未填项」。**排序 = 未填优先**（用户定稿 2026-09-24）：有未填模块的排前面、全填的沉底，两组内部都保持**默认顺序**（`_order.json`），全都填完时结果就是默认顺序；键盘 ↑↓ 跟着这个显示顺序走（`listedItems()` 一处供渲染与导航）。判据在服务端 `filledModules()`（**空占位行不算填**：`推荐：` 后面没东西、主词条三槽全空都不算；**天赋另有特例**：三格全 1 的默认 `A1 E1 Q1` 只是「按 111 正常显示」的占位，**不算填** —— 要任一格升级 / 投皇冠 / 写说明才算，所以补过默认行的角色在目录里依旧显示「未填：… 天 …」）；鼠标悬停给完整模块名 + 已标记无需填写的模块。行距压到 4px/2px 内边距，长名字省略号截断（`.nm` 的 `min-width: 0`）——同屏能多放几个名字 |
 | 武器行 | 「自定义标签」与「档位」**二选一**：填了自定义词（如 `建议`）自动清空档位下拉，反之亦然；行首实时显示「显示为：X」 |
 | 武器 / 圣遗物行的 chip | 徽标**只留图标**（完整类型名在 `title` 里）、名字框**按内容自适应宽度**（`field-sizing: content`，不支持的浏览器由 `autoSizeInput` 兜底）—— 名字短占得少，一行就能多放一把 |
@@ -764,15 +782,17 @@ PowerShell 的隐藏命令，而不是直接指向 `node.exe`：
 ```
 写角色 JSON  →  重建 data/_index.json  →  build-docx.mjs 写回 Word 主文档（先备份）
             →  build-html.mjs 生成 guide.html  →  生成提交摘要
-            →  三方一致性校验（全过才继续）  →  git add + git commit（**绝不 push**）
+            →  三方一致性校验（全过才算发布成功）  →  **到此为止：不执行 git add / commit / push**
 ```
 
 **保存并发布 = 保存 + 发布 + 多方校验 + 提交摘要；提交与推送（`git push`）都由人工执行** ——
 发布链路**不执行** `git add` / `git commit` / `git push`，也不会碰远端；
+`build-docx.mjs --write-main` **只写文档，不提交**（整个 `build-docx.mjs` 里没有任何 git 调用）；
 `/api/commit` 是显式接口（界面默认不触发），它只 `add` 本次指定的路径、绝不 `add -A`。
 
 「一致」指：**数据库（`data/gi`）× 主文档（干净可读版）× 标记版文档 × 网页版（`guide.html`）** 内容等价。
-提交前逐项校验，**任一项不过就跳过提交**（已生成的文档 / 网页保持可用，不回滚）：
+发布前逐项校验，**任一项不过就返回失败**（发布链路本来就不提交，所以不会留下半个提交；
+已生成的文档 / 网页保持可用，不回滚）：
 
 | 校验 | 命令 / 依据 | 通过标准 |
 |------|-------------|----------|
@@ -831,11 +851,12 @@ PowerShell 的隐藏命令，而不是直接指向 `node.exe`：
 3. **按角色变化** —— 武器 / 圣遗物 / 天赋 / 面板 / 命座 / 配队 各「增 / 删 / 改」几条
 4. **未跟踪文件** —— `git status` 里的 `??` 文件提醒
 
-**提交范围**：只提交本次发布真正动过的路径（`data/gi/*.json`、`data/_index.json`、`guide.html`、`out/_commit-summary*.md`）
-以及**未跟踪的新文件**，不会把仓库里别人的在途改动一起卷进去。
+**提交范围**（只对显式 `POST /api/commit` 有意义 —— 发布链路不提交）：只提交本次指定的路径
+（`data/gi/*.json`、`data/_index.json`、`guide.html`、`out/_commit-summary*.md`）以及**未跟踪的新文件**，
+不会把仓库里别人的在途改动一起卷进去。
 主文档不在仓库内，不进 git。需要「整仓 `git add -A`」时可显式传 `{ "stageAll": true }`。
 
-**提交失败/无改动都不算发布失败**：`git` 不可用、无改动、提交失败 → 返回
+**提交失败 / 无改动都不算保存失败**（发布链路不提交，这里说的都是显式 `/api/commit`）：`git` 不可用、无改动、提交失败 → 返回
 `{ok:true, commitExecuted:false, commitError|commitSkipped:'…'}`，保存与生成的结果**不回滚**，提示用户手动提交。
 
 响应形状：
@@ -848,13 +869,18 @@ PowerShell 的隐藏命令，而不是直接指向 `node.exe`：
   "summary": { "suggestedMessage": "docs: 更新 旅行者·火（武器）", "markdown": "…", "changedFiles": [], "characterChanges": [], "untracked": [] },
   "summaryFile": "out/_commit-summary.md",
   "summaryStampFile": "out/_commit-summary-20260919-213340.md",
-  "docx": { "path": "D:\\文件\\游戏\\原神\\原神·角色攻略.docx", "backup": "…bak-20260919-213340", "bytes": 29414 },
-  "html": { "path": "guide.html", "bytes": 220601 },
-  "commit": "1a2b3c4",
-  "commitExecuted": true,
+  "docx": { "path": "D:\\文件\\游戏\\原神\\原神·角色攻略.docx", "backup": "…bak-20260919-213340", "bytes": 35969 },
+  "html": { "path": "guide.html", "bytes": 728545 },
+  "commit": null,
+  "commitExecuted": false,
+  "commitSkipped": "发布不会自动提交：摘要已生成，请自行 git add / git commit",
   "pushed": false
 }
 ```
+
+> 上面是响应**形状**示例：`bytes` 是 2026-10-04 实测的当前产物大小（`backup` 里的时间戳是占位）；
+> `commit` / `commitExecuted` / `commitSkipped` / `pushed` 固定是「未提交、未推送」——
+> 发布链路不执行 git，要提交得调用显式 `/api/commit`（见上）。
 
 任何一步失败：该步 `ok:false` 并带 `detail`，**后续步骤继续尝试**（例如 docx 失败也会照常产摘要），
 响应里如实列出每一步，不会静默跳过。
@@ -901,7 +927,8 @@ node scripts/build-docx.mjs [--out 目标docx] [--template 模板docx] [--no-mar
   点名字看它用在哪里，并可从这里直接发起批量替换
 - 保存时由服务器重新生成 `tags` / `sections`（丢弃前端传来的这两个字段），并强制 `schema: 2`
 - **未被编辑器编辑的字段会从原文件按位置合并回来**（`raw`、`sep`、套装 `pieces`、空的主词条占位行等），
-  所以「打开再保存」不会产生多余 diff；129 个 v2 文件实测逐字节不变
+  所以「打开再保存」不会产生多余 diff；当前 131 个角色文件**全部**是 `schema: 2`（v2 文件数随加角色变化，以 `data/` 为准）。
+  「逐字节不变」原本由维护者本地脚本 `.dsh/verify-editor-delete.mjs` 实测，该脚本**不入库、本仓库不存在**，本轮**未能复现**
 - `highlight` 编辑器只读、保存时原样保留；备注行（`{kind:'note'}`）与主词条的 `note` / `noteSlot` 也会原样带回
   （圣遗物段可以直接把某一行切成「备注（注：）」类型来编辑）
 
@@ -1081,13 +1108,13 @@ font-family: 'HYWenHei-85W', 'MiSans', 'Source Han Sans SC', 'Noto Sans CJK SC',
 ### 数据来源
 
 - **攻略正文**：由本地 Word 文档《原神·角色攻略.docx》整理转换而来（`scripts/parse-docx.mjs`）。
-  每个角色文件的出处记录在 `source.guide` 字段，目前取值有 `原神·角色攻略.docx` 与 `原神·角色攻略`。
+  每个角色文件的出处记录在 `source.guide` 字段，2026-10-04 实测 131 个角色文件的取值**都是** `原神·角色攻略`。
 - **名称索引** `data/_index.json`（武器 / 角色 / 圣遗物套装名）：由图鉴后端
   [nanoka-atlas-backend](https://github.com/MOPELotus/nanoka-atlas-backend)（数据源 [nanoka.cc](https://nanoka.cc/)）生成，
   见 `scripts/build-index.mjs`。
 - **游戏内名词与原始资料**：名称、图标、数值等的原始出处为游戏内图鉴与官方资料；
   若某条正文引用或改编自米游社观测枢等社区词条，其版权归原作者所有，转载时请一并保留原作者署名。
 
-`source` 字段是本仓库唯一的来源标注依据（当前 129 个角色文件全部带有 `source.guide`）；
+`source` 字段是本仓库唯一的来源标注依据（2026-10-04 实测 131 个角色文件全部带有 `source.guide`；这个计数随加角色变化）；
 数据文件中的 `source` 与本节描述不一致时，以数据文件为准。
 
