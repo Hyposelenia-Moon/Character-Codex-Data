@@ -14,6 +14,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { childRun } from './mark-docx.mjs'
+import { parserDeps } from './lib/parse-isolation.mjs'
+import { MAIN_DOC } from './lib/main-doc.mjs'
 import { ARTIFACT_KIND_LABEL } from './lib/guide-display.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -21,12 +23,14 @@ const root = path.resolve(here, '..')
 const giDir = path.join(root, 'data', 'gi')
 const work = path.join(root, '.tmp', 'docmerge')
 const shadow = path.join(work, 'shadow')
-const docx = process.argv.find(a => !a.startsWith('--')) ?? 'D:\\文件\\游戏\\原神\\原神·角色攻略.docx'
 /** 已有稳定快照时直接用它（主文档可能正被别的任务反复重写） */
 const snapshotArg = (() => {
   const i = process.argv.indexOf('--snapshot')
   return i >= 0 ? process.argv[i + 1] : null
 })()
+// 位置参数才是文档路径：`process.argv` 里 argv[0] 是 node.exe、argv[1] 是本脚本，都要跳过
+// （以前写 `process.argv.find(a => !a.startsWith('--'))`，取到的是 node.exe，稳定副本永远拿不到）
+const docx = process.argv.slice(2).find(a => !a.startsWith('--') && a !== snapshotArg) ?? MAIN_DOC
 
 const readJson = (f) => JSON.parse(fs.readFileSync(f, 'utf8').replace(/^\uFEFF/, ''))
 const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b)
@@ -39,7 +43,15 @@ function parseShadow () {
   fs.mkdirSync(path.join(shadow, 'scripts', 'lib'), { recursive: true })
   fs.mkdirSync(path.join(shadow, 'data'), { recursive: true })
   fs.copyFileSync(path.join(here, 'parse-docx.mjs'), path.join(shadow, 'scripts', 'parse-docx.mjs'))
-  for (const f of ['docx.mjs', 'schema.mjs']) fs.copyFileSync(path.join(here, 'lib', f), path.join(shadow, 'scripts', 'lib', f))
+  // 依赖清单从 parse-docx.mjs 的 import 扫出来：以前手抄 `['docx.mjs', 'schema.mjs']`，
+  // 漏了 `lib/parse-warnings.mjs`，干净目录里直接 ERR_MODULE_NOT_FOUND
+  for (const rel of parserDeps()) {
+    const src = path.join(here, rel)
+    if (!fs.existsSync(src)) throw new Error(`解析器依赖缺失：scripts/${rel.replace(/^\.\//, '')}（parse-docx.mjs 里 import 了它）`)
+    const dst = path.join(shadow, 'scripts', rel)
+    fs.mkdirSync(path.dirname(dst), { recursive: true })
+    fs.copyFileSync(src, dst)
+  }
   fs.copyFileSync(path.join(root, 'data', '_index.json'), path.join(shadow, 'data', '_index.json'))
   // 用当前 data/gi 作为「上一版」（parse-docx 会读它来继承 highlight/source）
   const srcGi = path.join(shadow, 'data', 'gi')

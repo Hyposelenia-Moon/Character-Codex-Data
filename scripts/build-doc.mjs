@@ -4,6 +4,11 @@
  * - 默认写出仓库根目录的 guide.md（纯文本，可直接贴进 Word / 飞书）
  * - 加 --docx-dir <目录> 时额外写出 OOXML 片段，供打包成 .docx：
  *     node scripts/build-doc.mjs --docx-dir .tmp-docx
+ *
+ *   目录安全（2026-10-04 审核 P1）：**默认只覆盖本脚本生成的三个文件**
+ *   （`[Content_Types].xml` / `_rels/.rels` / `word/document.xml`），目录里原有的其它文件
+ *   一律保留；确需先清空整个目录要显式加 `--docx-dir-clean`。
+ *   盘根 / 仓库目录及其祖先 / 用户主目录会被直接拒绝。
  *     powershell -Command "$d='.tmp-docx';$o='攻略.docx';Add-Type -AssemblyName System.IO.Compression.FileSystem;$z=[IO.Compression.ZipFile]::Open($o,'Create');foreach($r in @('[Content_Types].xml','_rels/.rels','word/document.xml')){$e=$z.CreateEntry($r);$w=New-Object IO.StreamWriter($e.Open(),(New-Object Text.UTF8Encoding($false)));$w.Write([IO.File]::ReadAllText((Join-Path $d ($r -replace '/','\')),[Text.Encoding]::UTF8));$w.Close()};$z.Dispose()"
  *
  *   注意：不要用 ZipFile::CreateFromDirectory —— PowerShell 5.1（.NET Framework）会把 zip 条目名
@@ -15,6 +20,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { isBlankDisplay } from './lib/guide-display.mjs'
+import { assertSafeOutputDir, assertTargetInside } from './lib/safe-dir.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '..')
@@ -193,12 +199,26 @@ console.log(`已生成 ${path.relative(root, outMd)}（${text.split('\n').length
 
 const docxDirFlag = process.argv.indexOf('--docx-dir')
 if (docxDirFlag > -1 && process.argv[docxDirFlag + 1]) {
-  const dir = path.resolve(process.argv[docxDirFlag + 1])
-  fs.rmSync(dir, { recursive: true, force: true })
-  fs.mkdirSync(path.join(dir, '_rels'), { recursive: true })
-  fs.mkdirSync(path.join(dir, 'word'), { recursive: true })
-  fs.writeFileSync(path.join(dir, '[Content_Types].xml'), CONTENT_TYPES, 'utf8')
-  fs.writeFileSync(path.join(dir, '_rels', '.rels'), RELS, 'utf8')
-  fs.writeFileSync(path.join(dir, 'word', 'document.xml'), buildDocumentXml(text), 'utf8')
-  console.log(`已生成 OOXML 片段 → ${dir}（打包命令见脚本头部注释，注意用逐个 CreateEntry 的写法）`)
+  try {
+    const clean = process.argv.includes('--docx-dir-clean')
+    // 危险路径（盘根 / 仓库及其祖先 / 用户主目录）在这里就被拒，后面的写入才有意义
+    const dir = assertSafeOutputDir(process.argv[docxDirFlag + 1], { label: '--docx-dir 输出目录：' })
+    // 本脚本生成的三项；其余都算"目录里原有的内容"，默认原样保留
+    const GENERATED = ['[Content_Types].xml', '_rels', 'word']
+    const foreign = fs.existsSync(dir) ? fs.readdirSync(dir).filter(n => !GENERATED.includes(n)) : []
+    if (clean) fs.rmSync(dir, { recursive: true, force: true })
+    fs.mkdirSync(path.join(dir, '_rels'), { recursive: true })
+    fs.mkdirSync(path.join(dir, 'word'), { recursive: true })
+    const write = (rel, body) => fs.writeFileSync(assertTargetInside(dir, path.join(dir, rel)), body, 'utf8')
+    write('[Content_Types].xml', CONTENT_TYPES)
+    write(path.join('_rels', '.rels'), RELS)
+    write(path.join('word', 'document.xml'), buildDocumentXml(text))
+    console.log(`已生成 OOXML 片段 → ${dir}（打包命令见脚本头部注释，注意用逐个 CreateEntry 的写法）`)
+    if (!clean && foreign.length) {
+      console.log(`保留了目录里原有的 ${foreign.length} 项：${foreign.slice(0, 5).join('、')}${foreign.length > 5 ? '…' : ''}（要清空整个目录请加 --docx-dir-clean）`)
+    }
+  } catch (err) {
+    console.error(`× ${err.message}`)
+    process.exitCode = 1
+  }
 }

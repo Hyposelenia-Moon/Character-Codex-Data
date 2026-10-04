@@ -6,15 +6,16 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { childRun } from './mark-docx.mjs'
+import { cloneParser, seedGi, assertDirUnchanged } from './lib/parse-isolation.mjs'
+import { MAIN_DOC } from './lib/main-doc.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '..')
 const giDir = path.join(root, 'data', 'gi')
 const work = path.join(root, '.tmp', 'deepdiff')
-const shadow = path.join(work, 'shadow')
 const snapArg = (() => { const i = process.argv.indexOf('--snapshot'); return i >= 0 ? process.argv[i + 1] : null })()
 const only = process.argv.slice(2).filter(a => !a.startsWith('--') && a !== snapArg)
-const docx = 'D:\\文件\\游戏\\原神\\原神·角色攻略.docx'
+const docx = MAIN_DOC
 
 const readJson = (f) => JSON.parse(fs.readFileSync(f, 'utf8').replace(/^\uFEFF/, ''))
 const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b)
@@ -44,21 +45,18 @@ function firstDiffs (a, b, pathStr = '', out = [], max = 6) {
   return out
 }
 
-// 影子解析（不写 data/gi）
-fs.rmSync(shadow, { recursive: true, force: true })
-fs.mkdirSync(path.join(shadow, 'scripts', 'lib'), { recursive: true })
-fs.mkdirSync(path.join(shadow, 'data'), { recursive: true })
-fs.copyFileSync(path.join(here, 'parse-docx.mjs'), path.join(shadow, 'scripts', 'parse-docx.mjs'))
-for (const f of ['docx.mjs', 'schema.mjs']) fs.copyFileSync(path.join(here, 'lib', f), path.join(shadow, 'scripts', 'lib', f))
-fs.copyFileSync(path.join(root, 'data', '_index.json'), path.join(shadow, 'data', '_index.json'))
-const srcGi = path.join(shadow, 'data', 'gi')
-fs.mkdirSync(srcGi, { recursive: true })
-for (const f of fs.readdirSync(giDir)) fs.copyFileSync(path.join(giDir, f), path.join(srcGi, f))
+// 影子解析（不写 data/gi）：解析器克隆 + 只读输入种子。
+// 依赖清单由 `cloneParser()` 从 parse-docx.mjs 的 import 里扫出来 —— 以前这里手抄
+// `['docx.mjs', 'schema.mjs']`，漏了 `lib/parse-warnings.mjs`，干净目录里直接 ERR_MODULE_NOT_FOUND。
+const cl = cloneParser(work)
+const seedBefore = seedGi(cl, giDir)
+const srcGi = cl.giDir
 const ascii = path.join(work, 'main.docx')
-fs.mkdirSync(work, { recursive: true })
 if (snapArg) fs.writeFileSync(ascii, fs.readFileSync(snapArg))
 else fs.copyFileSync(docx, ascii)
-const r = childRun(path.join(shadow, 'scripts', 'parse-docx.mjs'), [ascii], shadow, path.join(work, 'out.txt'))
+const r = childRun(path.join(cl.scriptsDir, 'parse-docx.mjs'), [ascii], cl.clone, path.join(work, 'out.txt'), { DSH_GI_DIR: srcGi })
+// 输入只读契约：不管子进程成功与否，先证明 data/gi 一个字节都没被动过
+assertDirUnchanged(giDir, seedBefore, '输入目录 data/gi')
 if (r.status !== 0) { console.error(r.stderr.slice(0, 600)); process.exit(1) }
 
 const names = readJson(path.join(srcGi, '_order.json'))

@@ -15,7 +15,8 @@
  *
  * 用法：
  *   node scripts/build-docx.mjs [--out 目标docx] [--no-mark] [--dry] [--no-verify]
- *   默认目标：D:\文件\游戏\原神\原神·角色攻略.docx
+ *   默认目标：主文档（`scripts/lib/main-doc.mjs` 的 MAIN_DOC：`CODEX_DOCX` 优先，
+ *   缺省 D:\文件\游戏\原神\原神·角色攻略.docx）
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -24,19 +25,23 @@ import { fileURLToPath } from 'node:url'
 import { readDocx, writeDocx, escapeXml, SEPARATOR } from './lib/docx.mjs'
 import { deriveSections, renderArtifactRow, talentLevelLine, crownItemText, joinWithSep, sepTokens, itemText, stripMarks, isNoteRow, noteText, resolveNoteText, artifactStatPool, NOTE_PREFIX, NOTE_SEP } from './lib/schema.mjs'
 import { loadRefs, planMarks, applyPlan, splitBlocks, loadParseBlock, parseToJson, parseDry } from './mark-docx.mjs'
+// 主文档 / 标记版路径统一从 lib/main-doc.mjs 取（CODEX_DOCX 优先），不再本脚本硬编码一份
+import { MAIN_DOC, markedDocOf } from './lib/main-doc.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '..')
 const dataDir = path.join(root, 'data')
 const giDir = path.join(dataDir, 'gi')
-const DEFAULT_DOC = 'D:\\文件\\游戏\\原神\\原神·角色攻略.docx'
+/** 主文档：与 lib/main-doc.mjs 同源（`CODEX_DOCX` 优先，缺省 D 盘主文档） */
+const DEFAULT_DOC = MAIN_DOC
 /**
  * 两份文档的分工（用户决定，模式 B）：
  *   主文档 = 纯文本可读版（--write-main 时等价 --no-mark）
  *   标记版 = 带 [[w:]]/[[a:]]/[[c:]]/[[t:]]/[[k:]] 的转换用版本
  */
 const MARKED_OUT = path.join(root, 'out', '原神·角色攻略(标记版).docx')
-const MARKED_SHIPPED = 'D:\\文件\\游戏\\原神\\原神·角色攻略(标记版).docx'
+/** 交付用标记版：与主文档同目录、基名 + `(标记版)` + 原扩展名（主文档路径一改，它跟着改） */
+const MARKED_SHIPPED = markedDocOf(MAIN_DOC)
 /** 标记版的中间产物（验证通过后才同步到 out/ 与交付路径） */
 const MARKED_STAGE = path.join(root, '.tmp', 'build-docx', '原神·角色攻略(标记版).docx')
 
@@ -498,7 +503,9 @@ export function snapshotJson () {  const map = new Map()
  * @param {string} [frozenGiDir] 冻结的 data/gi 快照目录（并发写 data/gi 时用它保证校验稳定）
  */
 export function verifyAgainstJson (docx, bundle, tmpDir, before, frozenGiDir) {
-  const opts = frozenGiDir ? { giDir: frozenGiDir } : {}
+  // `seedGiDir` = 只读输入种子：mark-docx 先把它复制进解析克隆体再解析，解析后断言种子没被改写。
+  // 旧名 `giDir` 会被当成「解析器的写入目录」，等于让回读结果覆写冻结快照（审核 P1-3）。
+  const opts = frozenGiDir ? { seedGiDir: frozenGiDir } : {}
   const parsed = parseToJson(docx, path.join(tmpDir, 'out'), opts)
   const stats = parseDry(docx, tmpDir, opts).stats
   const after = snapshotJson()
@@ -590,7 +597,7 @@ function sha1File (file) {
 
 /**
  * 同步「标记版文档」：把主文档原样写出到 `out/原神·角色攻略(标记版).docx`，
- * 再拷贝一份到 `D:\文件\游戏\原神\原神·角色攻略(标记版).docx`（覆盖前备份 `.bak-<时间戳>`，保留最近 5 份）。
+ * 再拷贝一份到主文档同目录的 `(标记版)` 文档（覆盖前备份 `.bak-<时间戳>`，保留最近 5 份）。
  *
  * 说明：主文档当前**本身就是带引用标记**的产物（build-docx 默认写标记），
  * 所以标记版与主文档字节级一致、只是多一层「另一份文件名」的产物；
@@ -725,8 +732,8 @@ async function main () {
   }
   // ---- 标记版（自包含块，防止被并发编辑覆盖）：主文档=干净可读版，标记版=带引用标记 ----
   if (writesMain) {
-    const MARKED_OUT = path.join(OUT_DIR, '原神·角色攻略(标记版).docx')
-    const MARKED_SHIPPED = 'D:\\文件\\游戏\\原神\\原神·角色攻略(标记版).docx'
+    // 用模块级的 MARKED_OUT / MARKED_SHIPPED（都由 lib/main-doc.mjs 派生）：
+    // 以前这里各写一份局部常量，`CODEX_DOCX` 一改就会分叉到两个不同的文件
     const mstage = path.join(tmp, `marked-${process.pid}.docx`)
     const mr = await build({ template: args.template, mark: true, out: mstage, frozenGiDir: r.frozenGiDir?.dir })
     // 自包含：写 stage + 往返校验（不依赖 main 里的局部函数，避免被并发编辑覆盖）

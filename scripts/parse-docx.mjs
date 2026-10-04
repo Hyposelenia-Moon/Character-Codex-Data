@@ -4,7 +4,11 @@
  * 特点：
  *  - 识别 [[w:武器名]] [[a:圣遗物]] [[c:角色]] [[t:E]] [[k:2]] 引用标记（有标记时以标记为准，无标记时按行形态推断）
  *  - 每类信息写进独立字段（v2.weapons / v2.artifacts / v2.talents / v2.panels / v2.constellations / v2.teams）
- *  - 认不出来的行原样存进 unparsed，绝不丢内容；tags / sections 由 v2 回推，旧渲染器与插件继续可用
+ *  - tags / sections 由 v2 回推，旧渲染器与插件继续可用
+ *  - **认不出来的行（stray）不写进 JSON**：只要出现一条，本次导入就整体拒绝写盘并以退出码 1 结束
+ *    （2026-10-04 审核 P1-2：以前是"先逐角色落盘、循环跑完再按 stray 报错"，于是用户看到导入失败、
+ *    磁盘数据却已经变了）。真正写盘前会在 `data/_backup/parse-docx-<时间戳>/` 留一份改动前副本，
+ *    并逐文件「写临时文件 + rename」原子替换。
  *
  * 用法：
  *   node scripts/parse-docx.mjs [docx路径] [--dry]
@@ -16,6 +20,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { readDocx, SEPARATOR } from './lib/docx.mjs'
 import { makeRef, parseRef, deriveSections, deriveTags, validate, constellationIndex, extractMarks, stripMarks, MARK_RE, parseNoteLine, resolveNoteText, artifactStatPool, isNoteRow, shortenTwoPiece } from './lib/schema.mjs'
 import { warn, getWarnings, resetWarnings, setWarnContext } from './lib/parse-warnings.mjs'
+import { MAIN_DOC } from './lib/main-doc.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '..')
@@ -23,7 +28,7 @@ const dataDir = process.env.DSH_DATA_DIR ? path.resolve(process.env.DSH_DATA_DIR
 // DSH_GI_DIR 可指向 data/gi 的**冻结副本**：并发写 data/gi 时（编辑器多个窗口 / 批处理脚本），
 // build-docx 的往返校验用副本 + 同一份内存 bundle 比对，避免被别处的在途改动搅乱。
 const giDir = process.env.DSH_GI_DIR ? path.resolve(process.env.DSH_GI_DIR) : path.join(dataDir, 'gi')
-const DEFAULT_DOC = 'D:\\文件\\游戏\\原神\\原神·角色攻略.docx'
+const DEFAULT_DOC = MAIN_DOC
 
 const SECTION_TITLES = ['武器推荐', '圣遗物推荐', '天赋加点', '毕业面板参考', '命座推荐', '配队推荐']
 /** 小节 → v2 字段名（备注行 `注：` 落到所属小节的数组里） */
@@ -735,6 +740,94 @@ function parseBlock (lines, index) {
   return data
 }
 
+/* ------------------------------------------------------------------ *
+ * 写盘：报告 / 原子替换 / 改动前副本（2026-10-04 审核 P1-2）
+ * ------------------------------------------------------------------ */
+
+/** 解析报告（诊断产物，不是数据）：未识别行时也要留下，方便排查 */
+function writeParseReport (report) {
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true })
+  fs.writeFileSync(path.join(dataDir, '_parse-report.json'), JSON.stringify(report, null, 2) + '\n', 'utf8')
+}
+
+/** 逐文件原子替换：先写同目录临时文件再 rename，中途失败不会留下半个 JSON */
+function atomicWriteJson (file, data) {
+  const dir = path.dirname(file)
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+  const tmp = `${file}.tmp-${process.pid}`
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2) + '\n', 'utf8')
+  fs.renameSync(tmp, file)
+}
+
+/**
+ * 写盘前的「改动前副本」：`data/_backup/parse-docx-<时间戳>/`（含 `_order.json` 与 manifest.json）
+ * 只有内容确实会变的角色才进副本；毫无改动时返回 null（不建目录）。
+ * @returns {string|null}
+ */
+function backupBeforeWrite (items, docFile) {
+  const changed = items.filter(it => {
+    if (!fs.existsSync(it.prevFile)) return false
+    try { return fs.readFileSync(it.prevFile, 'utf8') !== JSON.stringify(it.data, null, 2) + '\n' } catch { return false }
+  })
+  if (!changed.length) return null
+  const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
+  const dir = path.join(dataDir, '_backup', `parse-docx-${stamp}`)
+  fs.mkdirSync(dir, { recursive: true })
+  for (const it of changed) fs.copyFileSync(it.prevFile, path.join(dir, path.basename(it.prevFile)))
+  const orderFile = path.join(giDir, '_order.json')
+  if (fs.existsSync(orderFile)) fs.copyFileSync(orderFile, path.join(dir, '_order.json'))
+  fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify({
+    at: new Date().toISOString(),
+    doc: docFile,
+    note: 'parse-docx 导入前的改动前副本（把这里的文件复制回 data/gi 即可还原）',
+    files: changed.map(it => path.basename(it.prevFile))
+  }, null, 2) + '\n', 'utf8')
+  return dir
+}
+
+/**
+ * 写回 `_order.json`：展示顺序按文档出现顺序重建（文档顺序 = 图鉴发布时间从远到近）；
+ * ⚠ data/gi 里有、文档里还没有的角色（「从图鉴添加」建出来但还没填内容的空档模板）
+ * 必须保留在末尾 —— 否则一次 parse-docx 就把新角色从 _order.json 里抹掉（编辑器里直接消失）。
+ */
+function commitParse (report) {
+  const parsedNames = report.characters.map(c => c.name)
+  const prevOrder = (() => {
+    try {
+      const doc = JSON.parse(fs.readFileSync(path.join(giDir, '_order.json'), 'utf8'))
+      return Array.isArray(doc) ? doc.map(String) : []
+    } catch { return [] }
+  })()
+  const files = fs.readdirSync(giDir)
+    .filter(f => f.endsWith('.json') && !f.startsWith('_'))
+    .map(f => f.slice(0, -'.json'.length))
+  const rest = [
+    ...prevOrder.filter(n => files.includes(n) && !parsedNames.includes(n)),
+    ...files.filter(n => !parsedNames.includes(n) && !prevOrder.includes(n)).sort()
+  ]
+  const order = [...parsedNames, ...rest]
+  fs.writeFileSync(path.join(giDir, '_order.json'), JSON.stringify(order, null, 2) + '\n', 'utf8')
+}
+
+/** 收尾统计（写盘失败 / 未识别行两条路径共用） */
+function printSummary (report, docFile, dry) {
+  console.log(`文档：${docFile}`)
+  console.log(`角色块：${report.totals.characters}`)
+  console.log(`武器行 ${report.totals.weapons} / 圣遗物行 ${report.totals.artifacts} / 天赋行 ${report.totals.talents} / 面板行 ${report.totals.panels} / 命座 ${report.totals.constellations} / 配队行 ${report.totals.teams}`)
+  console.log(`备注行（注：）${report.totals.notes} 条`)
+  console.log(`未识别行：${report.totals.unparsed}${dry ? '（--dry 未写文件）' : ''}`)
+  if (report.warnings.length) {
+    console.log(`解析告警：${report.warnings.length} 条（无法保留 / 无法归位的括注与标记${dry ? '，--dry 不写文件' : '，已汇总进 data/_parse-report.json 的 warnings'}）`)
+    for (const w of report.warnings.slice(0, 8)) console.log(`  ⚠ ${w}`)
+  } else {
+    console.log('解析告警：0 条（没有无法保留 / 无法归位的括注与标记）')
+  }
+  if (report.issues.length) {
+    console.log(`名称校验问题：${report.issues.length} 条（详见 data/_parse-report.json）`)
+    for (const it of report.issues.slice(0, 8)) console.log(`  · ${it.name} ${it.where} ${it.ref} — ${it.reason}`)
+  }
+}
+
 function main () {
   const args = process.argv.slice(2)
   const dry = args.includes('--dry')
@@ -754,6 +847,8 @@ function main () {
 
   const report = { doc: docFile, characters: [], totals: { characters: 0, weapons: 0, artifacts: 0, talents: 0, panels: 0, constellations: 0, teams: 0, notes: 0, unparsed: 0 }, issues: [], stray: [], warnings: [] }
   resetWarnings()
+  /** 阶段 1 的产物：解析结果先全部留在内存，门禁通过后才写盘 */
+  const items = []
   for (const block of blocks) {
     const lines = block.filter(x => x !== '')
     if (!lines.length) continue
@@ -803,55 +898,32 @@ function main () {
     report.characters.push(cnt)
     report.totals.characters++
     for (const k of ['weapons', 'artifacts', 'talents', 'panels', 'constellations', 'teams', 'notes', 'unparsed']) report.totals[k] += cnt[k]
-    if (!dry) {
-      if (!fs.existsSync(giDir)) fs.mkdirSync(giDir, { recursive: true })
-      fs.writeFileSync(prevFile, JSON.stringify(data, null, 2) + '\n', 'utf8')
-    }
+    // 只收集，不写盘 —— 未识别行必须在**任何角色文件被写之前**判定
+    items.push({ name: parsed.name, prevFile, data, stray: parsed.stray })
   }
-  if (!dry) {
-    if (!fs.existsSync(giDir)) fs.mkdirSync(giDir, { recursive: true })
-    fs.writeFileSync(path.join(dataDir, '_parse-report.json'), JSON.stringify(report, null, 2) + '\n', 'utf8')
-    // 展示顺序按文档出现顺序重建（文档顺序 = 图鉴发布时间从远到近）；
-    // ⚠ data/gi 里有、文档里还没有的角色（「从图鉴添加」建出来但还没填内容的空档模板）
-    // 必须保留在末尾 —— 否则一次 parse-docx 就把新角色从 _order.json 里抹掉（编辑器里直接消失）。
-    const parsedNames = report.characters.map(c => c.name)
-    const prevOrder = (() => {
-      try {
-        const doc = JSON.parse(fs.readFileSync(path.join(giDir, '_order.json'), 'utf8'))
-        return Array.isArray(doc) ? doc.map(String) : []
-      } catch { return [] }
-    })()
-    const files = fs.readdirSync(giDir)
-      .filter(f => f.endsWith('.json') && !f.startsWith('_'))
-      .map(f => f.slice(0, -'.json'.length))
-    const rest = [
-      ...prevOrder.filter(n => files.includes(n) && !parsedNames.includes(n)),
-      ...files.filter(n => !parsedNames.includes(n) && !prevOrder.includes(n)).sort()
-    ]
-    const order = [...parsedNames, ...rest]
-    fs.writeFileSync(path.join(giDir, '_order.json'), JSON.stringify(order, null, 2) + '\n', 'utf8')
-  }
-  console.log(`文档：${docFile}`)
-  console.log(`角色块：${report.totals.characters}`)
-  console.log(`武器行 ${report.totals.weapons} / 圣遗物行 ${report.totals.artifacts} / 天赋行 ${report.totals.talents} / 面板行 ${report.totals.panels} / 命座 ${report.totals.constellations} / 配队行 ${report.totals.teams}`)
-  console.log(`备注行（注：）${report.totals.notes} 条`)
-  console.log(`未识别行：${report.totals.unparsed}${dry ? '（--dry 未写文件）' : ''}`)
   report.warnings = getWarnings()
-  if (report.warnings.length) {
-    console.log(`解析告警：${report.warnings.length} 条（无法保留 / 无法归位的括注与标记${dry ? '，--dry 不写文件' : '，已汇总进 data/_parse-report.json 的 warnings'}）`)
-    for (const w of report.warnings.slice(0, 8)) console.log(`  ⚠ ${w}`)
-  } else {
-    console.log('解析告警：0 条（没有无法保留 / 无法归位的括注与标记）')
-  }
-  if (report.issues.length) {
-    console.log(`名称校验问题：${report.issues.length} 条（详见 data/_parse-report.json）`)
-    for (const it of report.issues.slice(0, 8)) console.log(`  · ${it.name} ${it.where} ${it.ref} — ${it.reason}`)
-  }
+
+  // ── 阶段 2：门禁 —— 有未识别行时**一个角色文件都不写** ──
+  // 以前是"循环内逐角色落盘、跑完再按 stray 置退出码 1"，于是"用户看到导入失败、磁盘数据却已经变了"。
   if (report.stray.length) {
+    if (!dry) writeParseReport(report)
+    printSummary(report, docFile, dry)
     console.log('未识别行明细（应为 0；不为 0 说明文档里有解析器不认识的写法）：')
     for (const s of report.stray.slice(0, 20)) console.log(`  · ${s.name} [${s.section}] ${s.line}`)
+    console.log(`× 未识别行 ${report.stray.length} 条：本次**没有写入任何文件**（data/gi 与 _order.json 保持原样）。请先修正文档写法或解析器。`)
     process.exitCode = 1
+    return
   }
+
+  // ── 阶段 3：提交 —— 先留改动前副本，再逐文件原子替换 ──
+  if (!dry) {
+    const backupDir = backupBeforeWrite(items, docFile)
+    for (const it of items) atomicWriteJson(it.prevFile, it.data)
+    commitParse(report)
+    writeParseReport(report)
+    console.log(`已写入 ${items.length} 个角色 JSON${backupDir ? `（改动前副本：${path.relative(root, backupDir)}）` : '（内容无变化）'}`)
+  }
+  printSummary(report, docFile, dry)
 }
 
 /**

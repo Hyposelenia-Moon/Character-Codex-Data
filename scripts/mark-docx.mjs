@@ -23,12 +23,14 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { readDocx, writeDocx, escapeXml, SEPARATOR } from './lib/docx.mjs'
 import { MARK_RE, parseRef } from './lib/schema.mjs'
+import { cloneParser, seedGi, assertDirUnchanged, parserDeps } from './lib/parse-isolation.mjs'
+import { MAIN_DOC } from './lib/main-doc.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '..')
 const dataDir = path.join(root, 'data')
 const giDir = path.join(dataDir, 'gi')
-const DEFAULT_DOC = 'D:\\文件\\游戏\\原神\\原神·角色攻略.docx'
+const DEFAULT_DOC = MAIN_DOC
 const DEFAULT_OUT = path.join(root, 'out', '原神·角色攻略(标记版).docx')
 
 const CN_NUM = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6 }
@@ -55,9 +57,14 @@ export async function loadParseBlock () {
   fs.mkdirSync(path.join(dir, 'lib'), { recursive: true })
   const code = fs.readFileSync(path.join(here, 'parse-docx.mjs'), 'utf8')
   fs.writeFileSync(path.join(dir, 'parse-docx.mjs'), code.replace(/^if \(isDirectRun\) main\(\)$/m, '') + '\nexport { parseBlock }\n', 'utf8')
-  for (const f of ['docx.mjs', 'schema.mjs', 'parse-warnings.mjs']) {
-    const src = path.join(here, 'lib', f)
-    if (fs.existsSync(src)) fs.copyFileSync(src, path.join(dir, 'lib', f))
+  // 依赖清单从 parse-docx.mjs 的 import 里扫出来（以前是手抄数组，
+  // deep-diff / compare-doc-json 就是因为漏抄 lib/parse-warnings.mjs 而跑不起来）
+  for (const rel of parserDeps()) {
+    const src = path.join(here, rel)
+    if (!fs.existsSync(src)) continue
+    const dst = path.join(dir, rel)
+    fs.mkdirSync(path.dirname(dst), { recursive: true })
+    fs.copyFileSync(src, dst)
   }
   const mod = await import(new URL('file://' + path.join(dir, 'parse-docx.mjs').replace(/\\/g, '/')).href)
   if (typeof mod.parseBlock !== 'function') throw new Error('无法从 parse-docx.mjs 复用 parseBlock')
@@ -565,15 +572,27 @@ export function childRun (scriptPath, argv, cwd, outFile, extraEnv) {
   return { status: r.status, stdout, stderr }
 }
 
+/**
+ * 子进程失败时的可读摘要：stderr 优先，并把 stdout 末尾几行一起带上
+ * （`未识别行：1` 与明细都在 stdout 上，只报 stderr 会看不出失败原因）
+ */
+function failTail (r) {
+  const err = String(r.stderr ?? '').trim()
+  const out = String(r.stdout ?? '').trim().split('\n').slice(-4).map(l => l.trim()).filter(Boolean).join(' ｜ ')
+  return [err.slice(0, 300), out].filter(Boolean).join(' ｜ ') || '（无输出）'
+}
+
 /** --dry 先确认能解析（不写任何文件）
+ * `--dry` 不落盘，所以这里可以把 `DSH_GI_DIR` 直接指向只读种子，不需要克隆。
  * @param {string} docx
  * @param {string} tmpDir
- * @param {{giDir?: string}} [opts] giDir：指向冻结的 data/gi 快照（并发写 data/gi 时保证结果稳定）
+ * @param {{seedGiDir?: string, giDir?: string}} [opts] seedGiDir：指向冻结的 data/gi 快照（并发写 data/gi 时保证结果稳定）；`giDir` 是旧名，等价
  */
 export function parseDry (docx, tmpDir, opts = {}) {
+  const seed = opts.seedGiDir ?? opts.giDir ?? null
   const out = path.join(tmpDir, 'dry-' + crypto.createHash('sha1').update(docx).digest('hex').slice(0, 8) + '.txt')
-  const r = childRun(path.join(root, 'scripts', 'parse-docx.mjs'), [docx, '--dry'], root, out, opts.giDir ? { DSH_GI_DIR: opts.giDir } : undefined)
-  if (r.status !== 0) throw new Error(`parse-docx --dry 失败（${r.status}）：${r.stderr.slice(0, 500)}`)
+  const r = childRun(path.join(root, 'scripts', 'parse-docx.mjs'), [docx, '--dry'], root, out, seed ? { DSH_GI_DIR: path.resolve(seed) } : undefined)
+  if (r.status !== 0) throw new Error(`parse-docx --dry 失败（${r.status}）：${failTail(r)}`)
   const text = r.stdout
   // 输出形如「角色块：129」「武器行 222 / 圣遗物行 403 / …」「未识别行：0」
   // 输出形如「角色块：129」「武器行 222 / 圣遗物行 403 / …」「未识别行：0」；全角冒号要跳过去
@@ -596,33 +615,43 @@ export function parseDry (docx, tmpDir, opts = {}) {
 
 /** 真正解析并落盘（parse-docx 自己没有 dump 选项，这里在临时目录里跑一个克隆）
  *
- * 输出目录与输入分开：克隆放在 `<dumpDir>/clone/`，子进程 cwd 也在那里，
- * 所以它写出的 data/gi 落在 `<dumpDir>/clone/data/gi`；
- * `opts.giDir` 只作为**输入**（冻结的 data/gi 快照，避免并发写干扰）。
+ * **输入只读 / 输出独立**（2026-10-04 审核 P1-3）：
+ *   · 克隆放在 `<dumpDir>/clone/`，子进程 cwd 也在那里，它写出的 data/gi 只落在克隆体内部；
+ *   · `opts.seedGiDir` 是**只读输入种子**：内容先复制进克隆体再解析，子进程拿到的
+ *     `DSH_GI_DIR` 永远指向克隆体；解析完用 `assertDirUnchanged()` 证明种子一个字节没被动过。
+ *   以前是把 `opts.giDir` 直接交给子进程当**写入目录**，于是"冻结快照"被解析结果覆写，
+ *   诊断再从这个目录读期望值 → 「数据 ↔ 文档」退化成"文档和自己比"，恒为 0 个不一致
+ *   （发布校验用的就是这一项）。
  *
  * @param {string} docx
  * @param {string} dumpDir
- * @param {{giDir?: string}} [opts]
+ * @param {{seedGiDir?: string, giDir?: string}} [opts] `giDir` 是旧名，等价于 `seedGiDir`
+ * @returns {{names: string[], objs: object[], stdout: string, giDir: string, dataDir: string, report: object|null}}
  */
 export function parseToJson (docx, dumpDir, opts = {}) {
-  const clone = path.join(dumpDir, 'clone')
-  fs.rmSync(dumpDir, { recursive: true, force: true })
-  fs.mkdirSync(path.join(clone, 'scripts', 'lib'), { recursive: true })
-  fs.mkdirSync(path.join(clone, 'data'), { recursive: true })
-  fs.copyFileSync(path.join(here, 'parse-docx.mjs'), path.join(clone, 'scripts', 'parse-docx.mjs'))
-  for (const f of ['docx.mjs', 'schema.mjs', 'parse-warnings.mjs']) {
-    const src = path.join(here, 'lib', f)
-    if (fs.existsSync(src)) fs.copyFileSync(src, path.join(clone, 'scripts', 'lib', f))
-  }
-  fs.copyFileSync(path.join(dataDir, '_index.json'), path.join(clone, 'data', '_index.json'))
+  const seed = opts.seedGiDir ?? opts.giDir ?? null
+  const seedGiDir = seed ? path.resolve(seed) : null
+  const clone = cloneParser(dumpDir)
+  const seedBefore = seedGiDir ? seedGi(clone, seedGiDir) : null
   const abs = path.isAbsolute(docx) ? docx : path.resolve(root, docx)
-  const r = childRun(path.join(clone, 'scripts', 'parse-docx.mjs'), [abs], clone, path.join(clone, 'stdout.txt'), opts.giDir ? { DSH_GI_DIR: opts.giDir } : undefined)
-  if (r.status !== 0) throw new Error(`parse-docx 失败（${r.status}）：${r.stderr.slice(0, 500)}`)
-  // 子进程写哪儿：给了 DSH_GI_DIR 就写那里（= opts.giDir），否则写克隆自己的 data/gi
-  const outGi = opts.giDir ? path.resolve(opts.giDir) : path.join(clone, 'data', 'gi')
-  const names = readJson(path.join(outGi, '_order.json'))
-  const objs = names.map(n => readJson(path.join(outGi, `${n}.json`)))
-  return { names, objs, stdout: r.stdout }
+  const r = childRun(
+    path.join(clone.scriptsDir, 'parse-docx.mjs'),
+    [abs],
+    clone.clone,
+    path.join(clone.clone, 'stdout.txt'),
+    seedGiDir ? { DSH_GI_DIR: clone.giDir } : undefined
+  )
+  // 输入只读契约：无论子进程成功与否，先证明种子目录没被改写
+  if (seedGiDir) assertDirUnchanged(seedGiDir, seedBefore, `输入快照 ${seedGiDir}`)
+  if (r.status !== 0) throw new Error(`parse-docx 失败（${r.status}）：${failTail(r)}`)
+  const orderFile = path.join(clone.giDir, '_order.json')
+  if (!fs.existsSync(orderFile)) throw new Error(`解析没有产出 data/gi/_order.json（${clone.giDir}）`)
+  const names = readJson(orderFile)
+  const objs = names.map(n => readJson(path.join(clone.giDir, `${n}.json`)))
+  // 解析报告（`data/_parse-report.json`）：文档里真实出现的角色集合在这里，比 _order.json 干净
+  // （后者按设计保留空档模板与残留名），诊断用它对齐角色集合。
+  const report = (() => { try { return readJson(path.join(clone.dataDir, '_parse-report.json')) } catch { return null } })()
+  return { names, objs, stdout: r.stdout, giDir: clone.giDir, dataDir: clone.dataDir, report }
 }
 
 /** 全量比对两份解析结果 */

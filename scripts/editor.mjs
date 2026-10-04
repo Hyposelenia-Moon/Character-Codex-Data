@@ -45,6 +45,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { deriveSections, deriveTags, validate, parseRef, itemText, foldMainNoteIntoStats, normalizeFreeModules, MODULE_KEYS, shortenTwoPiece, ARTIFACT_2PC } from './lib/schema.mjs'
 import { renderGuideSectionsHtml, renderGuideSectionsText, characterSections, renderCard } from './build-html.mjs'
 import { verifyThreeWay, snapshotMainDoc, sha1File } from './lib/publish-verify.mjs'
+// 主文档路径与其它脚本同源（lib/main-doc.mjs：CODEX_DOCX 优先），不再本文件硬编码一份
+import { MAIN_DOC, markedDocOf } from './lib/main-doc.mjs'
 import { buildIndex, readAtlasCharacters } from './build-index.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -56,8 +58,8 @@ const backupDir = path.join(dataDir, '_backup')
 const indexPath = path.join(dataDir, '_index.json')
 const orderPath = path.join(giDir, '_order.json')
 const editorDir = path.join(root, 'resources', 'editor')
-/** 主文档（「保存即发布」会写回它；build-docx 会先备份） */
-const DEFAULT_DOC = 'D:\\文件\\游戏\\原神\\原神·角色攻略.docx'
+/** 主文档（「保存即发布」会写回它；build-docx 会先备份）：与 lib/main-doc.mjs 同源 */
+const DEFAULT_DOC = MAIN_DOC
 /** 提交摘要落盘位置（out/ 已在 .gitignore 里，不污染仓库） */
 const SUMMARY_FILE = path.join(root, 'out', '_commit-summary.md')
 
@@ -2232,7 +2234,7 @@ function parseMarkedDocxLog (text) {
   const t = String(text ?? '')
   const outPath = t.match(/^标记版输出：(.*)$/m)?.[1]?.trim() ?? null
   const shim = t.match(/^标记版拷贝：(.*?)（备份 (.*?)）$/m)
-  const shippedPath = shim?.[1]?.trim() ?? 'D:\\文件\\游戏\\原神\\原神·角色攻略(标记版).docx'
+  const shippedPath = shim?.[1]?.trim() ?? markedDocOf(MAIN_DOC)
   const backup = shim?.[2]?.trim() ?? null
   const roundTrip = t.match(/^标记版往返（parse-docx ↔ 生成时 JSON）：(.*)$/m)?.[1]?.trim() ?? null
   const mainSha = t.match(/^主文档 sha1：(.*)$/m)?.[1]?.trim() ?? null

@@ -4,7 +4,8 @@
  * 只在 publish 流程里用：**四项全过才允许 git commit**，任一项不过就跳过提交，
  * 已生成的文档与网页保持可用（不回滚）。
  *
- *   a. 数据 ↔ 文档：`scripts/diagnose-docx-json.mjs` 的不一致角色数必须为 0
+ *   a. 数据 ↔ 文档：`scripts/diagnose-docx-json.mjs` 的结构化结论行必须 `ok=true`
+ *      （内容不一致 / 只在文档 / 只在 JSON / 顺序不符都算不过）；拿不到结论行时回退中文正则并在 detail 里标注
  *   b. 文档往返：build-docx 的往返校验（parse-docx 读回 vs 生成时 JSON）必须 129/129
  *   c. 网页版新鲜度：guide.html 必须是本次 publish 里 build-html 刚生成的
  *   d. 悬挂/重复分隔符：`scripts/scan-separators.mjs` 必须 0 处
@@ -17,6 +18,8 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+// 主文档 / 标记版路径统一从 lib/main-doc.mjs 取（CODEX_DOCX 优先），不再本文件硬编码 D 盘路径
+import { MAIN_DOC, markedDocOf } from './main-doc.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '..', '..')
@@ -57,32 +60,57 @@ function runScript (file, args = [], extraEnv) {
 }
 
 /**
+ * 解析诊断脚本的机器可读结论行（全角冒号 + 单行 JSON）：
+ *   `诊断结论：{"ok":false,"fields":1,"onlyDoc":["X"],"onlyJson":[],"order":true}`
+ * 拿不到（旧版诊断脚本 / 输出被截断 / JSON 坏了）返回 null —— 调用方回退中文正则，
+ * 但必须在 detail 里写明是回退判定，不能静默。
+ * @param {string} text
+ * @returns {{ok: boolean, fields: number, onlyDoc: string[], onlyJson: string[], order: boolean}|null}
+ */
+function parseDiagConclusion (text) {
+  const m = String(text ?? '').match(/^诊断结论：(\{.*\})$/m)
+  if (!m) return null
+  try {
+    const r = JSON.parse(m[1])
+    return r && typeof r === 'object' ? r : null
+  } catch {
+    return null
+  }
+}
+
+/**
  * 三方一致性校验
  * @param {{docxRoundTripRaw?: string, docxHashBefore?: string|null, html?: {path?: string, bytes?: number, hash?: string, builtWithinRun?: boolean}, name?: string}} ctx
  * @returns {Promise<{ok: boolean, detail: string, checks: object[], failed: string[]}>}
  */
 export async function verifyThreeWay (ctx = {}) {
   const checks = []
-  const docxFile = path.join(root, '原神·角色攻略.docx')
-  const docxCandidates = [ctx.docxPath, 'D:\\文件\\游戏\\原神\\原神·角色攻略.docx', docxFile].filter(Boolean)
+  // 主文档候选：调用方给的最优先，其次 main-doc 的 MAIN_DOC（两者现在同源，去重后通常只有一个）
+  const docxCandidates = [...new Set([ctx.docxPath, MAIN_DOC].filter(Boolean))]
 
   // a. 数据 ↔ 文档（diagnose：不一致角色必须 0）
   const diagScript = path.join(scriptsDir, 'diagnose-docx-json.mjs')
   if (fs.existsSync(diagScript)) {
     // 有冻结快照就用它（并发写 data/gi 时结果稳定）；否则退回实时 data/gi
     const env = ctx.frozenGiDir ? { DSH_GI_DIR: ctx.frozenGiDir } : undefined
-    const r = await runScript(diagScript, [], env)
+    // 必须把文档路径显式传下去：ctx.docxPath 以前只用来算 hash，诊断永远看的是另一份硬编码文件
+    const r = await runScript(diagScript, [ctx.docxPath ?? MAIN_DOC], env)
     const text = `${r.stdout}\n${r.stderr}`
+    // 优先吃结构化结论行；拿不到才回退中文正则
+    const conclusion = parseDiagConclusion(text)
     const m = text.match(/不一致角色：(\d+)\s*个/)
-    const count = m ? Number(m[1]) : null
+    const count = conclusion ? Number(conclusion.fields) : (m ? Number(m[1]) : null)
     const names = [...text.matchAll(/^· (.+)$/gm)].map(x => x[1].trim()).slice(0, 8)
+    const list = (arr) => (Array.isArray(arr) && arr.length ? arr.join('、') : '无')
     checks.push({
       key: 'docx-json',
       name: '数据 ↔ 文档（diagnose-docx-json）',
-      ok: r.code === 0 && count === 0,
-      detail: count === null
-        ? `无法解析诊断输出（退出码 ${r.code}）`
-        : (count === 0 ? '不一致角色 0 个' : `不一致角色 ${count} 个：${names.join('、') || '（详见诊断输出）'}`)
+      ok: conclusion ? (r.code === 0 && conclusion.ok === true) : (r.code === 0 && count === 0),
+      detail: conclusion
+        ? `不一致角色 ${count} 个；只在文档：${list(conclusion.onlyDoc)}；只在 JSON：${list(conclusion.onlyJson)}；顺序${conclusion.order ? '一致' : '不一致'}${count > 0 && names.length ? `（${names.join('、')}）` : ''}`
+        : (count === null
+            ? `无法解析诊断输出（退出码 ${r.code}），也没有「诊断结论：{…}」结构化行`
+            : `回退中文正则（无「诊断结论：{…}」结构化行）：不一致角色 ${count} 个：${names.join('、') || '（详见诊断输出）'}`)
     })
   } else {
     checks.push({ key: 'docx-json', name: '数据 ↔ 文档（diagnose-docx-json）', ok: false, detail: '找不到 scripts/diagnose-docx-json.mjs' })
@@ -150,7 +178,7 @@ export async function verifyThreeWay (ctx = {}) {
   }
 
   // d2. 标记版文档：存在 + 由本次发布刷新 + 往返与 JSON 相等 + 与主文档去标记后逐字一致
-  const markedShipped = ctx.markedDocx?.shippedPath ?? 'D:\\文件\\游戏\\原神\\原神·角色攻略(标记版).docx'
+  const markedShipped = ctx.markedDocx?.shippedPath ?? markedDocOf(MAIN_DOC)
   const markedExists = fs.existsSync(markedShipped)
   const markedHash = markedExists ? sha1File(markedShipped) : null
   const markedFresh = Boolean(ctx.markedDocx?.fresh) && markedExists

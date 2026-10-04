@@ -13,6 +13,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { childRun } from './mark-docx.mjs'
+import { parserDeps } from './lib/parse-isolation.mjs'
+import { MAIN_DOC } from './lib/main-doc.mjs'
 import { ARTIFACT_KIND_LABEL } from './lib/guide-display.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -21,7 +23,7 @@ const giDir = path.join(root, 'data', 'gi')
 const work = path.join(root, '.tmp', 'cmp2')
 const shadow = path.join(work, 'shadow')
 const snapArg = (() => { const i = process.argv.indexOf('--snapshot'); return i >= 0 ? process.argv[i + 1] : null })()
-const docx = 'D:\\文件\\游戏\\原神\\原神·角色攻略.docx'
+const docx = MAIN_DOC
 
 const readJson = (f) => JSON.parse(fs.readFileSync(f, 'utf8').replace(/^\uFEFF/, ''))
 const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b)
@@ -33,7 +35,15 @@ fs.rmSync(shadow, { recursive: true, force: true })
 fs.mkdirSync(path.join(shadow, 'scripts', 'lib'), { recursive: true })
 fs.mkdirSync(path.join(shadow, 'data'), { recursive: true })
 fs.copyFileSync(path.join(here, 'parse-docx.mjs'), path.join(shadow, 'scripts', 'parse-docx.mjs'))
-for (const f of ['docx.mjs', 'schema.mjs']) fs.copyFileSync(path.join(here, 'lib', f), path.join(shadow, 'scripts', 'lib', f))
+// 依赖清单从 parse-docx.mjs 的 import 扫出来：以前手抄 `['docx.mjs', 'schema.mjs']`，
+// 漏了 `lib/parse-warnings.mjs`，干净目录里直接 ERR_MODULE_NOT_FOUND
+for (const rel of parserDeps()) {
+  const src = path.join(here, rel)
+  if (!fs.existsSync(src)) throw new Error(`解析器依赖缺失：scripts/${rel.replace(/^\.\//, '')}（parse-docx.mjs 里 import 了它）`)
+  const dst = path.join(shadow, 'scripts', rel)
+  fs.mkdirSync(path.dirname(dst), { recursive: true })
+  fs.copyFileSync(src, dst)
+}
 fs.copyFileSync(path.join(root, 'data', '_index.json'), path.join(shadow, 'data', '_index.json'))
 const srcGi = path.join(shadow, 'data', 'gi')
 fs.mkdirSync(srcGi, { recursive: true })
