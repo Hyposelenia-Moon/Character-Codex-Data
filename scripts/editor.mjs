@@ -751,46 +751,97 @@ function nameKindInIndex (name, index) {
 }
 
 /**
+ * 一格配队成员的名字 → 候选数组（`莫娜 / 沃雅妮莎` → ['莫娜','沃雅妮莎']）
+ * 口径与 resources/editor/app.js 的 memberCandidates 一致（半角/全角斜杠、两侧空白都认）
+ * @param {string} name
+ * @returns {string[]}
+ */
+function memberCandidates (name) {
+  return String(name ?? '').split(/\s*[/／]\s*/).map(s => s.trim()).filter(Boolean)
+}
+
+/**
+ * 命中项改写后的 ref（与 applyRefHit 写盘 / 回报同一口径）
+ * 配队格的 ref 永远跟随**新的首候选**（app.js 保存时也写 `character:${cands[0]}`）
+ */
+function refOfHit (type, name, candidates, hasRefField) {
+  if (!hasRefField) return `${type}:${name}`
+  const first = type === 'character' ? (asArray(candidates)[0] || name) : name
+  return `${type}:${first}`
+}
+
+/**
  * 扫描全部 data/gi/*.json，列出命中「某个引用名」的位置。
  *
  * 只看 v2 引用（name / ref / 天赋 order / 命座），不看 note、也不看 tags / sections —— 
  * note 是人工备注（如「精5」「二命」），批量替换它只会把文字改坏。
  *
- * 返回项字段：{file,name(角色),section,where,path,line,kind,ref,text,hitId,note}
- *   · path   —— 形如 `v2.weapons.0.items.1`，供 undo 精确定位
- *   · line   —— 段落内第几行（同一条武器/配队行的多个条目共享行号，对应 guide 输出的一行）
- *   · hitId  —— `${file}#${path}`，前端用来高亮
+ * 配队格（type==='character'）按**候选级**匹配：一格的 name 可能是同一格里的多个候选
+ * （`莫娜 / 沃雅妮莎`，ref 只指向第一个候选），所以逐候选精确比较，并把命中的下标带出去。
+ *
+ * 返回项字段：{file,name(角色),section,where,path,line,kind,ref,text,hitId,note,candidates,hitIndex}
+ *   · path       —— 形如 `v2.weapons.0.items.1`，供 undo 精确定位
+ *   · line       —— 段落内第几行（同一条武器/配队行的多个条目共享行号，对应 guide 输出的一行）
+ *   · hitId      —— `${file}#${path}`，前端用来高亮
+ *   · candidates —— 该格的候选数组（非配队格恒为 []）
+ *   · hitIndex   —— 命中的是第几个候选，-1 = 该格没有候选概念
+ *   · newName / newRef —— 只有传了 toName（dry-run 试算）才有：改写后的 name / ref，
+ *                        由 rewriteHitName 算出，与实跑 applyRefHit 的结果一致
+ * @param {string} type
+ * @param {string} fromName
+ * @param {string} [toName] 传了就在每条命中上附上改写预览（dry-run 用）
  * @returns {Array<object>}
  */
-function collectRefHits (type, fromName) {
+function collectRefHits (type, fromName, toName = '') {
     const wanted = String(fromName ?? '').trim()
     if (!wanted) return []
-    const nameOf = (v) => String(v ?? '').trim()
     const out = []
     const push = (name, section, path, line, entry) => {
       const ref = hasText(entry?.ref) ? String(entry.ref).trim() : ''
       const { name: refName } = parseRef(ref)
+      const isObj = typeof entry === 'object' && entry !== null
+      const rawName = isObj ? entry.name : entry
       let hit = false
       if (refName === wanted) hit = true
       // 天赋行 ref 写的是 talent:A，名称相同就算；命座行没有 ref，按 names 匹配
       if (!hit && type === 'character' && ref === `talent:${wanted}`) hit = true
-      if (!hit && type === 'character' && nameOf(entry?.name ?? entry) === wanted) hit = true
+      // 配队格：逐候选精确比较。老写法「整串 name 等于 wanted」既漏掉第 2..n 个候选，
+      // 又会在改写时把没命中的候选一起抹掉，这里不再用整串比较
+      let candidates = []
+      let hitIndex = -1
+      if (type === 'character') {
+        candidates = memberCandidates(rawName)
+        hitIndex = candidates.indexOf(wanted)
+        if (hitIndex >= 0) hit = true
+        // ref 只指向首候选，所以「ref 命中」等价于命中第 0 个候选；
+        // candidates 里找不到 wanted 时（空 name 之类违反「ref = 首候选」的格）退化成单候选，别漏命中
+        else if (refName === wanted) { candidates = [wanted]; hitIndex = 0 }
+      }
       if (!hit) return
-    out.push({
-      file: '',
-      name,
-      section,
-      where: `${section} · ${lineLabel(type, line)}`,
-      path,
-      rowId: rowPathOf(path),
-      line,
-      kind: type,
-      ref: ref || `${type}:${wanted}`,
-      text: itemText(entry),
-      hitId: '',
-      note: hasText(entry?.note) ? String(entry.note).trim() : ''
-    })
-  }
+      const row = {
+        file: '',
+        name,
+        section,
+        where: `${section} · ${lineLabel(type, line)}`,
+        path,
+        rowId: rowPathOf(path),
+        line,
+        kind: type,
+        ref: ref || `${type}:${wanted}`,
+        text: itemText(entry),
+        hitId: '',
+        note: hasText(entry?.note) ? String(entry.note).trim() : '',
+        candidates,
+        hitIndex
+      }
+      // dry-run 试算：预览值走的是与实跑同一个 rewriteHitName，保证「预览 = 实跑」
+      if (toName) {
+        const rw = rewriteHitName(type, rawName, hitIndex, toName)
+        row.newName = rw.name
+        row.newRef = refOfHit(type, rw.name, rw.candidates, isObj && 'ref' in entry)
+      }
+      out.push(row)
+    }
 
   for (const name of listCharacterNames()) {
     let data
@@ -878,32 +929,65 @@ function summarizeHits (hits) {
 }
 
 /**
+ * 命中项改写后的 name（纯函数：applyRefHit 与 dry-run 试算共用，两处结果必然一致）
+ *
+ * 配队格（type==='character'）只换命中的那一个候选：
+ *   `['莫娜','沃雅妮莎']` + hitIndex 0 + to「审核新名」→ `审核新名 / 沃雅妮莎`
+ * 换完去重（新名已在候选里时只留首次出现的那一个，与 app.js 的 joinCandidates 同口径），
+ * 所以 `['莫娜','沃雅妮莎']` + hitIndex 1 + to「莫娜」→ `莫娜`（不会出现 `莫娜 / 莫娜`）。
+ * @param {string} type
+ * @param {string} rawName 条目原样的 name（字符串条目就是它自己）
+ * @param {number} hitIndex 命中的候选下标（-1 = 无候选概念）
+ * @param {string} toName
+ * @returns {{name: string, candidates: string[]}}
+ */
+function rewriteHitName (type, rawName, hitIndex, toName) {
+  if (type === 'talent') return { name: String(toName).toUpperCase(), candidates: [] }
+  if (type !== 'character') return { name: toName, candidates: [] }
+  const cands = memberCandidates(rawName)
+  // 没有候选下标（空 name 之类）：整格当成单个候选，与旧行为一致，别在这里丢数据
+  if (!(hitIndex >= 0 && hitIndex < cands.length)) return { name: toName, candidates: [toName] }
+  cands[hitIndex] = toName
+  const dedup = []
+  for (const c of cands) if (!dedup.includes(c)) dedup.push(c)
+  return { name: dedup.join(' / '), candidates: dedup }
+}
+
+/**
  * 在内存里把一处命中的 name / ref 改成新名字
+ *
+ * 配队格只替换**命中的那一个候选**：其余候选、顺序、note 原样保留，
+ * ref 跟随**新的首候选**（`character:<新首候选>`，与 app.js 保存时的写法同一套不变量）。
+ * @param {object} container 条目所在的数组/对象
+ * @param {string} key 条目在 container 里的键
+ * @param {string} toName 新名字
+ * @param {string} type
+ * @param {number} [hitIndex] 命中的候选下标（来自 collectRefHits，-1 = 无候选概念）
  * @returns {{from: string, oldName: string, oldRef: string, to: string, newRef: string}|null}
  */
-function applyRefHit (container, key, toName, type) {
+function applyRefHit (container, key, toName, type, hitIndex = -1) {
   const entry = container?.[key]
   if (entry == null) return null
   const isObj = typeof entry === 'object'
   const before = String(isObj ? (entry.name ?? '') : entry).trim()
   const oldRef = isObj && hasText(entry.ref) ? String(entry.ref).trim() : ''
+  const rw = rewriteHitName(type, isObj ? entry.name : entry, hitIndex, toName)
 
   if (type === 'talent') {
-    const upper = toName.toUpperCase()
     if (isObj) {
-      entry.name = upper
-      if ('ref' in entry) entry.ref = `talent:${upper}`
+      entry.name = rw.name
+      if ('ref' in entry) entry.ref = `talent:${rw.name}`
     } else {
-      container[key] = upper
+      container[key] = rw.name
     }
   } else if (isObj) {
-    entry.name = toName
-    if ('ref' in entry) entry.ref = `${type}:${toName}`
+    entry.name = rw.name
+    if ('ref' in entry) entry.ref = refOfHit(type, rw.name, rw.candidates, true)
   } else {
-    container[key] = toName
+    container[key] = rw.name
   }
   const after = isObj ? String(entry.name ?? '') : String(container[key])
-  const newRef = isObj && hasText(entry.ref) ? String(entry.ref).trim() : `${type}:${after}`
+  const newRef = isObj && hasText(entry.ref) ? String(entry.ref).trim() : refOfHit(type, after, rw.candidates, false)
   return { from: before, oldName: before, oldRef, to: after, newRef }
 }
 
@@ -961,7 +1045,7 @@ function runBatchReplace ({ type, from, to }) {
       const key = parts.pop()
       let container = data
       for (const p of parts) container = container?.[p]
-      if (applyRefHit(container, key, to, type)) n++
+      if (applyRefHit(container, key, to, type, h.hitIndex)) n++
     }
     if (!n) continue
     data.tags = deriveTags(data)
@@ -1811,7 +1895,8 @@ async function apiBatchReplace (req, res) {
 
   const dry = body?.dry === true
   if (dry) {
-    const hits = collectRefHits(type, from)
+    // 试算也带上 to：每条命中附 newName / newRef，预览值与实跑（applyRefHit）走同一个 rewriteHitName
+    const hits = collectRefHits(type, from, to)
     return sendJson(res, 200, {
       ok: true,
       dry: true,

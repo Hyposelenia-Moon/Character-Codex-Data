@@ -16,6 +16,12 @@
  *   5e. 面板（毕业面板参考）改版：**一行两个控件**（属性下拉 + 数值输入），百分比属性自动补 `%`、
  *      数值不留尾部 `+`；**空模块里新增的行直接就是这两个控件**（用户报：「新增行没按新格式激活」）。
  *   6. 界面上的临时标记（`_new`）**不许落盘**。
+ *   7. 技术审核 P1/P2 回归（见文件末尾第 10 组）：
+ *      #4 切「无需填写」开关不许顺手清掉别的字段的 dirty；
+ *      #5 保存 / 发布的响应在途期间又改了角色，不能被当成「已保存」清掉；
+ *      #7 `beforeunload` 要认**全部**待保存任务，不能只看当前角色。
+ *      这几条都只在「请求还没回来」的窗口里露头，所以用「手动 resolve 的 Promise」控制时序
+ *      （桩里的 setTimeout 是空实现，拿它模拟延迟不会发生任何事）。
  *
  * 用法：node scripts/editor-selftest.mjs        # 全绿则 exit 0
  */
@@ -73,6 +79,20 @@ const ctx = {
   CustomEvent: function () {},
   JSON, Math, Date, String, Number, Array, Object, Boolean, RegExp, Error, Promise,
   encodeURIComponent, decodeURIComponent, parseInt, parseFloat, isNaN
+}
+/**
+ * 全局事件记录器：原来 addEventListener 是 noop，拿不到 boot() 注册的回调，
+ * `beforeunload`（审核 #7）就只能靠肉眼读代码。这里把它换成记录器，
+ * 测试里用 `fireGlobal('beforeunload', e)` 手动触发。
+ */
+const globalHandlers = new Map()
+ctx.addEventListener = (type, h) => {
+  if (!globalHandlers.has(type)) globalHandlers.set(type, [])
+  if (typeof h === 'function') globalHandlers.get(type).push(h)
+}
+const fireGlobal = (type, ev) => {
+  for (const h of globalHandlers.get(type) || []) h(ev)
+  return ev
 }
 ctx.window = ctx
 ctx.globalThis = ctx
@@ -792,6 +812,8 @@ push('配队：候选拆分', fn('memberCandidates')('迪奥娜 / 阿罗夏'), [
   // 没有改动时集合为空（「发布」会按磁盘上的 JSON 发布）
   api.markDirty(false)
   push('全局保存：当前角色不脏时只剩暂存的', api.dirtyJobs().map(j => j.name), ['甲'])
+  // 收尾：把暂存清掉，否则后面的用例会带着这个幽灵待保存项（审核 #5 的用例尤其怕这个）
+  delete api.state.pending['甲']
 }
 
 /* 9. 从图鉴添加新角色（用户定稿 2026-09-26）：缺人判据要认「旅行者 / 奇偶」的多形态，
@@ -804,6 +826,173 @@ push('配队：候选拆分', fn('memberCandidates')('迪奥娜 / 阿罗夏'), [
   push('图鉴缺人：奇偶按家族判', missingAtlasCharacters([{ name: '奇偶·男性' }], ['奇偶·女性']), [])
   push('图鉴缺人：真缺的角色带星级返回',
     missingAtlasCharacters([{ name: '琴' }, { name: '新角色甲', rarity: '五星' }], ['琴']), [{ name: '新角色甲', rarity: '五星' }])
+}
+
+/* 10. 技术审核 P1/P2 回归（#4 开关清 dirty / #5 在途改动被清掉 / #7 刷新不提示）。
+ *
+ *     这几个坑都只在「请求还没回来」的窗口里才露头，所以这里**不用 setTimeout**
+ *     （桩里的 setTimeout 是空实现，延迟根本不会发生），改成把 `ctx.fetch` 换成
+ *     「挂着不 resolve 的 Promise」，由测试决定什么时候把响应放回去 —— 手动控制时序。 */
+{
+  const mkModel = (name, weapon) => ctx.__editor.internals.normalizeData(
+    mkData({ weapons: [{ tier: 1, sep: ' > ', items: [{ name: weapon }] }] }, name))
+  /** 把待保存状态清干净：每个小节的起点必须是「不脏 + 没有暂存项」，否则计数会互相污染 */
+  const resetDirty = () => {
+    api.markDirty(false)
+    for (const k of Object.keys(api.state.pending)) delete api.state.pending[k]
+  }
+  resetDirty()
+  /**
+   * 发出去的 `/api/save` 请求体（按顺序攒着），断言「第二次保存带上了新值」时用它。
+   * 换桩也不清空 —— 索引是全局的，清空反而会错位。
+   */
+  let history = []
+  /**
+   * 把 fetch 换成「手动 resolve」的桩：`pending` 里按顺序放着还没回响应的请求，
+   * 测试用 `next()` 放行下一个。放行时把这次请求体交给 `reply`，
+   * 于是响应 `characters` 的名字集合天然等于「服务端确认写盘的角色」。
+   */
+  const mkStub = (reply) => {
+    const pending = []
+    ctx.fetch = (url, opts) => new Promise((resolve) => {
+      const body = opts && opts.body ? JSON.parse(opts.body) : null
+      if (/\/api\/save$/.test(url)) history.push(body)
+      pending.push({ url: url, body: body, resolve: resolve })
+    })
+    return {
+      count: () => pending.length,
+      next: () => {
+        const p = pending.shift()
+        // `/api/save` 的响应要按**这次发出去的请求体**回名字，所以把 body 交给 reply
+        const data = typeof reply === 'function' ? reply(p.body, p.url) : reply
+        p.resolve({ ok: true, status: 200, text: async () => JSON.stringify(data) })
+      }
+    }
+  }
+  /**
+   * `/api/save` 的响应：按**这次发出去的请求体**回名字（= 服务端确认写盘的角色）。
+   * 顺带被用来回 refreshIndex / refreshList 的 `{}`（它们只读字段，给空对象就行）。
+   */
+  const okReply = (body) => ({
+    ok: true,
+    characters: body && body.characters ? body.characters.map(c => ({ name: c.name, json: '', fields: [] })) : [],
+    issues: []
+  })
+  /**
+   * 驱动一个自己会连着发好几个请求的调用（`save` / `toggleFreeModule` = 写盘 + refreshIndex + refreshList）。
+   * 桩不会自己回响应，所以每转一圈把当前挂起的请求都放行，直到整个 promise 落地。
+   * 注意**不能**先手动 `next()` 再 await：那样写盘的回调会在放行之后才发出刷新请求，
+   * 而刷新请求已经没人放行了，await 就永远等下去。
+   */
+  const drive = async (p, stub) => {
+    let done = false
+    p.then(() => { done = true }, () => { done = true })
+    let n = 0
+    while (!done && n < 50) {
+      while (stub.count()) stub.next()
+      await Promise.resolve()
+      await Promise.resolve()
+      await Promise.resolve()
+      n++
+    }
+    return p
+  }
+
+  /* a. 审核 #4：切「无需填写」开关不许把别的字段的未保存改动一起抹掉 */
+  {
+    api.setModelForTest(mkModel('甲', '西风剑'))
+    api.markDirty(true)
+    const stubA = mkStub(() => ({ ok: true, freeModules: ['teams'] }))
+    await drive(api.toggleFreeModule('teams'), stubA)
+    push('开关（审核#4）：另有改动时切开关不清 dirty', api.dirtyCount(), 1)
+    push('开关（审核#4）：freeModules 已写进模型', api.state.model.freeModules, ['teams'])
+    api.markDirty(false)
+    const stubA2 = mkStub(() => ({ ok: true, freeModules: [] }))
+    await drive(api.toggleFreeModule('teams'), stubA2)
+    push('开关（审核#4）：本来不脏时切开关仍不脏', api.dirtyCount(), 0)
+    push('开关（审核#4）：服务端回的 freeModules 写进模型', api.state.model.freeModules, [])
+  }
+
+  /* b. 审核 #5：save 的响应**延迟返回**，等待期间又改了一个字段 → 不能当成已保存 */
+  {
+    api.setModelForTest(mkModel('甲', '西风剑'))
+    api.markDirty(true)
+    const stubB = mkStub(okReply)
+    const pB = api.save()
+    push('在途改动（审核#5）：save 已发出', stubB.count(), 1)
+    const bodyB1 = history[0]
+    // 响应还没回来，这时用户又改了一个字段
+    api.state.model.v2.weapons[0].items[0].name = '祭礼剑'
+    api.markDirty(true)
+    await drive(pB, stubB)   // 现在才放行响应
+    push('在途改动（审核#5）：响应后仍有 1 个待保存（新改动没被当成已保存）', api.dirtyCount(), 1)
+    push('在途改动（审核#5）：该角色仍在待保存集合里', api.dirtyJobs().map(j => j.name), ['甲'])
+    const stubB2 = mkStub(okReply)
+    const pB2 = api.save()
+    // 用可选链：修复被回退时第二次 save 可能压根没发出去（第一次就把 dirty 清了），
+    // 那时这里要报「用例失败」而不是把整个自检崩掉
+    push('在途改动（审核#5）：第二次 save 的请求体带上了新值',
+      history[1]?.characters?.[0]?.character?.v2?.weapons?.[0]?.items?.[0]?.name, '祭礼剑')
+    push('在途改动（审核#5）：第一次 save 提交的还是旧值（确实是在途期间改的）',
+      bodyB1.characters[0].character.v2.weapons[0].items[0].name, '西风剑')
+    await drive(pB2, stubB2)
+    push('在途改动（审核#5）：没有再改，第二次 save 后清空', api.dirtyCount(), 0)
+  }
+
+  /* c. 审核 #5：save 在途时切走并编辑**另一个**角色 → 甲不能被误清，乙必须留着 */
+  {
+    api.setModelForTest(mkModel('甲', '西风剑'))
+    api.markDirty(true)
+    const stubC = mkStub(okReply)
+    const pC = api.save()                    // 响应挂着不回
+    api.markDirty(true)                      // 在途期间又改了甲
+    api.stashCurrent()                       // 甲带着新版本号进 pending
+    api.setModelForTest(mkModel('乙', '祭礼剑'))
+    api.markDirty(true)
+    await drive(pC, stubC)                   // 响应回来（服务端说甲、乙都写了）
+    push('在途换人（审核#5）：甲（在途被改过）没被误清', api.dirtyJobs().map(j => j.name).sort(), ['乙', '甲'])
+    push('在途换人（审核#5）：当前角色乙仍是脏的', api.state.dirty, true)
+    push('在途换人（审核#5）：计数仍是 2', api.dirtyCount(), 2)
+    api.markDirty(false)
+    delete api.state.pending['甲']
+    delete api.state.pending['乙']
+  }
+
+  /* d. 审核 #7：beforeunload 要认「全部待保存任务」，不能只看当前角色 */
+  {
+    const runUnload = () => {
+      let prevented = false
+      const ev = { preventDefault: () => { prevented = true }, returnValue: '' }
+      fireGlobal('beforeunload', ev)
+      return prevented
+    }
+    api.setModelForTest(mkModel('甲', '西风剑'))
+    api.markDirty(true)
+    api.markDirty(true)
+    api.stashCurrent()          // 甲：改过 → 切走（进 pending）
+    api.setModelForTest(mkModel('乙', '祭礼剑'))
+    api.markDirty(false)        // 乙：干净
+    push('刷新提示（审核#7）：只有暂存的甲 / 当前角色不脏', [api.dirtyCount(), api.state.dirty], [1, false])
+    push('刷新提示（审核#7）：还有待保存 → 拦住刷新', runUnload(), true)
+    api.markDirty(false)
+    delete api.state.pending['甲']
+    delete api.state.pending['乙']
+    push('刷新提示（审核#7）：无待保存 → 不拦', runUnload(), false)
+  }
+
+  /* e. 开关失败分支（有内容 → 服务端拒开）：dirty 与 model 都不许动 */
+  {
+    api.setModelForTest(mkModel('甲', '西风剑'))
+    api.markDirty(true)
+    const before = JSON.parse(JSON.stringify(api.state.model.freeModules))
+    const stubE = mkStub(() => ({ ok: false, reason: 'has-content', detail: '该模块已有内容：先清空再标记' }))
+    await drive(api.toggleFreeModule('teams'), stubE)
+    push('开关失败（审核#4）：dirty 计数不变', api.dirtyCount(), 1)
+    push('开关失败（审核#4）：model.freeModules 不变', JSON.stringify(api.state.model.freeModules), JSON.stringify(before))
+    // 收尾：把状态清干净，免得影响后面的用例（这个桩里没有挂起的请求）
+    api.markDirty(false)
+    delete api.state.pending['甲']
+  }
 }
 
 /* ---------------------------------------------------------------- 汇总 */

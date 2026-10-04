@@ -14,7 +14,7 @@ import { pathToFileURL } from 'node:url'
 import { fileURLToPath } from 'node:url'
 import {
   displayLines, normalizeGuideSections, DISPLAY_SECTIONS, EMPTY_TEXT, WEAPON_REFINE_HINT, FREE_MODULE_HINTS,
-  displayText, displayLabel, constellationNumber, crownItems, isZeroValue, ARTIFACT_KIND_LABEL
+  displayText, displayLabel, constellationNumber, crownItems, isZeroValue, isBlankDisplay, ARTIFACT_KIND_LABEL
 } from './lib/guide-display.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -438,5 +438,98 @@ console.log('\n================ 词条写法 ================')
   const bad = checks.filter(c => !c.ok)
   for (const c of checks) console.log(`${c.ok ? '✓' : '✗'} ${c.what}：${JSON.stringify(c.got)}${c.ok ? '' : `（期望 ${JSON.stringify(c.want)}）`}`)
   console.log(`词条写法断言：${checks.length - bad.length}/${checks.length}${bad.length ? ' ← 有失败' : ' 全通过'}`)
+  if (bad.length) process.exitCode = 1
+}
+
+/* ---------- 纯备注模块的判空（审核 #13） ---------- */
+console.log('\n================ 纯备注模块判空（审核 #13） ================')
+{
+  const { characterSections, renderDisplaySection } = await import(pathToFileURL(path.join(root, 'scripts/build-html.mjs')).href)
+  const checks = []
+  const push = (what, got, want) => checks.push({ what, got, want, ok: JSON.stringify(got) === JSON.stringify(want) })
+  /** 只有 `sections[].lines` 的角色（网页版 / 面板两条链路共用的数据形状） */
+  const mk = sections => ({ schema: 2, name: '自检', game: 'gi', meta: {}, v2: {}, sections })
+  const secOf = (data, kw) => characterSections(data).find(s => s.title === kw) ?? {}
+
+  // ① 天赋「三格全 1」（占位写法）+ 一条备注：旧代码只留下备注行，却按「除备注外无内容」判空
+  //    → 渲染端只看 `empty`，先画「暂无」，留在 `rows` 里的备注行没人画（网页版与纯文本都只有「暂无」）
+  const t111 = secOf(mk([{ title: '3. 天赋加点', lines: ['优先级：A1 E1 Q1', '注：仅使用二命重击玩法'] }]), '天赋')
+  push('天赋 111 + 备注：不判空', t111.empty, false)
+  push('天赋 111 + 备注：备注行仍在 rows 里',
+    (t111.rows ?? []).some(r => r.kind === 'note' && /仅使用二命重击玩法/.test(r.items?.[0]?.text ?? '')), true)
+  push('天赋 111 + 备注：HTML 不画「暂无」', renderDisplaySection(t111, 0, '.').includes(EMPTY_TEXT), false)
+  push('天赋 111 + 备注：纯文本不出现「暂无」', sectionTexts([t111]).join('\n').includes(EMPTY_TEXT), false)
+
+  // ② 同一风险的其它纯备注模块（武器 / 圣遗物 / 命座各一条 `注：…`；配队与面板本来就把备注算内容）
+  const onlyNote = mk([
+    { title: '1. 武器推荐', lines: ['注：武器备注'] },
+    { title: '2. 圣遗物推荐', lines: ['注：圣遗物备注'] },
+    { title: '3. 天赋加点', lines: ['注：天赋备注'] },
+    { title: '5. 命座推荐', lines: ['注：命座备注'] }
+  ])
+  for (const kw of ['武器', '圣遗物', '天赋', '命座']) {
+    const sec = secOf(onlyNote, kw)
+    push(`只有一条「注：」的${kw}段：不判空（不画「暂无」）`, sec.empty, false)
+  }
+
+  // ③ 没有备注行时语义照旧 —— 这两条是防回归锚点：
+  //    没有备注行时 `kept` 与「除备注外的内容」永远相等，所以本次修复对它们**取值完全无影响**
+  push('天赋 111 无备注：照旧不判空（A/E/Q 三格照旧渲染，与修复前一致）',
+    secOf(mk([{ title: '3. 天赋加点', lines: ['优先级：A1 E1 Q1'] }]), '天赋').empty, false)
+  push('天赋段完全没有行：照旧判空 →「暂无」',
+    normalizeGuideSections([{ title: '3. 天赋加点', type: 'rows', rows: [] }]).find(s => s.title === '天赋')?.empty, true)
+
+  const bad = checks.filter(c => !c.ok)
+  for (const c of checks) console.log(`${c.ok ? '✓' : '✗'} ${c.what}：${JSON.stringify(c.got)}${c.ok ? '' : `（期望 ${JSON.stringify(c.want)}）`}`)
+  console.log(`纯备注判空断言：${checks.length - bad.length}/${checks.length}${bad.length ? ' ← 有失败' : ' 全通过'}`)
+  if (bad.length) process.exitCode = 1
+}
+
+/* ---------- guide.md 角色抬头「100级提升」（审核 #12） ---------- */
+console.log('\n================ guide.md 抬头「100级提升」（审核 #12） ================')
+{
+  // build-doc.mjs 顶层会写 guide.md，所以这里只 import 它的导出函数
+  //（该脚本已加「只有直接运行才写盘」的守卫，与 build-docx / build-index 同一写法）
+  const { renderCharacter } = await import(pathToFileURL(path.join(root, 'scripts/build-doc.mjs')).href)
+  const { deriveTags } = await import(pathToFileURL(path.join(root, 'scripts/lib/schema.mjs')).href)
+  const checks = []
+  const push = (what, got, want) => checks.push({ what, got, want, ok: JSON.stringify(got) === JSON.stringify(want) })
+  /** 与 data/gi/*.json 同形状：meta + 可选 highlight + 已落盘的派生 tags */
+  const mkDoc = (meta, highlight) => ({ schema: 2, name: '自检', game: 'gi', meta, highlight, tags: deriveTags({ meta }) })
+  /** 抬头区（第一个空行之前那几行）里那条「100级提升：…」 */
+  const powerLine = data => {
+    const lines = renderCharacter(data)
+    const end = lines.indexOf('')
+    return (end < 0 ? lines : lines.slice(0, end)).find(line => line.startsWith('100级提升：')) ?? ''
+  }
+
+  push('只有 meta（权威字段）→ 回落到派生标签，不再丢这一行', powerLine(mkDoc({ 建议等级: '90级', 定位: '岩系副C', '100级提升': '约 9%' })), '100级提升：约 9%')
+  push('highlight 为空串时同样回落', powerLine(mkDoc({ '100级提升': '约 9%' }, '')), '100级提升：约 9%')
+  push('highlight 有值 → 原样输出它（`（随命座）` 这类括注不丢）',
+    powerLine(mkDoc({ '100级提升': '约 7.2%~7.8%' }, '100级提升：约 7.2%~7.8%（随命座）')), '100级提升：约 7.2%~7.8%（随命座）')
+  push('meta 是占位 `___%` → 不输出这一行', powerLine(mkDoc({ '100级提升': '___%' })), '')
+  push('meta 是 `0%` → 派生层本就不产出该标签，也不输出', powerLine(mkDoc({ '100级提升': '0%' })), '')
+
+  // 真实数据交叉核对：抬头数 = 8 名只填了 meta + 6 名带 highlight；
+  // 且「只有 meta 的那批」抬头必须与 meta 原文**逐字一致**（派生标签只做 stripMarks，不改数值写法）
+  const powered = []
+  const mismatched = []
+  for (const file of fs.readdirSync(giDir)) {
+    if (!file.endsWith('.json') || file.startsWith('_')) continue
+    const data = readJson(path.join(giDir, file))
+    const line = powerLine(data)
+    if (!line) continue
+    powered.push(data.name || file)
+    if (isBlankDisplay(data.highlight ?? '')) {
+      const want = `100级提升：${data.meta?.['100级提升'] ?? ''}`
+      if (line !== want) mismatched.push(`${data.name || file}：${line} ≠ ${want}`)
+    }
+  }
+  push('真实数据：带「100级提升：」抬头的角色数', powered.length, 14)
+  push('真实数据：只有 meta 的那批，抬头与 meta 原文逐字一致', mismatched, [])
+
+  const bad = checks.filter(c => !c.ok)
+  for (const c of checks) console.log(`${c.ok ? '✓' : '✗'} ${c.what}：${JSON.stringify(c.got)}${c.ok ? '' : `（期望 ${JSON.stringify(c.want)}）`}`)
+  console.log(`100级提升抬头断言：${checks.length - bad.length}/${checks.length}${bad.length ? ' ← 有失败' : ' 全通过'}`)
   if (bad.length) process.exitCode = 1
 }

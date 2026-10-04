@@ -1368,8 +1368,16 @@ export function normalizeSection (section) {
       const invested = kept.some(r => r.kind !== 'note' && (r.items ?? []).some(it => Number(it?.level) > 1 || it?.crown === true))
       if (!invested) kept = kept.filter(r => r.kind === 'note')
     }
-    const content = kept.filter(r => r.kind !== 'note')
-    return { ...out, rows: kept, empty: !content.length }
+    // 判空看**留下来的可渲染行**，不把备注行排除在外（审核 #13）。
+    //
+    // 渲染端（`build-html.mjs` 的 renderDisplaySection / 面板模板）都是「先看 `empty`」：
+    // 为真就直接画「暂无」，`rows` 里还有没有东西根本不看。所以按「备注不算内容」判空时，
+    // 上面那条天赋规则刚留下的备注行（以及武器 / 圣遗物 / 命座的纯备注段）会变成
+    // 「`rows` 里有行、屏幕上却是『暂无』」—— 备注被吞掉。
+    //
+    // 与 `applyFreeHints`（`freeModules` 路径）语义对齐：那边同样是保留备注行 + `empty: false`。
+    // 注意「备注不算**内容**」的口径本身没动：上面按 `kind !== 'note'` 判是否投入的规则照旧。
+    return { ...out, rows: kept, empty: !kept.length }
   }
   if (kind === 'list') {
     const items = (section.items ?? [])

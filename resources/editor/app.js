@@ -240,10 +240,16 @@ var state = {
   model: null,
   // 全局保存（用户定稿 2026-09-26）：切走时把**有改动**的角色暂存在这里（不写盘），
   // 「保存 / 发布」一次把当前 + 暂存的全部写下去。
-  pending: {},           // name → { model, issues, issueMap }
+  pending: {},           // name → { model, issues, issueMap, rev }
   issues: [],
   issueMap: {},
   dirty: false,
+  // 编辑版本号（单调递增）：`editSeq` 是全局计数器，当前角色每次 markDirty(true) 都领一个新号；
+  // `currentRev` 是「当前角色正处在哪个版本」。写盘请求返回后要靠它判断
+  // 「这段时间里这个角色又被改过没有」——改过就不能清 dirty（见 confirmSaved）。
+  // `pending[name].rev` 是切走暂存时带走的版本号，两者取最大值即该角色的最新版本（见 revOf）。
+  editSeq: 0,
+  currentRev: 0,
   filter: '',
   view: 'search',        // 全局搜索框下拉里的内容：search | batch | library
   pendingFocus: null,    // 跳转过来要高亮的 rowId
@@ -675,9 +681,63 @@ function fallbackCopy (text) {
 
 function markDirty (on) {
   state.dirty = !!on
+  // 每次「又一次改动」都领一个新的编辑版本号：写盘请求在途时再改，
+  // 返回的响应就不能算数了（confirmSaved 靠版本号比对认出这种情况）。
+  // 注意 markDirty(false) **不重置 currentRev**：重置只能发生在「确认已落盘」或
+  // 「换了另一个角色」时，否则清 dirty 与清版本号会脱节。
+  if (state.dirty) {
+    state.editSeq += 1
+    state.currentRev = state.editSeq
+  }
   renderDirtyBadge()
   // 改动后刷新实时预览（预览面板没开时是空操作）
   if (state.dirty) renderPreviewSoon()
+}
+
+/** 角色当前的编辑版本号；没改过 / 不存在的角色是 0 */
+function revOf (name) {
+  if (!name) return 0
+  var p = state.pending[name]
+  var stashed = p ? (p.rev || 0) : 0
+  var live = (name === state.current && state.dirty) ? (state.currentRev || 0) : 0
+  return Math.max(stashed, live)
+}
+
+/**
+ * 确认「这些角色已经落盘」的唯一出口（保存 / 发布 / 保存并发布共用一个）。
+ *
+ * 三条判据缺一不可：
+ *   ① `writtenNames` 非空且不含该名字 → 服务端这次没写它，待保存留着；
+ *      `writtenNames === null` 表示「拿不到名单」（publish 的三方校验失败分支 JSON 其实已写盘），
+ *      这时只按版本号判。
+ *   ② 该角色现在的版本号 ≠ 提交时的版本号 → 请求在途期间又被改过，不能清，否则用户的新改动
+ *      会从待保存集合里消失（审核 #5 的坑）。
+ *   ③ 都过了才 `delete state.pending[name]`；若它正是当前角色，同时清 `dirty` 与 `currentRev`。
+ * @param {Array<{name: string, rev: number}>} submitted 发请求时的快照（**必须**是快照，不能读现状态）
+ * @param {?Array<string>} writtenNames 服务端确认写盘的角色名；null = 只按版本号判
+ * @returns {number} 这次真正清掉（确认已保存）的角色数
+ */
+function confirmSaved (submitted, writtenNames) {
+  var cleared = 0
+  // 只认「我们提交了、服务端又说写了」的名字：响应里若混进别的名字（服务端多回一条），
+  // 也不能因此连累真正写盘的项清不掉
+  var names = asArray(submitted).map(function (j) { return j && j.name }).filter(Boolean)
+  var written = writtenNames ? names.filter(function (n) { return writtenNames.indexOf(n) >= 0 }) : null
+  asArray(submitted).forEach(function (job) {
+    var name = job && job.name
+    if (!name) return
+    if (written && written.indexOf(name) < 0) return
+    if (revOf(name) !== (job.rev || 0)) return
+    delete state.pending[name]
+    if (name === state.current) {
+      state.dirty = false
+      state.currentRev = 0
+    }
+    cleared++
+  })
+  // 无论清没清干净都要刷一下待保存角标（清不掉的项仍要显示）
+  renderDirtyBadge()
+  return cleared
 }
 
 /** 待保存提示：当前角色 + 切走时暂存下来的角色（全局保存的口径） */
@@ -1778,7 +1838,11 @@ function toggleFreeModule (moduleKey) {
     }
     state.model.freeModules = asArray(res && res.freeModules)
     renderForm()
-    markDirty(false)
+    // 这里**不能**清 dirty：开关改的是 `/api/free-modules` 这个单字段接口（服务端立刻落盘，
+    // 不在保存 body 里，服务端用 prev.freeModules 兜底），和本地的「待保存」根本不是一件事 ——
+    // 原先那句 markDirty(false) 会顺手把**别的字段**的未保存改动一起抹掉
+    // （实测：改了「定位」→ 切一下开关 → 待保存从 1 变 0，而定位并没写盘）。
+    // 开关本身也从不进 dirty 基线：handleAction('toggle-free') 不调 markDirty(true)。
     renderPreviewSoon()   // 预览里那一行自由说明要立刻跟上
     return refreshIndex().then(refreshList).then(function () {
       var label = MODULE_LABEL[moduleKey]
@@ -2502,7 +2566,8 @@ function buildIssueMap (issues) {
 function stashCurrent () {
   if (!state.current || !state.model || !state.dirty) return false
   syncRefInputs()
-  state.pending[state.current] = { model: state.model, issues: state.issues, issueMap: state.issueMap }
+  // 连版本号一起暂存：写盘请求在途时切走的角色，回来也要能认出「提交后又被改过」
+  state.pending[state.current] = { model: state.model, issues: state.issues, issueMap: state.issueMap, rev: state.currentRev || 0 }
   return true
 }
 
@@ -2514,7 +2579,11 @@ function openCharacter (name) {
     state.model = stashed.model
     state.issues = asArray(stashed.issues)
     state.issueMap = stashed.issueMap || buildIssueMap(state.issues)
-    markDirty(true)
+    // 恢复暂存项是**接着原来的版本号往下走**，不是一次新改动：
+    // 走 markDirty(true) 会凭空 +1，让在途的保存响应误判成「又被改过」而清不掉 dirty。
+    state.dirty = true
+    state.currentRev = stashed.rev || 0
+    renderDirtyBadge()
     renderForm()
     renderList()
     renderPreviewSoon()   // 切角色 / 恢复暂存后预览要跟上
@@ -2525,7 +2594,10 @@ function openCharacter (name) {
     state.model = normalizeData(data)
     state.issues = asArray(data.issues)
     state.issueMap = buildIssueMap(state.issues)
-    markDirty(false)
+    // 刚从磁盘读进来 = 干净，版本号归零（同 openCharacter 的暂存分支，不用 markDirty）
+    state.dirty = false
+    state.currentRev = 0
+    renderDirtyBadge()
     renderForm()
     renderList()
     renderPreviewSoon()   // 切角色后预览要跟上
@@ -2542,14 +2614,15 @@ function selectCharacter (name) {
 
 /**
  * 本次要写盘的角色：当前角色（有改动时）+ 切走时暂存下来的。
- * @returns {Array<{name: string, model: object}>}
+ * 每项带上提交时的 `rev`（编辑版本号快照）：响应回来时用它判断「发请求之后又被改过没有」。
+ * @returns {Array<{name: string, model: object, rev: number}>}
  */
 function dirtyJobs () {
   var jobs = []
   Object.keys(state.pending || {}).forEach(function (name) {
-    jobs.push({ name: name, model: state.pending[name].model })
+    jobs.push({ name: name, model: state.pending[name].model, rev: state.pending[name].rev || 0 })
   })
-  if (state.current && state.model && state.dirty) jobs.push({ name: state.current, model: state.model })
+  if (state.current && state.model && state.dirty) jobs.push({ name: state.current, model: state.model, rev: state.currentRev || 0 })
   return jobs
 }
 
@@ -2777,6 +2850,43 @@ function buildBody () {
 }
 
 /**
+ * `/api/save` 响应里 `characters:[{name,json,fields}]` 的角色名清单。
+ * 名字字段缺失时返回 null —— 交给 `confirmSaved` 走「只按版本号判」的老路（不猜服务端写了谁）。
+ * @returns {?Array<string>}
+ */
+function savedNamesOf (characters) {
+  if (!Array.isArray(characters) || !characters.length) return null
+  var names = characters.map(function (c) { return c && c.name })
+  return names.every(Boolean) ? names : null
+}
+
+/**
+ * `/api/publish` 到底把哪些角色的 JSON 写进盘了。
+ *
+ * verify（三方一致性校验）**在 JSON 落盘之后**才跑，`ok:false && step==='verify'` 时
+ * 各角色的 JSON 其实已经写好了 —— 所以这时也按名单清 pending，不能留着让用户白存一次。
+ * 其余失败（`ok:false && step!=='verify'`，比如写盘本身失败）拿不到名单，返回 null。
+ * @returns {?Array<string>}
+ */
+function writtenNamesFor (res) {
+  var names = savedNamesOf(res && res.summary && res.summary.characterChanges)
+  if (names) return names
+  if (res && res.step === 'verify') return submittedNames(res)
+  return null
+}
+
+/** 从响应里捞「服务端回写过 JSON 的角色名」（保存 / 发布两套响应形状都认） */
+function submittedNames (res) {
+  var names = savedNamesOf(res && res.characters)
+  if (names) return names
+  if (Array.isArray(res && res.written)) {
+    var w = res.written.map(function (x) { return typeof x === 'string' ? x : (x && x.name) })
+    return w.every(Boolean) && w.length ? w : null
+  }
+  return null
+}
+
+/**
  * 保存（**全局**，用户定稿 2026-09-26）：把当前角色 + 切走时暂存的其它角色一次写盘。
  * 用法：`POST /api/save { characters: [...] }` → 返回每个角色的字段级变化（改动清单用）。
  */
@@ -2789,25 +2899,30 @@ function save () {
     return Promise.resolve(false)
   }
   showStatus('正在保存 ' + jobs.length + ' 个角色…', '', true)
+  // jobs（含 rev）在发请求**之前**就固定下来：回调里要拿它和「响应回来时的状态」比对，
+  // 不能读现状态 —— 请求在途期间用户可能又改了同一个角色。
+  var submitted = jobs
   return api('POST', '/api/save', { characters: charactersPayload(jobs) }).then(function (res) {
-    var savedNames = jobs.map(function (j) { return j.name })
-    savedNames.forEach(function (n) { delete state.pending[n] })
+    // 服务端逐个角色回写，认它给的名单（拿不到就传 null，只按版本号判）
+    var writtenNames = savedNamesOf(res && res.characters)
+    var cleared = confirmSaved(submitted, writtenNames)
+    var staleCount = dirtyCount()
     state.issues = asArray(res && res.issues).filter(function (i) { return !i.name || i.name === state.current })
     state.issueMap = buildIssueMap(state.issues)
-    markDirty(false)
     // 保存后服务器会自动重建 data/_index.json（重建失败只算警告，不影响保存）
     var idxWarn = (res && res.indexWarning) ? res.indexWarning : ''
     var issueCount = asArray(res && res.issues).length
     return refreshIndex().then(refreshList).then(function () {
-      showChanges(asArray(res && res.characters), savedNames.length + ' 个角色保存成功')
+      showChanges(asArray(res && res.characters), cleared + ' 个角色保存成功')
       renderForm()
       renderPreviewSoon()
-      if (issueCount || idxWarn) {
-        showStatus('保存成功：' + [
-          issueCount ? issueCount + ' 处名称不在图鉴（输入框旁的 ⚠ 可看详情）' : '',
-          idxWarn
-        ].filter(Boolean).join('；'), 'warn', true)
-        toast('保存成功，但有警告', [issueCount ? issueCount + ' 处名称不在图鉴' : '', idxWarn].filter(Boolean), 'warn')
+      // 文案要如实（审核 #5）：提交之后又改的（或服务端没写回的）角色仍在待保存里，不能只说「保存成功」
+      var tail = staleCount ? '（保存期间的新改动仍未保存：还有 ' + staleCount + ' 个角色待保存）' : ''
+      if (issueCount || idxWarn || staleCount) {
+        showStatus('保存成功' + (issueCount ? '：' + issueCount + ' 处名称不在图鉴（输入框旁的 ⚠ 可看详情）' : '') +
+          (idxWarn ? '；' + idxWarn : '') + tail, 'warn', true)
+        toast(staleCount ? '保存成功，但还有未保存的改动' : '保存成功，但有警告',
+          [issueCount ? issueCount + ' 处名称不在图鉴' : '', idxWarn, staleCount ? '还有 ' + staleCount + ' 个角色待保存' : ''].filter(Boolean), 'warn')
       } else {
         showStatus('保存成功', 'ok')
         toast('保存成功')
@@ -2829,8 +2944,11 @@ function publish () {
   syncRefInputs()
   var jobs = dirtyJobs()
   showStatus('发布中…', '', true)
+  // 同 save()：提交快照必须在发请求前固定（响应回来时状态可能已经变了）
+  var submitted = jobs
   return api('POST', '/api/publish', { characters: charactersPayload(jobs) }).then(function (res) {
-    jobs.forEach(function (j) { delete state.pending[j.name] })
+    // 「发布」也顺手写盘，所以同样只能清「服务端确认写了、且提交后没再改」的角色
+    confirmSaved(submitted, writtenNamesFor(res))
     var lines = []
     asArray(res.steps).forEach(function (s) { lines.push((s.ok ? '✓ ' : '✗ ') + s.step + (s.detail ? '：' + s.detail : '')) })
     asArray(res.files).forEach(function (f) { lines.push(f.file + '（' + String(f.mtime).replace('T', ' ').slice(0, 19) + '）') })
@@ -2849,7 +2967,6 @@ function publish () {
       showStatus('发布成功', 'ok')
       showChanges(asArray(res.summary && res.summary.characterChanges), '发布成功')
     }
-    markDirty(false)
     if (state.current) { refreshIndex().then(refreshList).catch(function () {}) }
     return res
   }).catch(function (e) {
@@ -2876,9 +2993,12 @@ function saveAndPublish () {
   syncRefInputs()
   var jobs = dirtyJobs()
   showStatus('保存并发布中…', '', true)
+  // 同 save()：提交快照必须在发请求前固定
+  var submitted = jobs
   return api('POST', '/api/publish', { characters: charactersPayload(jobs), targets: ['html'] }).then(function (res) {
-    jobs.forEach(function (j) { delete state.pending[j.name] })
-    markDirty(false)
+    // 三方校验没过（step==='verify'）时 JSON 其实已写盘，writtenNamesFor 照样能给出名单；
+    // 只有真拿不到名单（写盘本身失败）才退回「只按版本号判」，绝不猜。
+    confirmSaved(submitted, writtenNamesFor(res))
     state.issues = asArray(res.issues)
     return refreshIndex().then(refreshList).then(function () {
       renderForm()
@@ -4073,6 +4193,9 @@ function globalEvents () {
           state.current = null
           state.model = null
           markDirty(false)
+          // 旧名字没了：遗留的待保存项与版本号一并作废，否则它会被当成一个永远清不掉的幽灵角色
+          delete state.pending[from]
+          delete state.pending[to]
           return refreshIndex().then(refreshList).then(function () { return res })
         }).then(function (res) {
           return openCharacter(to).then(function () {
@@ -4103,6 +4226,8 @@ function globalEvents () {
         $('empty').className = 'empty'
         $('current-name').textContent = '未选择角色'
         markDirty(false)
+        // 角色没了：清掉它的待保存项（否则「待保存」角标会一直挂着这个已删除的角色）
+        delete state.pending[name]
         hideStatus()
         return refreshIndex().then(refreshList).then(function () {
           var idxNote = (res && res.indexRefreshed) ? '，索引已刷新' : ''
@@ -4291,7 +4416,9 @@ function globalEvents () {
   window.addEventListener('beforeunload', function (e) {
     // 关页面 / 刷新都先给服务端一个关闭信号：它等 5 秒再退，刷新时新页面的心跳会把它取消
     signalClose(false)
-    if (!state.dirty) return
+    // 判据是**全部**待保存任务，不能只看当前角色：切走的角色留在 pending 里，
+    // 只看 state.dirty 的话「改甲 → 切到乙 → 刷新」不会提示，甲就白改了
+    if (!dirtyCount()) return
     e.preventDefault()
     e.returnValue = ''
   })
@@ -4440,6 +4567,9 @@ window.__editor = {
   stashCurrent: stashCurrent,
   markDirty: markDirty,
   dirtyCount: dirtyCount,
+  revOf: revOf,
+  confirmSaved: confirmSaved,
+  saveAndPublish: saveAndPublish,
   payloadFromModel: payloadFromModel,
   charactersPayload: charactersPayload,
   showChanges: showChanges,

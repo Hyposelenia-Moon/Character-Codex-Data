@@ -100,12 +100,23 @@ function isEmptyCharacter (data) {
  * 唯一例外是**空值/占位符不再输出**（与 `guide.html`、面板同一判空口径），
  * 否则读者会看到 `___级` / `___%` 这类从未填过的占位。
  */
-function renderCharacter (data) {
+export function renderCharacter (data) {
   const lines = []
   const tags = visibleTags(data)
   const level = tags.find(t => t.startsWith('建议等级'))
   const role = tags.find(t => t.startsWith('定位'))
-  const power = isBlankDisplay(data.highlight ?? '') ? '' : plain(data.highlight)
+  // 「100级提升」与 level / role 同源，取的是**同一条派生标签链**（`deriveTags()` 由
+  // `meta['100级提升']` 派生成 `tags` 里 `100级提升：…` 那一项）：
+  //   · 可选字段 `highlight` 有值时**原样输出它的全文**（它是文档词汇，里面可能带
+  //     「（随命座）」这类括注，派生标签里没有，不能被顶掉）；
+  //   · 没填时**回落到派生标签** —— 以前这里只读 `highlight`，于是只填了
+  //     `meta['100级提升']` 的 8 名角色（千织 / 恰斯卡 / 玛拉妮 / 胡桃 / 荒泷一斗 /
+  //     诺艾尔 / 那维莱特 / 阿蕾奇诺）在 guide.md 里整行丢了，
+  //     而 guide.html / 面板渲染的是 `tags`，一直有这一行（审核 #12）。
+  // `meta['100级提升']` 是占位（`___%`）时派生层不产出该标签，这里自然也不输出。
+  const power = isBlankDisplay(data.highlight ?? '')
+    ? (tags.find(t => t.startsWith('100级提升')) ?? '')
+    : plain(data.highlight)
   const empty = isEmptyCharacter(data)
 
   // 抬头：有等级才写 ` —— 建议等级：…`（`——` 对 parse-docx 是可选的，缺等级不影响解析）
@@ -193,32 +204,39 @@ const RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 `
 
 /* ---------- 执行 ---------- */
-const text = buildText()
-fs.writeFileSync(outMd, text, 'utf8')
-console.log(`已生成 ${path.relative(root, outMd)}（${text.split('\n').length} 行）`)
+// 只在**直接运行本脚本**时写文件（与 build-docx.mjs / build-index.mjs 同一写法）：
+// `scripts/display-selftest.mjs` 要 `import { renderCharacter }` 来核对抬头，
+// 而顶层写盘会让「跑一次自检」顺带重写仓库根目录的 guide.md。
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main()
 
-const docxDirFlag = process.argv.indexOf('--docx-dir')
-if (docxDirFlag > -1 && process.argv[docxDirFlag + 1]) {
-  try {
-    const clean = process.argv.includes('--docx-dir-clean')
-    // 危险路径（盘根 / 仓库及其祖先 / 用户主目录）在这里就被拒，后面的写入才有意义
-    const dir = assertSafeOutputDir(process.argv[docxDirFlag + 1], { label: '--docx-dir 输出目录：' })
-    // 本脚本生成的三项；其余都算"目录里原有的内容"，默认原样保留
-    const GENERATED = ['[Content_Types].xml', '_rels', 'word']
-    const foreign = fs.existsSync(dir) ? fs.readdirSync(dir).filter(n => !GENERATED.includes(n)) : []
-    if (clean) fs.rmSync(dir, { recursive: true, force: true })
-    fs.mkdirSync(path.join(dir, '_rels'), { recursive: true })
-    fs.mkdirSync(path.join(dir, 'word'), { recursive: true })
-    const write = (rel, body) => fs.writeFileSync(assertTargetInside(dir, path.join(dir, rel)), body, 'utf8')
-    write('[Content_Types].xml', CONTENT_TYPES)
-    write(path.join('_rels', '.rels'), RELS)
-    write(path.join('word', 'document.xml'), buildDocumentXml(text))
-    console.log(`已生成 OOXML 片段 → ${dir}（打包命令见脚本头部注释，注意用逐个 CreateEntry 的写法）`)
-    if (!clean && foreign.length) {
-      console.log(`保留了目录里原有的 ${foreign.length} 项：${foreign.slice(0, 5).join('、')}${foreign.length > 5 ? '…' : ''}（要清空整个目录请加 --docx-dir-clean）`)
+function main () {
+  const text = buildText()
+  fs.writeFileSync(outMd, text, 'utf8')
+  console.log(`已生成 ${path.relative(root, outMd)}（${text.split('\n').length} 行）`)
+
+  const docxDirFlag = process.argv.indexOf('--docx-dir')
+  if (docxDirFlag > -1 && process.argv[docxDirFlag + 1]) {
+    try {
+      const clean = process.argv.includes('--docx-dir-clean')
+      // 危险路径（盘根 / 仓库及其祖先 / 用户主目录）在这里就被拒，后面的写入才有意义
+      const dir = assertSafeOutputDir(process.argv[docxDirFlag + 1], { label: '--docx-dir 输出目录：' })
+      // 本脚本生成的三项；其余都算"目录里原有的内容"，默认原样保留
+      const GENERATED = ['[Content_Types].xml', '_rels', 'word']
+      const foreign = fs.existsSync(dir) ? fs.readdirSync(dir).filter(n => !GENERATED.includes(n)) : []
+      if (clean) fs.rmSync(dir, { recursive: true, force: true })
+      fs.mkdirSync(path.join(dir, '_rels'), { recursive: true })
+      fs.mkdirSync(path.join(dir, 'word'), { recursive: true })
+      const write = (rel, body) => fs.writeFileSync(assertTargetInside(dir, path.join(dir, rel)), body, 'utf8')
+      write('[Content_Types].xml', CONTENT_TYPES)
+      write(path.join('_rels', '.rels'), RELS)
+      write(path.join('word', 'document.xml'), buildDocumentXml(text))
+      console.log(`已生成 OOXML 片段 → ${dir}（打包命令见脚本头部注释，注意用逐个 CreateEntry 的写法）`)
+      if (!clean && foreign.length) {
+        console.log(`保留了目录里原有的 ${foreign.length} 项：${foreign.slice(0, 5).join('、')}${foreign.length > 5 ? '…' : ''}（要清空整个目录请加 --docx-dir-clean）`)
+      }
+    } catch (err) {
+      console.error(`× ${err.message}`)
+      process.exitCode = 1
     }
-  } catch (err) {
-    console.error(`× ${err.message}`)
-    process.exitCode = 1
   }
 }

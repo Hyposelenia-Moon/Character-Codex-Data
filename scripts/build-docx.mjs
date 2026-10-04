@@ -249,6 +249,8 @@ export function loadDocxCharacters () {
  * ------------------------------------------------------------------ */
 
 const PARA_RE = /<w:p\b[^>]*\/>|<w:p\b[^>]*>[\s\S]*?<\/w:p>/g
+/** 节属性块：`<w:sectPr>…</w:sectPr>`（页面尺寸 / 页边距 / 分栏 / 文档网格都在里面） */
+const SECTPR_RE = /<w:sectPr\b[\s\S]*?<\/w:sectPr>|<w:sectPr\b[^>]*\/>/
 
 /**
  * 把模板里的段落拆成「头部（<w:p …> + 段属性）」「尾部（</w:p>）」，
@@ -262,6 +264,17 @@ function paraShell (chunk) {
   return { open: '<w:p>', pPr: m ? m[0] : '', close: '</w:p>' }
 }
 
+/**
+ * 从段落属性（w:pPr）里抠出节属性块（`<w:sectPr>…</w:sectPr>`），没有则返回空串。
+ * 写法 B（sectPr 嵌在某一节的最后一段的 w:pPr 里）靠它抢救。
+ * @param {string} pPr 段落属性 XML（可为空）
+ * @returns {string}
+ */
+function sectPrOf (pPr) {
+  const m = pPr ? pPr.match(SECTPR_RE) : null
+  return m ? m[0] : ''
+}
+
 /** 文本 → `<w:r><w:t xml:space="preserve">…</w:t></w:r>`（空格与首尾空白原样保留） */
 function runXml (text) {
   if (text === '') return ''
@@ -270,26 +283,68 @@ function runXml (text) {
 
 /**
  * 用新的段落文本序列重建 word/document.xml
- *  - 段落数 == 文本行数（模板段落数不同时，多出的用最后一段的段属性补、少的截断）
+ *  - 段落数 == 文本行数（模板段落数不同时，多出的用第一段的段属性补、少的截断）
  *  - 除段落属性外不保留模板的 run 结构：文本被整体重排，旧 run 已无意义
+ *  - **保留模板的正文级节属性（w:sectPr）**：页面尺寸 / 页边距 / 分栏 / 文档网格
+ *    两种写法都要照顾（审核 #11）：
+ *      写法 A（Word 常规）：`<w:sectPr>` 直接挂在 body 末尾（最后一个段落之后）；
+ *      写法 B：`<w:sectPr>` 嵌在某一节的最后一段的 `<w:pPr>` 里。
+ *    旧实现只取 `</w:body>` 之后的内容，把「最后一个段落 → `</w:body>`」之间整段丢掉，
+ *    于是写法 A 的 sectPr 全丢；写法 B 只在「那个段的 shell 恰好被用到」时才偶然幸存，
+ *    而常规运行是「模板 3700 段 → 产物只有数据行数」，末尾的 shell 永远用不到 → 同样丢。
  * @param {string} xml 模板 document.xml
  * @param {string[]} lines 新段落文本
- * @returns {{xml: string, templateParas: number}}
+ * @returns {{xml: string, templateParas: number, contentTail: string, appendedSectPr: string}}
  */
 export function rebuildDocumentXml (xml, lines) {
-  const chunks = xml.match(PARA_RE) ?? []
-  const shells = chunks.map(paraShell)
-  const first = shells[0] ?? { open: '<w:p>', pPr: '', close: '</w:p>' }
+  // 1) 逐段拿「段落块 + 它在 xml 里的位置」：PARA_RE 也匹配自闭合段 `<w:p/>`，
+  //    所以不能靠 `</w:p>` 反查位置（自闭合段没有闭合标签），只能用 matchAll 的 index。
+  //    这里克隆一份正则，避免共享正则的 lastIndex 状态影响结果。
+  const re = new RegExp(PARA_RE.source, PARA_RE.flags)
+  const chunks = [...xml.matchAll(re)]
+  if (!chunks.length) throw new Error('document.xml 里找不到任何段落（<w:p>）：模板不合法，拒绝重建')
   const bodyEnd = xml.lastIndexOf('</w:body>')
-  if (bodyEnd < 0) throw new Error('document.xml 缺少 </w:body>')
-  const head = xml.slice(0, xml.search(PARA_RE))
+  if (bodyEnd < 0) throw new Error('document.xml 缺少 </w:body>：模板不合法，拒绝重建')
+
+  const shells = chunks.map(m => paraShell(m[0]))
+  const first = shells[0]
+  const last = chunks[chunks.length - 1]
+  const lastEnd = last.index + last[0].length
+  if (lastEnd > bodyEnd) throw new Error('document.xml 的段落出现在 </w:body> 之后：模板不合法，拒绝重建')
+
+  // 2) 头部 = 第一个段落之前的内容（xml 声明、w:document / w:body 开标签…）
+  const head = xml.slice(0, chunks[0].index)
+  // 3) 正文末尾 = 最后一个段落结束 → </w:body> 之间的**原样**内容：
+  //    写法 A 的正文级 sectPr（w:pgSz / w:pgMar / w:cols / w:docGrid）就在这里，必须原样带走。
+  const contentTail = xml.slice(lastEnd, bodyEnd)
   const tail = xml.slice(bodyEnd)
-  // 段落之间是否夹着 sectPr 等非段落内容：直接丢弃（模板里段落是连续的）
+
+  // 4) 段落序列照旧：数量 == 文本行数，段落属性沿用模板对应段的 shell
   const parts = lines.map((text, i) => {
     const shell = shells[i] ?? first
     return `${shell.open}${shell.pPr}${runXml(text)}${shell.close}`
   })
-  return { xml: head + parts.join('') + tail, templateParas: chunks.length }
+
+  // 5) 写法 B 兜底：模板段数多于文本行数时，被截断的那些 shell 根本用不到，
+  //    嵌在它们 w:pPr 里的 sectPr 会跟着一起丢 —— 提取出来作为**正文级** sectPr 落到正文末尾
+  //    （Word 语义等价：body 级 sectPr 就是末节的节属性）。只取文档顺序上最后一个：
+  //    body 级 sectPr 按 schema 至多一个，最后一个才代表末节。
+  let appendedSectPr = ''
+  if (lines.length < shells.length) {
+    for (const shell of shells.slice(lines.length)) {
+      const s = sectPrOf(shell.pPr)
+      if (s) appendedSectPr = s
+    }
+  }
+  // 正文末尾本来就带着正文级 sectPr（写法 A）时不再追加，避免 body 里出现两个 sectPr
+  if (appendedSectPr && SECTPR_RE.test(contentTail)) appendedSectPr = ''
+
+  return {
+    xml: head + parts.join('') + contentTail + appendedSectPr + tail,
+    templateParas: chunks.length,
+    contentTail,
+    appendedSectPr
+  }
 }
 
 /* ------------------------------------------------------------------ *
@@ -716,7 +771,7 @@ async function main () {
 
   console.log(`zip：${written.count} 个部件（store ${written.stored.length} / deflate ${written.deflated.length}），${written.bytes} 字节`)
   console.log(`必需部件：${missing.length ? '缺失 ' + missing.join(',') : '齐全'}；其它部件${changedOthers.length ? '有改动 ' + changedOthers.join(',') : '与模板逐字节一致'}`)
-  console.log(`段落数：产物 ${rt.paragraphs}（模板 ${r.paragraphs}）`)
+  console.log(`段落数：产物 ${rt.paragraphs.length}（模板 ${r.paragraphs}）`)
   console.log(`备份：${backup ?? (writesMain ? '（目标不存在，未备份）' : '（非主文档，无需备份）')}`)
   console.log(`写出：${args.out}`)
   console.log(`主文档 sha1：${sha1File(args.out)}`)
